@@ -532,6 +532,8 @@ const framesOfHosts = (page) => page.frames().filter(f => /\/exec\.html/.test(f.
   ok(resc.imgs === 0 && resc.pwn === 0 && ro.indexOf('<img src=x onerror=window.__pwn=8>') > -1, 'R cell (Isolated): hostile output is shown as text and runs nothing', JSON.stringify(resc));
   await rRun('plot(1)');
   ok(await page.evaluate(() => !!document.querySelector('#rpane img[src*="base64,QUJD"]')), 'R cell (Isolated): a plot from the host is shown');
+  await rRun('plot_unreadable(1)'); ro = await rOut();
+  ok(/R plot not read: EIO simulated/.test(ro) && !/Completed with no output/.test(ro), 'R cell (Isolated): a plot that cannot be read is reported in the cell, not swallowed as "no output"', ro.slice(0, 160));
   await rRun('stop("boom")'); ro = await rOut();
   ok(/boom/.test(ro), 'R cell (Isolated): an R error is shown', ro.slice(0, 160));
   await rRun('warning_out(1)'); ro = await rOut();

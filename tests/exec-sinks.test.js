@@ -98,6 +98,16 @@ t('every webR captureR call turns captureGraphics off, so plots go to the png de
     assert.ok(re.test(src), f + ': its captureR options must include captureGraphics: false');
   }
 });
+t('a plot that cannot be read is reported in the cell, in the host and in the app (it used to be swallowed as "no output")', () => {
+  const hostAll = read('../runner/exec.js'), app = read('js/notebook/notebook-kernels.js');
+  const a = hostAll.indexOf('async function runR('), b = hostAll.indexOf('// ---- dispatch');
+  assert.ok(a > 0 && b > a);
+  const host = hostAll.slice(a, b);    // the R function only (the Python plot catch above it is a different, deliberate one)
+  assert.ok(!/catch \(e\) \{ \/\* no plots \*\/ \}/.test(host), 'the host must not swallow a plot read error');
+  assert.ok(/out\(id, 'stderr', '\[R plot not read: '/.test(host));
+  assert.ok(/errorText \+= '\[R plot not read: '/.test(app));
+  assert.ok(/is empty\]/.test(host) && /is empty\]/.test(app), 'an empty plot file is reported too');
+});
 
 console.log('what the screens say');
 t('Settings > Security: each isolation dropdown names its own surface (the Notebooks row once said "Terminal")', () => {

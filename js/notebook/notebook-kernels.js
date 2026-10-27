@@ -1195,6 +1195,7 @@ async function runCell(cell, pane) {
                             const fileData = await webr.FS.readFile(tmpFolder + '/' + f);
                             let binary = '';
                             const bytes = new Uint8Array(fileData);
+                            if (!bytes.byteLength) { errorText += '[R plot not read: ' + f + ' is empty]\n'; await webr.FS.unlink(tmpFolder + '/' + f); continue; }
                             for (let i = 0; i < bytes.byteLength; i++) {
                                 binary += String.fromCharCode(bytes[i]);
                             }
@@ -1202,7 +1203,10 @@ async function runCell(cell, pane) {
                             await webr.FS.unlink(tmpFolder + '/' + f);
                         }
                     }
-                } catch(e) { console.error("R Plot Capture Error:", e); }
+                } catch(e) {
+                    console.error("R Plot Capture Error:", e);
+                    errorText += '[R plot not read: ' + ((e && e.message) || String(e)) + ']\n';   // shown in the cell: there is no console on a phone
+                }
             }
 
         } else if (useHost) {

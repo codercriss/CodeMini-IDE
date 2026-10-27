@@ -10,7 +10,7 @@ export class WebR {
     this.FS = {
       mkdir: async () => {},
       readdir: async (dir) => ['.', '..'].concat(Object.keys(files).filter((f) => f.indexOf(dir + '/') === 0).map((f) => f.slice(dir.length + 1))),
-      readFile: async (p) => files[p],
+      readFile: async (p) => { if (this.failRead) { this.failRead = false; throw new Error('EIO simulated'); } return files[p]; },
       unlink: async (p) => { delete files[p]; },
     };
     const self = this;
@@ -32,6 +32,7 @@ export class WebR {
             if (m[1] in scope) output.push({ type: 'stdout', data: '[1] ' + scope[m[1]] });
             else throw new Error("object '" + m[1] + "' not found");
           } else if (/^plot\(/.test(line)) files[(self.pngBase || '/tmp/none_') + '001.png'] = new Uint8Array([65, 66, 67]);
+          else if (/^plot_unreadable\(/.test(line)) { files[(self.pngBase || '/tmp/none_') + '001.png'] = new Uint8Array([65, 66, 67]); self.failRead = true; }
           else if (/^warning_out\(/.test(line)) output.push({ type: 'stderr', data: 'Warning message: careful' });
           else if ((m = /^stop\("(.*)"\)$/.exec(line))) throw new Error(m[1]);
         }
