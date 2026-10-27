@@ -2,7 +2,7 @@
 
 An offline-first, installable IDE that runs entirely in your browser. No backend, no account, no build step.
 
-**[Try it live](https://the-code-mini-ide.vercel.app/)** (open it in Chrome, Edge or Safari and use the browser's install option to add it as an app)
+**[Try it live](https://codemini-ide.vercel.app/)** (open it in Chrome, Edge or Safari and use the browser's install option to add it as an app)
 
 Your files live on your device (IndexedDB). Install it as a PWA and it keeps working without a connection once its assets are cached.
 
@@ -27,7 +27,7 @@ Your files live on your device (IndexedDB). Install it as a PWA and it keeps wor
 CodeMini is static files, but it must be served over HTTP(S) (a service worker does not run from `file://`).
 
 ```bash
-git clone https://github.com/CodeMiniCommunity/codemini-ide.git
+git clone https://github.com/CoderCriss/codemini-ide.git
 cd codemini-ide
 npm start          # serves on http://localhost:3000
 ```
@@ -171,7 +171,7 @@ This needs internet access (Monaco and the icon font come from CDNs; the script 
 
 ## Deploying
 
-The reference deployment runs on Vercel at https://the-code-mini-ide.vercel.app/. Any static host works. The repository includes a `vercel.json` that serves `sw.js` with `no-cache` so updates reach users promptly.
+The reference deployment runs on Vercel at https://codemini-ide.vercel.app/. Any static host works. The repository includes a `vercel.json` that serves `sw.js` with `no-cache` so updates reach users promptly.
 Serve the site from the **root of a domain** (or adapt the absolute `/sw.js`, `/icons/...`, `id`, `scope` and `start_url` paths in `index.html`, `js/core/pwa.js`, `sw.js` and `manifest.json`).
 
 ## Privacy
@@ -184,7 +184,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Security issues: see [SECURITY.md](SECUR
 
 ## Credits
 
-Created and maintained by [The CodeMini Community](https://github.com/CodeMiniCommunity). Lead developer: [Christian Forson](https://github.com/CoderCriss).
+Created and maintained by [Christian Forson](https://github.com/CoderCriss).
 
 ## License
 

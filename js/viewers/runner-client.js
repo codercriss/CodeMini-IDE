@@ -19,7 +19,7 @@
 // never be the app's own origin.
 (function () {
     'use strict';
-    var DEFAULT_URL = 'https://the-code-mini-runner.vercel.app';
+    var DEFAULT_URL = 'https://codemini-runner.vercel.app';
     // HANDSHAKE_MS bounds the whole attempt; LOAD_GRACE_MS is how long after the frame fires `load` we still wait for
     // the runner's announcement (a healthy runner sends it before load; an unreachable host loads an error page at once).
     var HANDSHAKE_MS = 6000, LOAD_GRACE_MS = 1200, RPC_MS = 30000, RETRY_AFTER_MS = 60000;

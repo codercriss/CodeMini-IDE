@@ -4,6 +4,12 @@ The app currently reports itself as v1.3.2 (Settings > About / Updates).
 
 ## Unreleased
 
+### Project move
+- **The repository moves from the CodeMini Community organization to Christian Forson's own account** (`https://github.com/CoderCriss/codemini-ide`), and the community is no longer named anywhere: the copyright line (`LICENSE`, `THIRD_PARTY_NOTICES.md`, `js/core/app-info.js`, Settings > About), the README credits, `package.json` (repository, bugs, homepage) and `CONTRIBUTING.md`.
+- **New addresses:** the app is `https://codemini-ide.vercel.app` and the preview runner `https://codemini-runner.vercel.app` (they were `the-code-mini-ide` and `the-code-mini-runner`). The runner's allowlist (`runner/config.js` `allowedParents`), its `frame-ancestors` header (`runner/vercel.json`), the app's `DEFAULT_URL` (`js/viewers/runner-client.js`), the live link in About, the unit tests and the docs all use them. **The two projects must be redeployed together**: the new runner accepts only the new app address, and the new app talks only to the new runner. An app still served from the old address finds the runner refusing it and falls back to Normal mode (amber shield).
+- **Data does not move with the address.** The browser keeps files, settings, the GitHub token record and the My Keys vault per address (origin), so an installed app at the old address and the one at the new address are separate apps. Export from the old one first (see `docs/HANDOVER.md` section 9).
+- The entries below that mention the old addresses are the record of what was released and are left as written.
+
 ### Fixed
 - **Settings > Security > Notebooks: the dropdown's tooltips said "Always isolate the Terminal" and "Never isolate the Terminal"** (copied from the row above). They now say notebooks. The Console row also says that the editor's Run button, the bottom Console's input field and the editor's Debug follow its setting, which was true since 3a but not written anywhere in the app.
 - **My Keys > Config told you that code you run in previews, notebooks and the terminal always shares the app's page, and so can reach an unlocked vault.** With Isolation on (the default) that is no longer true. It now says that this is the case in Normal mode or after a fallback (the shield turns amber), and that Isolated mode keeps that code on a separate origin.

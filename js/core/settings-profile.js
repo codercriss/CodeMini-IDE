@@ -1255,7 +1255,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <li style="margin-bottom: 6px;"><strong>Virtual Filesystem:</strong> A robust IndexedDB-backed file structure supporting full hierarchy, permission emulation, and file locking.</li>
             </ul>
             <div style="margin-top: 35px; text-align: center; color: var(--text-muted); font-size: 12px; border-top: 1px solid var(--border-color); padding-top: 15px;">
-              &copy; 2026 ${_info.copyright || 'The CodeMini Community'}. Released under the ${_info.license || 'MIT'} License.<br><br>
+              &copy; 2026 ${_info.copyright || 'Christian Forson'}. Released under the ${_info.license || 'MIT'} License.<br><br>
               <div style="display: flex; flex-wrap: wrap; justify-content: center; row-gap: 8px;">
                 <a href="${_L('license')}" target="_blank" rel="noopener noreferrer" style="color: var(--accent-blue); text-decoration: none; margin: 0 10px; white-space: nowrap;">License</a>
                 <a href="${_L('privacy')}" target="_blank" rel="noopener noreferrer" style="color: var(--accent-blue); text-decoration: none; margin: 0 10px; white-space: nowrap;">Privacy Policy</a>

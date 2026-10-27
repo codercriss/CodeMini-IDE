@@ -6,7 +6,7 @@ const root = path.join(__dirname, '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 let n = 0;
 const t = async (name, fn) => { await fn(); n++; console.log('  ok', name); };
-const IDE = 'https://the-code-mini-ide.vercel.app', RUNNER = 'https://the-code-mini-runner.vercel.app', NONCE = 'c'.repeat(32);
+const IDE = 'https://codemini-ide.vercel.app', RUNNER = 'https://codemini-runner.vercel.app', NONCE = 'c'.repeat(32);
 const tick = () => new Promise((r) => setImmediate(r));
 // Poll in real time (counting event-loop turns is not a clock: a 30 ms timer can outlast thousands of them).
 const until = async (cond) => { const end = Date.now() + 4000; while (Date.now() < end && !cond()) await new Promise((r) => setTimeout(r, 2)); };
@@ -16,7 +16,7 @@ function host() {
   const parent = { postMessage: (m, o) => toApp.push({ m, o }) };
   const win = { parent, addEventListener: (type, fn) => { if (type === 'message') handlers.push(fn); }, prompt: () => '' };
   const sandboxConsole = { log() {}, info() {}, warn() {}, error() {} };
-  const ctx = vm.createContext({ window: win, document: { createElement() { return {}; }, head: { appendChild() {} } }, location: { origin: RUNNER, hostname: 'the-code-mini-runner.vercel.app', ancestorOrigins: [IDE] },
+  const ctx = vm.createContext({ window: win, document: { createElement() { return {}; }, head: { appendChild() {} } }, location: { origin: RUNNER, hostname: 'codemini-runner.vercel.app', ancestorOrigins: [IDE] },
     console: sandboxConsole, setTimeout, clearTimeout, JSON, Object, Array, Promise, Error, TypeError, Math, String, Number, Date, parseInt });
   vm.runInContext(read('runner/config.js'), ctx);
   vm.runInContext(read('runner/exec.js'), ctx);

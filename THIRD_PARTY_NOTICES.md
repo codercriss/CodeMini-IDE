@@ -1,6 +1,6 @@
 # Third-party notices
 
-CodeMini, Copyright (c) 2026 Christian Forson and The CodeMini Community, is MIT licensed (see `LICENSE`). It does not bundle third-party code in this repository;
+CodeMini, Copyright (c) 2026 Christian Forson, is MIT licensed (see `LICENSE`). It does not bundle third-party code in this repository;
 the libraries below are loaded at runtime from public CDNs and cached by the service worker for offline use.
 Each remains under its own license. Check each project for the exact license of the version you deploy.
 

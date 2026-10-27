@@ -6,7 +6,7 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 let n = 0;
 const t = async (name, fn) => { await fn(); n++; console.log('  ok', name); };
 
-const IDE = 'https://the-code-mini-ide.vercel.app', RUNNER = 'https://the-code-mini-runner.vercel.app';
+const IDE = 'https://codemini-ide.vercel.app', RUNNER = 'https://codemini-runner.vercel.app';
 const NONCE = 'a'.repeat(32);
 
 // ---- the shell, on a fake window ----
@@ -18,7 +18,7 @@ function shell(opts) {
   // A frame that behaves like a real one: after `src` is set it shows that address (unless the test blocks it).
   const writes = [];
   // like a browser, document.open() makes the document adopt the address of the script that called it (the shell's)
-  pageWin.document = { documentElement: {}, readyState: 'complete', open() { writes.push('open'); pageWin.location.href = 'https://the-code-mini-runner.vercel.app/shell.html'; }, write(h) { writes.push(h); }, close() { writes.push('close'); } }; pageWin.location = { href: 'about:blank', protocol: 'about:' };
+  pageWin.document = { documentElement: {}, readyState: 'complete', open() { writes.push('open'); pageWin.location.href = 'https://codemini-runner.vercel.app/shell.html'; }, write(h) { writes.push(h); }, close() { writes.push('close'); } }; pageWin.location = { href: 'about:blank', protocol: 'about:' };
   // mode: 'ok' commits the page at once; 'late' keeps showing the old blank frame until commit() (WebKit fires the old
   // frame's load first); 'blocked' never shows the page; 'foreign' turns the frame cross-origin.
   const page = { contentWindow: pageWin, onload: null, _src: '', mode: 'ok',
@@ -32,7 +32,7 @@ function shell(opts) {
   const clock = { t: 1000 }, timers = [];
   const made = new Set(); let seq = 0;
   const win = { parent: host, addEventListener: (type, fn) => { if (type === 'message') handlers.push(fn); } };
-  const hostname = opts.hostname || 'the-code-mini-runner.vercel.app';
+  const hostname = opts.hostname || 'codemini-runner.vercel.app';
   win.CM_RUNNER_CONFIG = undefined;
   const ctx = vm.createContext({
     window: win, document: { getElementById: () => page },
@@ -204,7 +204,7 @@ const hello = (s, origin, nonce) => s.send(s.host, origin || IDE, { cmRunner: 1,
     if (opts.settings) win.getIsolationSettings = () => opts.settings;
     const ctx = vm.createContext({
       window: win, document: { getElementById: () => iframe },
-      location: { origin: opts.origin || IDE, hostname: opts.hostname || 'the-code-mini-ide.vercel.app' },
+      location: { origin: opts.origin || IDE, hostname: opts.hostname || 'codemini-ide.vercel.app' },
       localStorage: { getItem: (k) => (k in ls ? ls[k] : null) }, URL, CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init && init.detail; } },
       MessageEvent: class {}, crypto: require('crypto').webcrypto, Uint8Array, Array, Object, Map, WeakMap, Date, Promise, Error, setTimeout, clearTimeout
     });
@@ -212,7 +212,7 @@ const hello = (s, origin, nonce) => s.send(s.host, origin || IDE, { cmRunner: 1,
     return { R: win.CodeMiniRunner, iframe, events, ctx };
   }
   await t('refuses a runner on the app\'s own origin (it would give no isolation), and reports "unavailable"', async () => {
-    const c = client({ origin: RUNNER, hostname: 'the-code-mini-runner.vercel.app' });
+    const c = client({ origin: RUNNER, hostname: 'codemini-runner.vercel.app' });
     assert.strictEqual(await c.R.ensure(c.iframe), false); assert.strictEqual(c.R.status(), 'unavailable');
   });
   await t('can be switched off, and then does not touch the frame', async () => {
