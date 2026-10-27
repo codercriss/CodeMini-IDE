@@ -82,6 +82,23 @@ t('every in-app branch of the editor Run and Debug sits behind the host check', 
   assert.ok(dbg > 0 && dbg < src.indexOf('await (new AsyncFunction(debugCode))()'));
 });
 
+console.log('R plots');
+t('every webR captureR call turns captureGraphics off, so plots go to the png device and not to webR\'s canvas device', () => {
+  // Real phone result (iOS, 2026-10-27): with the default, `plot(1:10)` through the host ended in "(Completed with no output)" and the same
+  // call in the app reloaded the page. The png file is what the app reads, so the canvas device must not be opened.
+  // Each site: file, how many captureR calls it has, and a pattern for the options object that call really uses (a comment cannot satisfy it).
+  const sites = [
+    ['../runner/exec.js', 1, /var capOpts = \{[^}]*captureGraphics:\s*false[^}]*\}/],
+    ['js/notebook/notebook-kernels.js', 1, /captureR\(execCode,\s*\{[^}]*captureGraphics:\s*false/],
+    ['js/notebook/notebook-ui.js', 1, /captureR\(code,\s*\{[^}]*captureGraphics:\s*false/],
+  ];
+  for (const [f, calls, re] of sites) {
+    const src = read(f);
+    assert.strictEqual((src.match(/\.captureR\(/g) || []).length, calls, f + ': the number of captureR calls changed, review each one');
+    assert.ok(re.test(src), f + ': its captureR options must include captureGraphics: false');
+  }
+});
+
 console.log('what the screens say');
 t('Settings > Security: each isolation dropdown names its own surface (the Notebooks row once said "Terminal")', () => {
   const lines = read('js/core/settings-profile.js').split('\n');

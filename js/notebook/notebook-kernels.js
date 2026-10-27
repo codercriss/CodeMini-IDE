@@ -1176,6 +1176,7 @@ async function runCell(cell, pane) {
                     withAutoprint: true,
                     captureStreams: true,
                     captureConditions: false,
+                    captureGraphics: false,   // the png device above gets the plot; webR's canvas device would take it otherwise (and has reloaded iOS)
                     env: rEnv
                 });
                 

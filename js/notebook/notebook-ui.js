@@ -1417,7 +1417,7 @@ json.dumps({
                         }, error = function(e) {})
                     `);
                     
-                    const capture = await shelter.captureR(code, { withAutoprint: true, captureStreams: true, captureConditions: false });
+                    const capture = await shelter.captureR(code, { withAutoprint: true, captureStreams: true, captureConditions: false, captureGraphics: false });
                     
                     out.innerHTML = ''; 
                     
