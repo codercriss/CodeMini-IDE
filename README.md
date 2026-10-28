@@ -27,8 +27,8 @@ Your files live on your device (IndexedDB). Install it as a PWA and it keeps wor
 CodeMini is static files, but it must be served over HTTP(S) (a service worker does not run from `file://`).
 
 ```bash
-git clone https://github.com/CoderCriss/codemini-ide.git
-cd codemini-ide
+git clone https://github.com/codercriss/CodeMini-IDE.git
+cd CodeMini-IDE
 npm start          # serves on http://localhost:3000
 ```
 
@@ -78,6 +78,7 @@ Each surface follows the global mode unless you override it (Use global, Isolate
     ├── html-sinks.test.js  Shared escaper, the HTML-sink scanner and its per-file ratchet (new unescaped interpolations fail CI)
     ├── hardening.test.js   Referrer policy, third-party script rules, noopener, CI permissions, the SRI tool (offline)
     ├── git-token.test.js   Where the GitHub token lives: device-key encryption, migrations, fallbacks, lost key, reloads (tests/lib/fake-idb.js)
+    ├── git-push.test.js    Push as one real push: plan (incremental, full, squash, merges), commit messages and order, deletions, binary files, empty repositories, failures leaving GitHub untouched, the unpushed count; against a fake GitHub that is strict about what the Git Data API accepts
     ├── my-keys.test.js     My Keys record format, password rules, validation and wiring checks
     ├── file-lock.test.js   Locked files and folders: locks, encrypted text, legacy upgrade, wiring checks
     ├── app-info.test.js    Keeps version, links and About page consistent with the repo
@@ -184,7 +185,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Security issues: see [SECURITY.md](SECUR
 
 ## Credits
 
-Created and maintained by [Christian Forson](https://github.com/CoderCriss).
+Created and maintained by [Christian Forson](https://github.com/codercriss).
 
 ## License
 

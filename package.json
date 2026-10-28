@@ -7,10 +7,10 @@
   "author": "Christian Forson <codercriss@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/CoderCriss/codemini-ide.git"
+    "url": "git+https://github.com/codercriss/CodeMini-IDE.git"
   },
   "bugs": {
-    "url": "https://github.com/CoderCriss/codemini-ide/issues"
+    "url": "https://github.com/codercriss/CodeMini-IDE/issues"
   },
   "homepage": "https://codemini-ide.vercel.app/",
   "scripts": {

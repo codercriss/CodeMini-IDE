@@ -2,7 +2,15 @@
 // are opened, CI permissions, and the SRI tool (tested offline with made-up hashes; it needs network for real ones).
 const fs = require('fs'), path = require('path'), assert = require('assert');
 const root = path.join(__dirname, '..');
-const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
+// A missing file whose name starts with a dot gets a plain explanation: the iOS Files app hides those, so they are the ones that go missing
+// when a repository is uploaded from a phone (this is what kept CI red on 2026-10-28, with only "ENOENT" to go on).
+const read = (p) => {
+  try { return fs.readFileSync(path.join(root, p), 'utf8'); }
+  catch (e) {
+    if (e && e.code === 'ENOENT' && /(^|\/)\./.test(p)) e.message = p + ' is missing from the repository. Files and folders that start with a dot are hidden in the iOS Files app, so they are easy to leave out when uploading: create it in the GitHub web editor (Add file > Create new file, type the name with its folder). ' + e.message;
+    throw e;
+  }
+};
 let n = 0;
 const t = async (name, fn) => { await fn(); n++; console.log('  ok', name); };
 const { findExternal, applyIntegrity } = require('../scripts/sri.js');

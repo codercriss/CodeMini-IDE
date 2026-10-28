@@ -5,8 +5,8 @@ Thanks for your interest in CodeMini.
 ## Setup
 
 ```bash
-git clone https://github.com/CoderCriss/codemini-ide.git
-cd codemini-ide
+git clone https://github.com/codercriss/CodeMini-IDE.git
+cd CodeMini-IDE
 npm start      # http://localhost:3000
 npm test
 npm install && npx playwright install chromium   # only needed for e2e

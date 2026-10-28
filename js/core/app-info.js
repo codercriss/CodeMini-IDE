@@ -5,7 +5,7 @@
 // and help-feedback.js. Keep `version` in sync with package.json and CACHE_NAME in sw.js;
 // tests/app-info.test.js fails if the repository links or version drift apart.
 (function () {
-    const REPO = 'https://github.com/CoderCriss/codemini-ide';
+    const REPO = 'https://github.com/codercriss/CodeMini-IDE';
     window.APP_INFO = Object.freeze({
         name: 'CodeMini IDE',
         version: '1.3.2',
