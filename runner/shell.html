@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>CodeMini runner</title>
+<style>
+  html, body { margin: 0; height: 100%; background: transparent; }
+  iframe { border: 0; width: 100%; height: 100%; display: block; }
+</style>
+<script src="config.js"></script>
+</head>
+<body>
+<!-- The page being previewed goes in here. Same sandbox flags as the app's own preview frame, no more. -->
+<iframe id="page" sandbox="allow-scripts allow-same-origin allow-modals allow-popups allow-forms" title="Preview"></iframe>
+<script src="shell.js"></script>
+</body>
+</html>

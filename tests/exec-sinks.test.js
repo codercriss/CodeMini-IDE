@@ -12,6 +12,9 @@
 const fs = require('fs'), path = require('path'), assert = require('assert');
 const root = path.join(__dirname, '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
+// Where the runner is: inside the repo as runner/ (how it sits on GitHub) or next to the app folder (the zip layout). A test that only looks
+// in one place passes on one machine and fails in CI (this one did, 2026-10-28).
+const RUNNER_EXEC = (fs.existsSync(path.join(root, 'runner', 'exec.js')) ? 'runner' : '../runner') + '/exec.js';
 let n = 0;
 const t = (name, fn) => { fn(); n++; console.log('  ok', name); };
 
@@ -88,7 +91,7 @@ t('every webR captureR call turns captureGraphics off, so plots go to the png de
   // call in the app reloaded the page. The png file is what the app reads, so the canvas device must not be opened.
   // Each site: file, how many captureR calls it has, and a pattern for the options object that call really uses (a comment cannot satisfy it).
   const sites = [
-    ['../runner/exec.js', 1, /var capOpts = \{[^}]*captureGraphics:\s*false[^}]*\}/],
+    [RUNNER_EXEC, 1, /var capOpts = \{[^}]*captureGraphics:\s*false[^}]*\}/],
     ['js/notebook/notebook-kernels.js', 1, /captureR\(execCode,\s*\{[^}]*captureGraphics:\s*false/],
     ['js/notebook/notebook-ui.js', 1, /captureR\(code,\s*\{[^}]*captureGraphics:\s*false/],
   ];
@@ -99,7 +102,7 @@ t('every webR captureR call turns captureGraphics off, so plots go to the png de
   }
 });
 t('a plot that cannot be read is reported in the cell, in the host and in the app (it used to be swallowed as "no output")', () => {
-  const hostAll = read('../runner/exec.js'), app = read('js/notebook/notebook-kernels.js');
+  const hostAll = read(RUNNER_EXEC), app = read('js/notebook/notebook-kernels.js');
   const a = hostAll.indexOf('async function runR('), b = hostAll.indexOf('// ---- dispatch');
   assert.ok(a > 0 && b > a);
   const host = hostAll.slice(a, b);    // the R function only (the Python plot catch above it is a different, deliberate one)
@@ -109,14 +112,14 @@ t('a plot that cannot be read is reported in the cell, in the host and in the ap
   assert.ok(/is empty\]/.test(host) && /is empty\]/.test(app), 'an empty plot file is reported too');
 });
 t('nothing calls webR\'s FS.readdir (it does not exist: "w.FS.readdir is not a function" on a phone), and the stand-in webR does not invent it', () => {
-  const files = walk('js', []).concat(['../runner/exec.js']);
+  const files = walk('js', []).concat([RUNNER_EXEC]);
   for (const f of files) {
     const code = read(f).split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
     assert.ok(!/\bFS\.readdir\s*\(/.test(code), f + ' calls FS.readdir');
   }
   const fake = read('tests/e2e/lib/fake-webr.mjs').split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
   assert.ok(!/readdir\s*:/.test(fake), 'the fake webR must not define FS.readdir');
-  for (const f of ['js/notebook/notebook-kernels.js', '../runner/exec.js']) assert.ok(/list\.files\(/.test(read(f)), f + ' must list files through R');
+  for (const f of ['js/notebook/notebook-kernels.js', RUNNER_EXEC]) assert.ok(/list\.files\(/.test(read(f)), f + ' must list files through R');
 });
 
 console.log('what the screens say');
