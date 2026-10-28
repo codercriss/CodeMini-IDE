@@ -1436,7 +1436,7 @@ json.dumps({
                     await webr.evalRVoid(`tryCatch(dev.off(), error=function(e) NULL)`);
                     
                     try {
-                        const files = await webr.FS.readdir('/tmp/');
+                        const files = await window._rListFiles(webr, '/tmp', '^webr_sp_plot_.*[.]png$');
                         for (let f of files) {
                             if (f.startsWith('webr_sp_plot_') && f.endsWith('.png')) {
                                 const fileData = await webr.FS.readFile('/tmp/' + f);
@@ -1452,7 +1452,13 @@ json.dumps({
                                 await webr.FS.unlink('/tmp/' + f);
                             }
                         }
-                    } catch(e) { console.error("Scratchpad R Plot Error:", e); }
+                    } catch(e) {
+                        console.error("Scratchpad R Plot Error:", e);
+                        const note = document.createElement('div');
+                        note.style.color = 'var(--color-danger)';
+                        note.textContent = '[R plot not read: ' + ((e && e.message) || String(e)) + ']';
+                        out.appendChild(note);
+                    }
                 }
             } else {
                 out.innerHTML = `<span style="color:var(--icon-yellow);">Scratchpad execution for ${kernelType} is currently limited.</span>`;

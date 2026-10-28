@@ -9,11 +9,19 @@ export class WebR {
     this.pngBase = null;
     this.FS = {
       mkdir: async () => {},
-      readdir: async (dir) => ['.', '..'].concat(Object.keys(files).filter((f) => f.indexOf(dir + '/') === 0).map((f) => f.slice(dir.length + 1))),
+      // No readdir on purpose: the real webR FS has none, and a stand-in that has one let code using it pass every test (phone, 2026-10-27).
       readFile: async (p) => { if (this.failRead) { this.failRead = false; throw new Error('EIO simulated'); } return files[p]; },
       unlink: async (p) => { delete files[p]; },
     };
     const self = this;
+    // Real-webR shaped listing: list.files("dir", pattern = "regex") answered from the fake file table.
+    const listFiles = (code) => {
+      const m = /^list\.files\("([^"]*)", pattern = "([^"]*)"\)$/.exec(code);
+      if (!m) throw new Error('fake webR: unsupported R code: ' + code);
+      const re = new RegExp(m[2]);
+      return Object.keys(files).filter((f) => f.indexOf(m[1] + '/') === 0).map((f) => f.slice(m[1].length + 1)).filter((n) => re.test(n));
+    };
+    this.evalRRaw = async (code, type) => { if (type !== 'string[]') throw new Error('fake webR: unsupported type ' + type); return listFiles(code); };
     this.REnvironment = class {
       constructor() { window.__rEnvCount = (window.__rEnvCount || 0) + 1; this.vars = {}; }
       destroy() { window.__rEnvDestroyed = (window.__rEnvDestroyed || 0) + 1; }

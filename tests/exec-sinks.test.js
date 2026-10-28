@@ -21,7 +21,7 @@ const SINKS = [
 ];
 const PINNED = {
   'js/core/editor.js': 16,
-  'js/notebook/notebook-kernels.js': 15,
+  'js/notebook/notebook-kernels.js': 16,   // +1: webr.evalR(list.files(...)) in _rListFiles, a fixed file listing (reviewed 2026-10-27)
   'js/notebook/notebook-ui.js': 5,
   'js/terminal/console.js': 10,
   'js/terminal/terminal-commands.js': 8,
@@ -107,6 +107,16 @@ t('a plot that cannot be read is reported in the cell, in the host and in the ap
   assert.ok(/out\(id, 'stderr', '\[R plot not read: '/.test(host));
   assert.ok(/errorText \+= '\[R plot not read: '/.test(app));
   assert.ok(/is empty\]/.test(host) && /is empty\]/.test(app), 'an empty plot file is reported too');
+});
+t('nothing calls webR\'s FS.readdir (it does not exist: "w.FS.readdir is not a function" on a phone), and the stand-in webR does not invent it', () => {
+  const files = walk('js', []).concat(['../runner/exec.js']);
+  for (const f of files) {
+    const code = read(f).split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
+    assert.ok(!/\bFS\.readdir\s*\(/.test(code), f + ' calls FS.readdir');
+  }
+  const fake = read('tests/e2e/lib/fake-webr.mjs').split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
+  assert.ok(!/readdir\s*:/.test(fake), 'the fake webR must not define FS.readdir');
+  for (const f of ['js/notebook/notebook-kernels.js', '../runner/exec.js']) assert.ok(/list\.files\(/.test(read(f)), f + ' must list files through R');
 });
 
 console.log('what the screens say');

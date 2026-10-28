@@ -525,6 +525,16 @@ sys.stderr = io.StringIO()
     });
 };
 
+// List files by asking R. webR's FS object has no readdir (a phone run on 2026-10-27 showed "w.FS.readdir is not a function"), and the
+// code that used it was swallowing that error, so R plots never came back. `regex` is an R regular expression, written without backslashes.
+window._rListFiles = async function(webr, dir, regex) {
+    const code = 'list.files("' + dir + '", pattern = "' + regex + '")';
+    if (typeof webr.evalRRaw === 'function') return (await webr.evalRRaw(code, 'string[]')) || [];
+    const o = await webr.evalR(code);
+    try { return ((await o.toArray()) || []).filter(function(x) { return typeof x === 'string'; }); }
+    finally { try { await webr.destroy(o); } catch (e) { /* nothing to free */ } }
+};
+
 window.getWebRInstance = async function() {
     const winId = _getWinId();
     const pane = document.querySelector('.editor-group.active-group .content-pane.active') || document.querySelector('.content-pane.active');
@@ -1164,7 +1174,7 @@ async function runCell(cell, pane) {
             
             try {
                 try {
-                    const oldFiles = await webr.FS.readdir(tmpFolder);
+                    const oldFiles = await window._rListFiles(webr, tmpFolder, '^webr_plot_');
                     for(let f of oldFiles) {
                         if(f.startsWith('webr_plot_')) await webr.FS.unlink(tmpFolder + '/' + f);
                     }
@@ -1189,7 +1199,7 @@ async function runCell(cell, pane) {
                 await webr.evalRVoid(`tryCatch(dev.off(), error=function(e) NULL)`);
                 
                 try {
-                    const files = await webr.FS.readdir(tmpFolder);
+                    const files = await window._rListFiles(webr, tmpFolder, '^webr_plot_.*[.]png$');
                     for (let f of files) {
                         if (f.startsWith('webr_plot_') && f.endsWith('.png')) {
                             const fileData = await webr.FS.readFile(tmpFolder + '/' + f);

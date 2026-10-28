@@ -59,8 +59,8 @@ const FAKE_SQLJS = [
 const FAKE_WEBR = require('fs').readFileSync(path.join(__dirname, 'lib', 'fake-webr.mjs'), 'utf8');
 const FAKE_PHP = `export class PhpWeb extends EventTarget { async run(code) { if (/trigger_error/.test(code)) { this.dispatchEvent(new CustomEvent('error', { detail: 'PHP Fatal: boom' })); return; } const m = code.match(/echo "(.*?)";/); if (m) this.dispatchEvent(new CustomEvent('output', { detail: m[1] })); } }`;
 
-async function open(browser, runnerUrl, extraLs, stubs) {
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+async function open(browser, runnerUrl, extraLs, stubs, ctxOptions) {
+  const ctx = await browser.newContext(Object.assign({ viewport: { width: 1280, height: 800 } }, ctxOptions || {}));
   const page = await ctx.newPage();
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   await page.addInitScript(([runnerUrl, extraLs]) => {
@@ -554,6 +554,25 @@ const framesOfHosts = (page) => page.frames().filter(f => /\/exec\.html/.test(f.
   await page.evaluate(() => window.saveSetting('isolationNotebooks', 'Normal')); await page.evaluate(() => { window.__rInApp = 0; });
   await rRun('cat("normal")'); ro = await rOut();
   ok((await page.evaluate(() => window.__rInApp)) >= 1 && (await hostJs('String(window.__webrCount || 0)')) === '1' && !/(^|\n)normal(\n|$)/.test(ro), 'R cell (Normal mode): the in-app webR is used, as before', ro.slice(0, 160));
+  await ctx.close();
+
+  console.log('\n[Notebook R cells in Normal mode: the in-app webR (here the stand-in), plots included]');
+  // This path once called FS.readdir, which real webR does not have: on a phone every plot ended in "no output" and nothing said why.
+  // The app's service worker would answer the in-app import of webR itself, and the test routes do not see a service worker's requests: block it here.
+  ({ ctx, page, errors } = await open(browser, RUNNER, null, undefined, { serviceWorkers: 'block' }));
+  await page.evaluate(() => {
+    const pane = document.createElement('div'); pane.id = 'rpane'; pane.className = 'content-pane active'; pane.innerHTML = window.getNotebookHTML('r');
+    document.body.appendChild(pane); window.cellMonacoEditors = window.cellMonacoEditors || {};
+    window.saveSetting('isolationNotebooks', 'Normal');
+  });
+  const rShow = () => page.evaluate(() => { const w = document.querySelector('#rpane .cell-output-wrapper'); return { img: !!(w && w.querySelector('img[src*="base64,QUJD"]')), text: w ? w.innerText : '' }; });
+  await rRun('plot(1)', 3500); let nr = await rShow();
+  ok(nr.img && !/R plot not read/.test(nr.text), 'R cell (Normal mode): the plot comes back, through the file listing', JSON.stringify(nr).slice(0, 200));
+  await rRun('plot_unreadable(1)', 3000); nr = await rShow();
+  ok(/R plot not read: EIO simulated/.test(nr.text) && !/Completed with no output/.test(nr.text), 'R cell (Normal mode): a plot that cannot be read is reported in the cell, not swallowed', JSON.stringify(nr).slice(0, 200));
+  await page.evaluate(() => { const pane = document.getElementById('rpane'); window.__spCode = 'cat("sp normal")\nplot(1)'; pane._spEditor = { getValue: () => window.__spCode }; pane.querySelector('.sp-run').click(); }); await sleep(3000);
+  const nsp = await page.evaluate(() => { const o = document.querySelector('#rpane .sp-output'); return { text: o.innerText, img: !!o.querySelector('img[src*="base64,QUJD"]') }; });
+  ok(/sp normal/.test(nsp.text) && nsp.img && !/R plot not read/.test(nsp.text), 'R scratchpad (Normal mode): the plot comes back, through the file listing', JSON.stringify(nsp).slice(0, 200));
   await ctx.close();
 
   console.log('\n[an older runner that does not know SQL]');
