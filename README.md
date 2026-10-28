@@ -79,6 +79,7 @@ Each surface follows the global mode unless you override it (Use global, Isolate
     ├── hardening.test.js   Referrer policy, third-party script rules, noopener, CI permissions, the SRI tool (offline)
     ├── git-token.test.js   Where the GitHub token lives: device-key encryption, migrations, fallbacks, lost key, reloads (tests/lib/fake-idb.js)
     ├── git-push.test.js    Push as one real push: plan (incremental, full, squash, merges), commit messages and order, deletions, binary files, empty repositories, failures leaving GitHub untouched, the unpushed count; against a fake GitHub that is strict about what the Git Data API accepts
+    ├── paths.test.js       The helper every test uses to find the runner (inside the app folder or beside it) and to report a missing hidden file plainly (tests/lib/paths.js)
     ├── my-keys.test.js     My Keys record format, password rules, validation and wiring checks
     ├── file-lock.test.js   Locked files and folders: locks, encrypted text, legacy upgrade, wiring checks
     ├── app-info.test.js    Keeps version, links and About page consistent with the repo

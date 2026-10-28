@@ -2,8 +2,9 @@
 // runs for real (in a vm); Python, PHP and Ruby need their CDN engines, so those are covered with stand-in engines in
 // tests/e2e/runner-exec.e2e.js, and the real engines were not available in the sandbox this was built in.
 const vm = require('vm'), fs = require('fs'), path = require('path'), assert = require('assert');
-const root = path.join(__dirname, '..');
-const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
+const paths = require('./lib/paths');   // where the runner is is worked out there, once
+const root = paths.ROOT;
+const read = paths.read;
 let n = 0;
 const t = async (name, fn) => { await fn(); n++; console.log('  ok', name); };
 const IDE = 'https://codemini-ide.vercel.app', RUNNER = 'https://codemini-runner.vercel.app', NONCE = 'c'.repeat(32);
@@ -131,7 +132,7 @@ function host() {
     assert.ok(at > -1 && at < src.indexOf('if (d.error) { p.reject(new Error(d.error)); return; }'), 'exec-done is resolved BEFORE the generic error check');
   });
   await t('exec.js is on the runner, shipped with the page, and the app loads exec-client after the runner client', () => {
-    assert.ok(fs.existsSync(path.join(root, 'runner/exec.html')) && fs.existsSync(path.join(root, 'runner/exec.js')));
+    assert.ok(paths.exists('runner/exec.html') && paths.exists('runner/exec.js'));
     const html = read('index.html'); assert.ok(html.indexOf('js/viewers/runner-client.js') < html.indexOf('js/viewers/exec-client.js') && html.indexOf('js/viewers/exec-client.js') < html.indexOf('js/viewers/preview.js'));
     assert.ok(read('sw.js').includes("'/js/viewers/exec-client.js'"));
   });

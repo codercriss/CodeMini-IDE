@@ -47,18 +47,18 @@ const innerFrame = (page) => page.frames().find(f => f.parentFrame() && /shell\.
 const previewFrame = (page, origin) => page.frames().find(f => f.url().startsWith('blob:' + origin + '/'));
 
 (async () => {
-  const runnerServer = createServer(path.resolve(__dirname, '..', '..', 'runner'), { headers: { 'Content-Security-Policy': "frame-ancestors 'self' http://localhost:8765 http://127.0.0.1:8765" } });
+  const runnerServer = createServer(require('../lib/paths').runnerDir(), { headers: { 'Content-Security-Policy': "frame-ancestors 'self' http://localhost:8765 http://127.0.0.1:8765" } });
   await new Promise(r => runnerServer.listen(8766, r));
   const strangerServer = http.createServer((req, res) => { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end('<iframe id="r" src="http://localhost:8766/shell.html" style="width:300px;height:200px"></iframe>'); });
   await new Promise(r => strangerServer.listen(8769, r));
   // A runner whose inner page never loads: its shell shows about:blank instead of the page (the blank preview seen on a phone).
   const fs = require('fs');
-  const brokenServer = createServer(path.resolve(__dirname, '..', '..', 'runner'));
+  const brokenServer = createServer(require('../lib/paths').runnerDir());
   const baseHandler = brokenServer.listeners('request')[0];
   brokenServer.removeAllListeners('request');
   brokenServer.on('request', (req, res) => {
     if (req.url.split('?')[0] === '/shell.js') {
-      const src = fs.readFileSync(path.resolve(__dirname, '..', '..', 'runner', 'shell.js'), 'utf8').replace('page.src = url;', "page.src = 'about:blank';");
+      const src = fs.readFileSync(require('../lib/paths').resolve('runner/shell.js'), 'utf8').replace('page.src = url;', "page.src = 'about:blank';");
       res.writeHead(200, { 'Content-Type': 'application/javascript' }); res.end(src);
     } else baseHandler(req, res);
   });

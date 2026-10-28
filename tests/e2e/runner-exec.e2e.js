@@ -94,7 +94,7 @@ async function openConsole(page, language) {
 const framesOfHosts = (page) => page.frames().filter(f => /\/exec\.html/.test(f.url()));
 
 (async () => {
-  const runnerServer = createServer(path.resolve(__dirname, '..', '..', 'runner'), { headers: { 'Content-Security-Policy': "frame-ancestors 'self' http://localhost:8765 http://127.0.0.1:8765" } });
+  const runnerServer = createServer(require('../lib/paths').runnerDir(), { headers: { 'Content-Security-Policy': "frame-ancestors 'self' http://localhost:8765 http://127.0.0.1:8765" } });
   await new Promise(r => runnerServer.listen(8766, r));
   const browser = await chromium.launch({ args: ['--no-sandbox'] });
 
@@ -578,7 +578,7 @@ const framesOfHosts = (page) => page.frames().filter(f => /\/exec\.html/.test(f.
   console.log('\n[an older runner that does not know SQL]');
   // Simulated by serving the runner's own exec.js with the sql language removed: the app and the runner deploy separately.
   ({ ctx, page, errors } = await open(browser, RUNNER));
-  const oldExec = require('fs').readFileSync(path.resolve(__dirname, '..', '..', 'runner', 'exec.js'), 'utf8').replace('ruby: 1, sql: 1, r: 1 }', 'ruby: 1 }');
+  const oldExec = require('fs').readFileSync(require('../lib/paths').resolve('runner/exec.js'), 'utf8').replace('ruby: 1, sql: 1, r: 1 }', 'ruby: 1 }');
   ok(oldExec.indexOf('sql: 1') === -1 && oldExec.indexOf(' r: 1') === -1, 'the simulated older runner really has neither the sql nor the r language');
   await page.route(RUNNER + '/exec.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: oldExec }));
   await page.evaluate(() => {
@@ -608,7 +608,7 @@ const framesOfHosts = (page) => page.frames().filter(f => /\/exec\.html/.test(f.
   await ctx.close();
 
   console.log('\n[a missing exec.html does not switch preview isolation off]');
-  const half = createServer(path.resolve(__dirname, '..', '..', 'runner'), { headers: { 'Content-Security-Policy': "frame-ancestors 'self' http://localhost:8765 http://127.0.0.1:8765" } });
+  const half = createServer(require('../lib/paths').runnerDir(), { headers: { 'Content-Security-Policy': "frame-ancestors 'self' http://localhost:8765 http://127.0.0.1:8765" } });
   const baseHandler = half.listeners('request')[0]; half.removeAllListeners('request');
   half.on('request', (req, res) => { if (req.url.split('?')[0].startsWith('/exec.')) { res.writeHead(404); res.end('missing'); } else baseHandler(req, res); });
   await new Promise(r => half.listen(8770, r));

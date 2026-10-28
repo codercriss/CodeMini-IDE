@@ -10,11 +10,10 @@
 // a way to run user code in the app's origin while Isolation is on? Then update PINNED and PHASE3.md section 10.
 // (Nothing needs to run in a browser.)
 const fs = require('fs'), path = require('path'), assert = require('assert');
-const root = path.join(__dirname, '..');
-const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
-// Where the runner is: inside the repo as runner/ (how it sits on GitHub) or next to the app folder (the zip layout). A test that only looks
-// in one place passes on one machine and fails in CI (this one did, 2026-10-28).
-const RUNNER_EXEC = (fs.existsSync(path.join(root, 'runner', 'exec.js')) ? 'runner' : '../runner') + '/exec.js';
+const paths = require('./lib/paths');   // the runner is found inside the repo or beside the app folder, there, once
+const root = paths.ROOT;
+const read = paths.read;
+const RUNNER_EXEC = 'runner/exec.js';
 let n = 0;
 const t = (name, fn) => { fn(); n++; console.log('  ok', name); };
 

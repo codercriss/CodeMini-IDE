@@ -1,16 +1,9 @@
 // The runner shell (runner/shell.js) and the client (js/viewers/runner-client.js) driven against fake windows.
 // The real-browser version, with two origins, is tests/e2e/runner.e2e.js.
 const vm = require('vm'), fs = require('fs'), path = require('path'), assert = require('assert');
-const root = path.join(__dirname, '..');
-// A missing file whose name starts with a dot gets a plain explanation: the iOS Files app hides those, so they are the ones that go missing
-// when a repository is uploaded from a phone (this is what kept CI red on 2026-10-28, with only "ENOENT" to go on).
-const read = (p) => {
-  try { return fs.readFileSync(path.join(root, p), 'utf8'); }
-  catch (e) {
-    if (e && e.code === 'ENOENT' && /(^|\/)\./.test(p)) e.message = p + ' is missing from the repository. Files and folders that start with a dot are hidden in the iOS Files app, so they are easy to leave out when uploading: create it in the GitHub web editor (Add file > Create new file, type the name with its folder). ' + e.message;
-    throw e;
-  }
-};
+const paths = require('./lib/paths');   // where the runner and the hidden files are is worked out there, once
+const root = paths.ROOT;
+const read = paths.read;
 let n = 0;
 const t = async (name, fn) => { await fn(); n++; console.log('  ok', name); };
 
