@@ -1,0 +1,12 @@
+# Keeps the GitHub Actions used in CI, and the dev dependency (Playwright), up to date.
+# Pinning actions to commit SHAs is a separate one-off step (see SECURITY.md); once pinned, Dependabot keeps them current.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
