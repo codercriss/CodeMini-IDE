@@ -1651,7 +1651,7 @@ function gitBranchExists(repo, name) {
 //
 // Tags are local-only for now: pushing them to GitHub would mean writing to
 // refs/tags/* via the Git Data API, a distinct action from this app's
-// existing per-file Contents-API push (`git push --tags` is genuinely its
+// existing branch push (`git push --tags` is genuinely its
 // own command in real git too) - flagged as a deliberate scope boundary for
 // this pass rather than silently half-implemented.
 //
@@ -3063,12 +3063,10 @@ async function gitLoadBranches(full, force) {
 // One record per dbName+branch (a repo can track different remote branches
 // depending on what's configured in the Remote tab): { branchSha, message,
 // fetchedAt }. branchSha is the tip of refs/heads/<branch> on the remote as
-// of the last fetch/push/pull - NOT a claim that this app made one atomic
-// commit there (push here still writes one GitHub commit per file, see
-// Tier 4 gap #21 elsewhere on this list; branchSha is simply whatever the
-// branch ref pointed to right after the last push finished, fetched fresh
-// via one extra request rather than assumed from the last file's own commit
-// sha, which would be wrong if the push loop had failed partway through).
+// of the last fetch/push/pull. It is a GitHub commit id: it never exists in the
+// local object store, so it can't be used to count local commits. That is what
+// the separate "synced" record is for (gitGetSynced: the last LOCAL commit
+// pushed or pulled).
 function gitRemoteTrackingKey(dbName, branch) { return gitStorageKey(dbName, `remotetrack_${branch}`); }
 function gitGetRemoteTracking(dbName, branch) {
     try {
@@ -3288,6 +3286,275 @@ function gitReadRemoteFields(ui) {
     if (bad) { gitSetResult(ui, 'remote', 'error', `Branch: ${bad}`); window.renderGitPanel(); return null; }
     return { ref, branch };
 }
+// --- Push: one atomic push through GitHub's Git Data API ---------------------------------
+// Push used to walk the branch's whole committed tree and PUT every file through the Contents
+// API. GitHub records one commit per Contents-API write, so a push of 40 files made 40 commits
+// titled "Update <path> via CodeMini" (the local commit messages never arrived), and a request
+// failing midway left the remote half-updated. It now does what `git push` does:
+//   1. read the remote branch and its file tree (3 requests),
+//   2. work out which local commits are new (see gitPlanPush),
+//   3. upload only the file contents GitHub does not already have, as blobs,
+//   4. create one tree + one commit per local commit being sent, with its own message and author,
+//   5. move the branch with a single, non-forced ref update.
+// Nothing on the remote branch changes before step 5, so a failure anywhere earlier leaves it
+// exactly as it was (uploaded blobs that no commit points at are harmless and GitHub discards
+// them). Requests are made one at a time on purpose: GitHub asks clients not to write
+// concurrently, and a secondary rate limit is what concurrent writes run into.
+
+// The bytes of a stored file: text is UTF-8 encoded, binary files are kept as base64.
+function gitFileBytes(file) {
+    if (file.encoding === 'base64') {
+        const bin = atob(String(file.content || '').replace(/\s/g, ''));
+        const out = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+        return out;
+    }
+    return new TextEncoder().encode(file.content || '');
+}
+function gitBytesToBase64(bytes) {
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+}
+// A file's git blob id: SHA-1 of "blob <size>\0" followed by its bytes. This is the `sha` GitHub
+// lists for a file in a tree, so comparing it with the remote's tree says, without downloading
+// anything, which files are already up there unchanged.
+async function gitBlobSha(bytes) {
+    const header = new TextEncoder().encode(`blob ${bytes.length}\0`);
+    const all = new Uint8Array(header.length + bytes.length);
+    all.set(header, 0); all.set(bytes, header.length);
+    const digest = await crypto.subtle.digest('SHA-1', all);
+    return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+function gitRepoPath(path) { return String(path).replace(/^\//, ''); }
+function gitStatusError(message, status) { const e = new Error(message); e.status = status; return e; }
+
+// The "synced" record: the last local commit this workspace pushed to (or pulled from) a given
+// remote branch. It is what lets the next push send only what is new, and what lets the app
+// count unpushed commits. (The remote's own commit ids can't do either job: they never exist in
+// the local object store.) Stored per workspace + remote branch, and only trusted for the
+// repository it was recorded against, so pointing the remote somewhere else starts fresh.
+function gitSyncedKey(dbName, branch) { return gitStorageKey(dbName, `synced_${branch}`); }
+function gitGetSynced(dbName, branch, repoFull) {
+    try {
+        const rec = JSON.parse(localStorage.getItem(gitSyncedKey(dbName, branch)));
+        if (rec && typeof rec.repo === 'string' && repoFull && rec.repo.toLowerCase() === String(repoFull).toLowerCase()) return rec;
+    } catch (e) {}
+    return null;
+}
+function gitSaveSynced(dbName, branch, rec) {
+    try { localStorage.setItem(gitSyncedKey(dbName, branch), JSON.stringify(rec)); } catch (e) {}
+}
+// Local commits on `localBranch` that a push would still send. Counted from the last synced
+// local commit; with a remote that has been checked but never pushed to from here, that is every
+// commit; with no remote known at all, none.
+function gitCountUnpushed(dbName, repo, localBranch) {
+    const tip = repo.refs[localBranch] || null;
+    if (!tip) return 0;
+    const full = localStorage.getItem(gitStorageKey(dbName, 'remoteRepo')) || '';
+    const branch = localStorage.getItem(gitStorageKey(dbName, 'remoteBranch')) || 'main';
+    const synced = full ? gitGetSynced(dbName, branch, full) : null;
+    if (synced) return gitCountAhead(repo, tip, synced.localSha);
+    return gitGetRemoteTracking(dbName, branch) ? gitCountAhead(repo, tip, null) : 0;
+}
+
+// Walks a branch's first-parent line from `headSha` (newest first) until it reaches `stopSha`.
+// { line, reached, complete }: `reached` - stopSha is on the line (so everything in `line` is new
+// since it); `complete` - the walk never hit a commit missing from the object store.
+function gitFirstParentLine(repo, headSha, stopSha) {
+    const line = []; const seen = new Set();
+    let cur = headSha, reached = false, complete = true;
+    while (cur) {
+        if (stopSha && cur === stopSha) { reached = true; break; }
+        if (seen.has(cur)) break;
+        seen.add(cur);
+        const c = repo.objects[cur];
+        if (!c) { complete = false; break; }
+        line.push({ sha: cur, message: c.message, author: c.author, authorEmail: c.authorEmail, timestamp: c.timestamp, files: c.files || [] });
+        cur = (c.parents && c.parents[0]) || null;
+    }
+    return { line, reached, complete };
+}
+// Decides WHICH local commits a push sends, as a list of { sha, message, author, authorEmail,
+// timestamp, files } (oldest first), where `files` is that commit's own change list.
+//   incremental  the last synced commit is on this branch's first-parent line: send the commits
+//                after it, one remote commit each.
+//   full         the remote is empty: send the whole first-parent line, so its history arrives.
+//   squash       otherwise (never pushed from here, or history was rewritten since by a rebase,
+//                reset or amend): send ONE commit holding the whole current tree, with the tip's
+//                message. `reason` says which; `deletionsKnown` is false when there is no earlier
+//                tree to compare against, in which case nothing is deleted on the remote.
+// Merge commits count as the single commit they are: only the first-parent line is walked, and a
+// merge's change list is already its difference from its first parent, so the merged-in branch's
+// own commits reach the remote as that merge rather than one by one (the remote history is linear).
+function gitPlanPush(repo, headSha, syncedSha, remoteEmpty) {
+    if (!headSha) return { mode: 'none', commits: [] };
+    const walk = gitFirstParentLine(repo, headSha, remoteEmpty ? null : syncedSha);
+    if (walk.reached) return { mode: 'incremental', commits: walk.line.reverse(), deletionsKnown: true };
+    if (remoteEmpty && walk.complete) return { mode: 'full', commits: walk.line.reverse(), deletionsKnown: true };
+    const head = repo.objects[headSha] || {};
+    const headTree = gitComputeHeadTree(repo, headSha);
+    const baseKnown = !!(syncedSha && repo.objects[syncedSha]);
+    const baseTree = baseKnown ? gitComputeHeadTree(repo, syncedSha) : null;
+    const files = [];
+    headTree.forEach((f, path) => files.push({ path, name: f.name, status: 'modified', content: f.content, encoding: f.encoding }));
+    if (baseTree) baseTree.forEach((f, path) => { if (!headTree.has(path)) files.push({ path, name: f.name, status: 'deleted', content: '', encoding: f.encoding }); });
+    return {
+        mode: 'squash', reason: baseKnown ? 'rewritten' : 'unlinked', deletionsKnown: baseKnown,
+        commits: [{ sha: headSha, message: head.message || 'Push from CodeMini', author: head.author, authorEmail: head.authorEmail, timestamp: head.timestamp, files }]
+    };
+}
+// Author/committer for a pushed commit. A commit made under the default profile identity
+// (an @codemini.local address GitHub can't tie to anyone) is sent without one, so GitHub
+// attributes it to the account that owns the token and it shows on that profile. A commit with a
+// real identity (custom, or the connected GitHub account) keeps it, with its original date.
+function gitPushAuthorFor(commit) {
+    const name = String(commit.author || '').trim(), email = String(commit.authorEmail || '').trim();
+    if (!name || !email || /@codemini\.local$/i.test(email)) return {};
+    const who = { name, email, date: new Date(commit.timestamp || Date.now()).toISOString() };
+    return { author: who, committer: Object.assign({}, who) };
+}
+// The remote branch as it is right now: { empty: true } for a repository with no commits at all,
+// otherwise { commitSha, treeSha, message, tree } where `tree` maps repo path -> { sha, mode } for
+// every file (or is null when GitHub says the tree is too big to list). A branch that is missing
+// from a repository that does have commits is an error rather than something to create.
+async function gitReadRemoteBranchState(ref, branch) {
+    const repoPath = `/repos/${ref.full}`;
+    let refData = null, refErr = null;
+    try {
+        refData = await gitHubRequest(`${repoPath}/git/refs/heads/${gitEncodePath(branch)}`);
+        // Only a prefix of this name exists (e.g. "feature/x" for "feature"): GitHub answers with a list.
+        if (Array.isArray(refData)) refData = refData.find(r => r.ref === `refs/heads/${branch}`) || null;
+    } catch (e) {
+        if (e.status !== 404 && e.status !== 409) throw e;
+        refErr = e;
+    }
+    if (!refData) {
+        let branches;
+        if (refErr && refErr.status === 409) branches = []; // "Git Repository is empty."
+        else {
+            try { branches = await gitHubRequest(`${repoPath}/branches?per_page=1`); }
+            catch (e) {
+                if (e.status === 404) throw gitStatusError(`GitHub can't find ${ref.full}, or the saved token has no access to it.`, 404);
+                if (e.status === 409) branches = []; else throw e;
+            }
+        }
+        if (Array.isArray(branches) && branches.length === 0) return { empty: true };
+        throw gitStatusError(`The branch "${branch}" doesn't exist on ${ref.full} yet. Create it on GitHub first, or push to a branch that already exists there.`, 404);
+    }
+    const commitSha = refData.object.sha;
+    const commitData = await gitHubRequest(`${repoPath}/git/commits/${commitSha}`);
+    const treeSha = commitData.tree.sha;
+    const treeData = await gitHubRequest(`${repoPath}/git/trees/${treeSha}?recursive=1`);
+    let tree = null;
+    if (!treeData.truncated) {
+        tree = new Map();
+        (treeData.tree || []).forEach(t => { if (t.type === 'blob') tree.set(t.path, { sha: t.sha, mode: t.mode }); });
+    }
+    return { empty: false, commitSha, treeSha, message: commitData.message || '', tree };
+}
+// Carries out a plan against the remote state read by gitReadRemoteBranchState. `progress` is
+// { text(msg), bootstrapped } - bootstrapped flips to true if the empty repository's first commit
+// was written, the one change that happens before the final ref update, so a failure can say
+// truthfully whether GitHub was touched.
+// Returns { upToDate: true } or { finalSha, commits, files, deleted, skippedDeletes }.
+async function gitSendCommitsToRemote(ref, branch, state, plan, headTree, progress) {
+    const repoPath = `/repos/${ref.full}`;
+    if (state.empty) {
+        // GitHub refuses blobs, trees and commits in a repository with no commits at all, but does
+        // accept a file written through the Contents API, which creates the first commit and the
+        // branch. One file is written that way; everything else then goes up as usual.
+        const first = Array.from(headTree.keys()).sort()[0];
+        progress.text('Creating the first commit...');
+        const putFirst = (withBranch) => gitHubRequest(`${repoPath}/contents/${gitEncodePath(gitRepoPath(first))}`, {
+            method: 'PUT',
+            body: JSON.stringify(Object.assign({ message: 'Initial commit via CodeMini', content: gitBytesToBase64(gitFileBytes(headTree.get(first))) }, withBranch ? { branch } : {}))
+        });
+        let res;
+        try { res = await putFirst(true); }
+        catch (e) {
+            // Some repositories refuse an explicit branch while no branch exists yet. If the branch asked for is the
+            // repository's default, leaving it out creates exactly that branch; for any other name, say so.
+            if (e.status !== 404 && e.status !== 422) throw e;
+            let def = null; try { def = (await gitHubRequest(repoPath)).default_branch; } catch (e2) {}
+            if (def !== branch) throw e;
+            res = await putFirst(false);
+        }
+        progress.bootstrapped = true;
+        state = { empty: false, commitSha: res.commit.sha, treeSha: res.commit.tree.sha, message: 'Initial commit via CodeMini', tree: new Map([[gitRepoPath(first), { sha: res.content.sha, mode: '100644' }]]) };
+    }
+
+    // Work out, without touching the network, what each commit has to change on the remote.
+    // `cur` is the remote's tree as it will look after each commit in turn.
+    const cur = state.tree;
+    const onRemote = new Set(); if (cur) cur.forEach(v => onRemote.add(v.sha));
+    const toUpload = new Map(); // blob sha -> file
+    const steps = []; const touched = new Set();
+    let deleted = 0, skippedDeletes = 0;
+    for (const commit of plan.commits) {
+        const entries = [];
+        for (const f of commit.files) {
+            const rp = gitRepoPath(f.path);
+            if (f.status === 'deleted') {
+                if (!cur) { skippedDeletes++; continue; }   // can't tell what is up there
+                if (!cur.has(rp)) continue;                  // already gone
+                cur.delete(rp);
+                entries.push({ path: rp, mode: '100644', sha: null });
+                touched.add(rp); deleted++;
+                continue;
+            }
+            const sha = await gitBlobSha(gitFileBytes(f));
+            const existing = cur ? cur.get(rp) : null;
+            if (existing && existing.sha === sha) continue; // already up there, unchanged
+            const mode = existing ? existing.mode : '100644';
+            if (cur) cur.set(rp, { sha, mode });
+            if (!onRemote.has(sha) && !toUpload.has(sha)) toUpload.set(sha, f);
+            entries.push({ path: rp, mode, sha });
+            touched.add(rp);
+        }
+        steps.push({ commit, entries });
+    }
+    if (steps.every(s => s.entries.length === 0) && !progress.bootstrapped) return { upToDate: true };
+
+    const shaMap = new Map(); // our blob sha -> the sha GitHub reports (identical unless something normalised the bytes)
+    let n = 0;
+    for (const [sha, f] of toUpload) {
+        n++; progress.text(`Uploading ${n}/${toUpload.size}: ${gitRepoPath(f.path)}`);
+        const blob = await gitHubRequest(`${repoPath}/git/blobs`, { method: 'POST', body: JSON.stringify({ content: gitBytesToBase64(gitFileBytes(f)), encoding: 'base64' }) });
+        shaMap.set(sha, blob.sha);
+    }
+    let parent = state.commitSha, baseTree = state.treeSha, k = 0;
+    for (const step of steps) {
+        k++; progress.text(steps.length > 1 ? `Creating commit ${k}/${steps.length}...` : 'Creating commit...');
+        let treeSha = baseTree;
+        if (step.entries.length) {
+            const t = await gitHubRequest(`${repoPath}/git/trees`, {
+                method: 'POST',
+                body: JSON.stringify({ base_tree: baseTree, tree: step.entries.map(e => ({ path: e.path, mode: e.mode, type: 'blob', sha: e.sha === null ? null : (shaMap.get(e.sha) || e.sha) })) })
+            });
+            treeSha = t.sha;
+        }
+        const created = await gitHubRequest(`${repoPath}/git/commits`, {
+            method: 'POST',
+            body: JSON.stringify(Object.assign({ message: step.commit.message, tree: treeSha, parents: [parent] }, gitPushAuthorFor(step.commit)))
+        });
+        parent = created.sha; baseTree = treeSha;
+    }
+    progress.text(`Updating ${branch}...`);
+    try {
+        await gitHubRequest(`${repoPath}/git/refs/heads/${gitEncodePath(branch)}`, { method: 'PATCH', body: JSON.stringify({ sha: parent, force: false }) });
+    } catch (e) {
+        // Not a fast-forward: the branch moved on GitHub after it was read. (Other 422s, such as a
+        // protected branch, keep GitHub's own wording.)
+        if (e.status === 422 && /fast.?forward/i.test(e.apiMessage || '')) {
+            const moved = gitStatusError(`${ref.full}@${branch} changed on GitHub while you were pushing, so the push was refused. Nothing was changed. Fetch or pull, then push again.`, 422);
+            moved.complete = true; // the message already says everything; no "nothing was changed" tail to add
+            throw moved;
+        }
+        throw e;
+    }
+    return { finalSha: parent, commits: steps.length, files: touched.size, deleted, skippedDeletes };
+}
 async function gitPushToGitHub() {
     const ui = gitUi();
     if (ui.busy.sync) return;
@@ -3298,48 +3565,59 @@ async function gitPushToGitHub() {
     gitSetRemote(dbName, ref.full, branch, ui);
 
     const config = getGitConfig(dbName); const repo = getGitRepo(dbName);
-    const tree = gitComputeHeadTree(repo, config.currentBranch);
-    if (tree.size === 0) { gitSetResult(ui, 'remote', 'error', 'Nothing committed yet to push.'); window.renderGitPanel(); return; }
-
-    // Only a *custom* identity is sent as author/committer. Otherwise GitHub attributes
-    // the commits to the authenticated account, which is what makes them show up on
-    // that account's profile - an @codemini.local address can't do that.
-    const identity = gitResolveIdentity(dbName);
-    const who = identity.source === 'custom' ? { author: { name: identity.name, email: identity.email }, committer: { name: identity.name, email: identity.email } } : {};
+    const headSha = repo.refs[config.currentBranch] || null;
+    if (!headSha) { gitSetResult(ui, 'remote', 'error', 'Nothing committed yet to push.'); window.renderGitPanel(); return; }
+    const headTree = gitComputeHeadTree(repo, headSha);
 
     ui.busy.sync = true;
-    gitStartRemoteProgress(ui, `Pushing 0/${tree.size}...`);
-    let done = 0;
+    gitStartRemoteProgress(ui, `Checking ${ref.full}@${branch}...`);
+    const progress = { bootstrapped: false, text: (t) => gitSetRemoteProgress(ui, t) };
+    const track = (rec) => { try { gitSaveRemoteTracking(dbName, branch, rec); } catch (e) {} }; // bookkeeping only: never the reason a finished push reads as failed
     try {
-        for (const [path, data] of tree.entries()) {
-            done++;
-            gitSetRemoteProgress(ui, `Pushing ${done}/${tree.size}: ${path}`);
-            const ghPath = gitEncodePath(path.replace(/^\//, ''));
-            let sha;
-            try { const existing = await gitHubRequest(`/repos/${ref.full}/contents/${ghPath}?ref=${encodeURIComponent(branch)}`); sha = existing.sha; }
-            catch (e) { sha = undefined; }
-            const content = data.encoding === 'base64' ? data.content : btoa(unescape(encodeURIComponent(data.content)));
-            await gitHubRequest(`/repos/${ref.full}/contents/${ghPath}`, {
-                method: 'PUT',
-                body: JSON.stringify(Object.assign({ message: `Update ${path} via CodeMini`, content, branch, sha }, who))
-            });
+        const state = await gitReadRemoteBranchState(ref, branch);
+        if (state.empty && headTree.size === 0) { gitSetResult(ui, 'remote', 'error', 'Nothing committed yet to push.'); return; }
+        const synced = gitGetSynced(dbName, branch, ref.full);
+        const plan = gitPlanPush(repo, headSha, synced && synced.localSha, state.empty);
+        const result = await gitSendCommitsToRemote(ref, branch, state, plan, headTree, progress);
+
+        if (result.upToDate) {
+            gitSaveSynced(dbName, branch, { repo: ref.full, localSha: headSha, remoteSha: state.commitSha, at: Date.now() });
+            track({ branchSha: state.commitSha, message: state.message, fetchedAt: Date.now() });
+            gitSetResult(ui, 'remote', 'success', `${ref.full}@${branch} already has everything committed on ${config.currentBranch}. Nothing to push.`, { url: `https://github.com/${ref.full}/tree/${gitEncodePath(branch)}`, linkText: 'View on GitHub' });
+            gitAutoClearResult(ui, 'remote');
+            gitLog('push', `Nothing to push from "${config.currentBranch}" to ${ref.full}@${branch} (already up to date)`, 'info', { repo: ref.full, branch }, dbName);
+            gitToast('Already up to date');
+            gitClearNotice('git-push-failed');
+            window.gitUpdateStatusBranch();
+            return;
         }
-        gitSetResult(ui, 'remote', 'success', `Pushed ${tree.size} file(s) to ${ref.full}@${branch}.`, { url: `https://github.com/${ref.full}/tree/${gitEncodePath(branch)}`, linkText: 'View on GitHub' });
+        const lastMessage = plan.commits.length ? plan.commits[plan.commits.length - 1].message : state.message;
+        gitSaveSynced(dbName, branch, { repo: ref.full, localSha: headSha, remoteSha: result.finalSha, at: Date.now() });
+        track({ branchSha: result.finalSha, message: lastMessage, fetchedAt: Date.now() });
+
+        const notes = [];
+        if (plan.mode === 'squash') notes.push(plan.reason === 'rewritten'
+            ? 'Your local history no longer lines up with the last push (after a rebase, reset or amend), so the changes went up as a single commit.'
+            : 'No earlier push of this branch is recorded here, so the changes went up as a single commit.');
+        if (plan.mode === 'squash' && !plan.deletionsKnown) notes.push('Files you deleted before this push were not removed from GitHub.');
+        if (result.skippedDeletes) notes.push('The repository is too large to compare file by file, so deletions were not synced.');
+        const summary = `Pushed ${result.commits} commit${result.commits === 1 ? '' : 's'} (${result.files} file${result.files === 1 ? '' : 's'} changed${result.deleted ? `, ${result.deleted} deleted` : ''}) to ${ref.full}@${branch}.${notes.length ? ' ' + notes.join(' ') : ''}`;
+        gitSetResult(ui, 'remote', 'success', summary, { url: `https://github.com/${ref.full}/tree/${gitEncodePath(branch)}`, linkText: 'View on GitHub' });
         gitAutoClearResult(ui, 'remote');
-        gitLog('push', `Pushed ${tree.size} file(s) from "${config.currentBranch}" to ${ref.full}@${branch}`, 'success', { repo: ref.full, branch, files: tree.size }, dbName);
+        gitLog('push', `Pushed ${result.commits} commit(s), ${result.files} file(s) from "${config.currentBranch}" to ${ref.full}@${branch}${plan.mode === 'squash' ? ' (as one commit)' : ''}`, 'success', { repo: ref.full, branch, commits: result.commits, files: result.files, deleted: result.deleted, mode: plan.mode }, dbName);
         gitToast('Pushed to GitHub');
         gitClearNotice('git-push-failed');
-        gitFetchRemoteTracking(ref, branch, dbName).then(() => window.gitUpdateStatusBranch());
+        window.gitUpdateStatusBranch();
     } catch (e) {
-        gitSetResult(ui, 'remote', 'error', `${gitFriendlyError(e)}${done > 1 ? ` (${done - 1} of ${tree.size} file(s) had already been pushed.)` : ''}`);
-        gitLog('push', `Push to ${ref.full}@${branch} failed on file ${done}/${tree.size}: ${e.message}`, 'error', { repo: ref.full, branch }, dbName);
+        const tail = progress.bootstrapped
+            ? ' The empty repository received its first commit, but the rest of your changes were not pushed - push again to finish.'
+            : ' Nothing was changed on GitHub.';
+        const text = `${gitFriendlyError(e)}${e.complete ? '' : tail}`;
+        gitSetResult(ui, 'remote', 'error', text);
+        gitLog('push', `Push to ${ref.full}@${branch} failed: ${e.message}`, 'error', { repo: ref.full, branch }, dbName);
         // A rejected token already has its own notification (from gitHubRequest), so this one is for everything else.
         if (!(e.status === 401 && !e.noToken)) {
-            gitNotify({
-                id: 'git-push-failed',
-                title: 'Push to GitHub failed',
-                text: `${ref.full}@${branch}: ${gitFriendlyError(e)}${done > 1 ? ` (${done - 1} of ${tree.size} file(s) had already been pushed.)` : ''}`
-            });
+            gitNotify({ id: 'git-push-failed', title: 'Push to GitHub failed', text: `${ref.full}@${branch}: ${text}` });
         }
     } finally { ui.busy.sync = false; window.renderGitPanel(); }
 }
@@ -3362,7 +3640,7 @@ async function gitFetchOnly() {
         if (!tracking) throw new Error('Could not reach that repository/branch.');
         const config = getGitConfig(dbName); const repo = getGitRepo(dbName);
         const localTip = repo.refs[config.currentBranch] || null;
-        const localAhead = localTip ? gitCountAhead(repo, localTip, tracking.branchSha) : 0;
+        const localAhead = localTip ? gitCountUnpushed(dbName, repo, config.currentBranch) : 0;
         gitSetResult(ui, 'remote', 'success', `Fetched ${ref.full}@${branch}.${localAhead > 0 ? ` You have ${localAhead} local commit${localAhead === 1 ? '' : 's'} not on the remote.` : ' Up to date.'}`);
         gitAutoClearResult(ui, 'remote');
         gitLog('fetch', `Fetched ${ref.full}@${branch}`, 'info', { repo: ref.full, branch }, dbName);
@@ -3426,6 +3704,9 @@ async function gitPullFromGitHub() {
             }
             gitSetRemote(dbName, ref.full, branch, ui);
             gitSaveRemoteTracking(dbName, branch, { branchSha: refData.object.sha, message: commitData.message || '', fetchedAt: Date.now() });
+            // After a pull the local files (and the pull commit, if there was a change) match the remote, so this
+            // is the point the next push starts from.
+            gitSaveSynced(dbName, branch, { repo: ref.full, localSha: repo.refs[config.currentBranch] || null, remoteSha: refData.object.sha, at: Date.now() });
             saveStagedPaths(dbName, []);
             if (typeof loadFilesFromDB === 'function') loadFilesFromDB();
             gitSetResult(ui, 'remote', 'success', `Pulled ${blobs.length} file(s) from ${ref.full}@${branch}.`, { url: `https://github.com/${ref.full}/tree/${branchPath}`, linkText: 'View on GitHub' });
@@ -3454,7 +3735,7 @@ async function gitPullFromGitHub() {
         const tracking = gitGetRemoteTracking(dbName, branch);
         let warningText = `This may overwrite local files that share a path with "${gitEsc(ref.full)}"@${gitEsc(branch)}. Continue?`;
         if (tracking && localTip) {
-            const localAheadOfLastSync = gitCountAhead(repo, localTip, tracking.branchSha);
+            const localAheadOfLastSync = gitCountUnpushed(dbName, repo, config.currentBranch);
             if (localAheadOfLastSync > 0) {
                 // Local has moved since the last known sync point - check
                 // whether the remote has ALSO moved since then. If it
@@ -3874,7 +4155,25 @@ function renderConfigTab(dbName, ui) {
 }
 
 // --- Remote tab: push/pull, repositories, new/fork, issues, PRs, log ---------
-function renderRemoteTab(dbName, ui) {
+// One line, shown right above the Push button, saying what pressing it will send. It follows the
+// same rule the push itself uses (gitFirstParentLine against the last synced commit), and it always
+// says that uncommitted changes stay behind, since that is the thing people get wrong.
+function gitPushNoteHtml(dbName, repo, config, repoFull, remoteBranch, uncommitted) {
+    const branchName = `<strong>${gitEsc(config.currentBranch)}</strong>`;
+    const tip = repo.refs[config.currentBranch] || null;
+    const left = uncommitted > 0 ? ` (<strong>${uncommitted} uncommitted change${uncommitted === 1 ? '' : 's'}</strong> not included)` : '';
+    let text;
+    if (!tip) text = `Nothing is committed on ${branchName} yet, so there is nothing to push${left}`;
+    else {
+        const synced = repoFull ? gitGetSynced(dbName, remoteBranch, repoFull) : null;
+        const walk = synced ? gitFirstParentLine(repo, tip, synced.localSha) : null;
+        if (walk && walk.reached && walk.line.length === 0) text = `Nothing new to push: ${branchName} has no commits since the last push${left}`;
+        else if (walk && walk.reached && walk.line.length > 1) text = `Pushes the <strong>${walk.line.length} commits</strong> on ${branchName} since the last push${left}`;
+        else text = `Pushes the last commit on ${branchName}${left}`;
+    }
+    return `<div class="git-hint git-push-note" id="gitPushNote" style="margin-top:8px;"><i class="ri-upload-cloud-2-line"></i> ${text}.</div>`;
+}
+function renderRemoteTab(dbName, ui, uncommitted) {
     const gh = gitGetGhProfile();
     const hasToken = !!gitGetToken();
     const savedRepo = localStorage.getItem(gitStorageKey(dbName, 'remoteRepo')) || '';
@@ -3900,7 +4199,7 @@ function renderRemoteTab(dbName, ui) {
     const localTip = repo.refs[config.currentBranch] || null;
     let trackingLine = '';
     if (tracking) {
-        const localAhead = localTip ? gitCountAhead(repo, localTip, tracking.branchSha) : 0;
+        const localAhead = localTip ? gitCountUnpushed(dbName, repo, config.currentBranch) : 0;
         trackingLine = `<div class="git-hint" style="margin-top:8px;"><i class="ri-git-branch-line"></i> Last checked ${gitRelativeTime(tracking.fetchedAt)}: ${localAhead > 0 ? `${localAhead} local commit${localAhead === 1 ? '' : 's'} not yet pushed` : 'up to date with the last fetch'}</div>`;
     }
     const syncSection = `
@@ -3910,6 +4209,7 @@ function renderRemoteTab(dbName, ui) {
             <div class="git-field-label" style="margin-top:6px;">Branch</div>
             <input type="text" id="gitRemoteBranchInput" data-git-keep class="git-input" list="gitRemoteBranchList" placeholder="main" value="${gitEsc(gitDraft(ui, 'gitRemoteBranchInput', savedBranch))}">
             ${branchList.length ? `<datalist id="gitRemoteBranchList">${branchList.map(b => `<option value="${gitEsc(b)}">`).join('')}</datalist>` : ''}
+            ${gitPushNoteHtml(dbName, repo, config, ref ? ref.full : '', (gitDraft(ui, 'gitRemoteBranchInput', savedBranch) || 'main').trim() || 'main', uncommitted || 0)}
             <div class="git-remote-actions">
                 <button class="git-btn" data-git-action="push" ${ui.busy.sync ? 'disabled' : ''}><i class="ri-upload-cloud-2-line"></i> Push</button>
                 <button class="git-btn git-btn-secondary" data-git-action="pull" ${ui.busy.sync ? 'disabled' : ''}><i class="ri-download-cloud-2-line"></i> Pull</button>
@@ -3917,7 +4217,7 @@ function renderRemoteTab(dbName, ui) {
             </div>
             ${gitResultBox(ui, 'remote')}
             ${trackingLine}
-            <div class="git-hint" style="margin-top:10px;">Push syncs your current commit's files up to the repo. Pull replaces local files with the repo's and records the result as a new commit here, so History stays meaningful. Fetch only checks what's on the remote.</div>
+            <div class="git-hint" style="margin-top:10px;">Push sends your committed work as real commits, all at once: GitHub only changes if the whole push succeeds. Changes you haven't committed are never sent. Pull replaces local files with the repo's and records the result as a new commit here, so History stays meaningful. Fetch only checks what's on the remote.</div>
         </div>`;
 
     const r = state.repos;
@@ -4272,7 +4572,7 @@ window.gitUpdateStatusBranch = function() {
         const savedBranch = localStorage.getItem(gitStorageKey(db.name, 'remoteBranch')) || 'main';
         const tracking = gitGetRemoteTracking(db.name, savedBranch);
         const localTip = repo.refs[name] || null;
-        const ahead = (tracking && localTip) ? gitCountAhead(repo, localTip, tracking.branchSha) : 0;
+        const ahead = (tracking && localTip) ? gitCountUnpushed(db.name, repo, name) : 0;
         syncBadge.textContent = ahead > 0 ? `\u2191${ahead}` : '';
         syncBadge.title = ahead > 0 ? `${ahead} local commit${ahead === 1 ? '' : 's'} not pushed as of the last fetch/pull/push` : '';
     }
@@ -4432,7 +4732,7 @@ window.renderGitPanel = async function() {
     const bodyHtml = uiState.activeTab === 'changes' ? renderChangesTab(stagedChanges, unstagedChanges, draftMsg, pendingMerge, unresolvedConflicts, uiState, !!repo.refs[config.currentBranch], ignoredNewPaths, hasGitignore)
         : uiState.activeTab === 'history' ? renderHistoryTab(repo, config, uiState, dbName)
         : uiState.activeTab === 'config' ? renderConfigTab(dbName, uiState)
-        : renderRemoteTab(dbName, uiState);
+        : renderRemoteTab(dbName, uiState, allChanges.length);
 
     sidebar.innerHTML = renderGitHeader() + renderGitTabs(uiState.activeTab) + `<div class="git-tab-content">${bodyHtml}</div>`;
 
