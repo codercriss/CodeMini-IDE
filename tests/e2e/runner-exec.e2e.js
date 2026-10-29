@@ -602,6 +602,7 @@ const framesOfHosts = (page) => page.frames().filter(f => /\/exec\.html/.test(f.
   // an older deployment looks like: the app and the runner deploy separately (a runner from before version numbers sends nothing).
   const realConfig = require('fs').readFileSync(require('../lib/paths').resolve('runner/config.js'), 'utf8');
   const cm = /version:\s*(\d+),\s*build:\s*'([^']*)'/.exec(realConfig);
+  if (!cm) throw new Error('runner/config.js has no "version: N, build: \'YYYY-MM-DD\'" line: the runner in this repository is older than the app. Upload config.js, exec.js and shell.js from the latest package into the repository\'s runner/ folder.');
   ok(!!cm, 'the runner config carries a version and a build');
   const realVersion = Number(cm[1]), realBuild = cm[2];
   const asConfig = (version, build) => realConfig.replace(/,\s*version:\s*\d+,\s*build:\s*'[^']*'/, version === null ? '' : ', version: ' + version + ', build: ' + JSON.stringify(build));

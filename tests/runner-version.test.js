@@ -10,11 +10,14 @@ const t = (name, fn) => { fn(); n++; console.log('  ok', name); };
 const cfg = paths.read('runner/config.js'), exec = paths.read('runner/exec.js'), shell = paths.read('runner/shell.js');
 const client = paths.read('js/viewers/runner-client.js'), settings = paths.read('js/core/settings-profile.js');
 const v = /version:\s*(\d+),\s*build:\s*'(\d{4}-\d{2}-\d{2})'/.exec(cfg);
+// The runner has two homes: the repository (what these tests read) and the Vercel project that serves it. They can drift apart, and CI then
+// fails here although the deployed runner is fine. Say so, instead of a bare assertion.
+const STALE = ' The runner files belong together (config.js, exec.js, shell.js): if the deployed runner is newer than the copy in this repository, upload those three files from the latest package into the repository\'s runner/ folder.';
 const needs = /var RUNNER_NEEDS = \{ preview: (\d+), exec: (\d+) \};/.exec(client);
 
 console.log('runner version handshake');
 t('the runner config carries an integer version (1 or more) and a dated build', () => {
-  assert.ok(v, 'runner/config.js: version: N, build: \'YYYY-MM-DD\' not found');
+  assert.ok(v, 'runner/config.js in this repository has no "version: N, build: \'YYYY-MM-DD\'" line, so it is older than the app.' + STALE);
   assert.ok(Number(v[1]) >= 1);
 });
 t('the runner config lists its current version in the level history, so a bump has to be written down', () => {
@@ -22,7 +25,7 @@ t('the runner config lists its current version in the level history, so a bump h
 });
 t('both runner pages send the version and the build in the hello-ack', () => {
   for (const [name, src] of [['exec.js', exec], ['shell.js', shell]])
-    assert.ok(/op: 'hello-ack', version: \(CFG\.version \| 0\), build: String\(CFG\.build \|\| ''\)/.test(src), name + ' must send version and build in hello-ack');
+    assert.ok(/op: 'hello-ack', version: \(CFG\.version \| 0\), build: String\(CFG\.build \|\| ''\)/.test(src), 'runner/' + name + ' does not send its version and build in hello-ack.' + STALE);
 });
 t('the version is not put in the "ready" announcement, which can go to an unknown origin (only the acknowledged parent gets it)', () => {
   for (const src of [exec, shell]) {
