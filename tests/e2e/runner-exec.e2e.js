@@ -597,6 +597,57 @@ const framesOfHosts = (page) => page.frames().filter(f => /\/exec\.html/.test(f.
   ok(/older than this version/.test(oldROut) && /does not know R yet/.test(oldROut), 'R cell against an older runner: the same clear message', oldROut.slice(0, 260));
   await ctx.close();
 
+  console.log('\n[the runner says which version it is; the app does not use one that is too old, and says why]');
+  // Real browser, the real runner. An old runner is simulated by serving its config.js with a different (or no) version, which is exactly what
+  // an older deployment looks like: the app and the runner deploy separately (a runner from before version numbers sends nothing).
+  const realConfig = require('fs').readFileSync(require('../lib/paths').resolve('runner/config.js'), 'utf8');
+  const cm = /version:\s*(\d+),\s*build:\s*'([^']*)'/.exec(realConfig);
+  ok(!!cm, 'the runner config carries a version and a build');
+  const realVersion = Number(cm[1]), realBuild = cm[2];
+  const asConfig = (version, build) => realConfig.replace(/,\s*version:\s*\d+,\s*build:\s*'[^']*'/, version === null ? '' : ', version: ' + version + ', build: ' + JSON.stringify(build));
+  ok(asConfig(null).indexOf('version:') === -1 && asConfig(3, 'x').indexOf('version: 3') > -1, 'the simulated configs really differ (none / version 3)');
+  const serveConfig = (pg, body) => pg.route(RUNNER + '/config.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body }));
+  const probe = (pg) => pg.evaluate(async () => {
+    const used = await window.CodeMiniExec.use('console');
+    // Callers ask for the notice only when use() said no (that is what fallbackNotice is for), so that is what is done here.
+    return { used, note: used ? '' : window.CodeMiniExec.fallbackNotice('console'), info: window.CodeMiniRunner.runnerInfo(), check: await window.CodeMiniRunner.checkRunner() };
+  });
+
+  ({ ctx, page, errors } = await open(browser, RUNNER));
+  let vr = await probe(page);
+  ok(vr.used === true, 'current runner: the execution host is used (no fallback, so no notice to ask for)');
+  ok(vr.info.exec && vr.info.exec.version === realVersion && vr.info.exec.build === realBuild, 'current runner: the app knows its version and build', JSON.stringify(vr.info.exec));
+  ok(vr.info.needs.exec <= realVersion && vr.info.needs.exec >= 1, 'the app needs a version the repository runner has', JSON.stringify(vr.info.needs));
+  ok(vr.check.state === 'ok' && /up to date/.test(vr.check.message) && vr.check.version === realVersion, 'Check runner on the current runner: up to date', vr.check.message);
+  await ctx.close();
+
+  ({ ctx, page, errors } = await open(browser, RUNNER));
+  await serveConfig(page, asConfig(null));
+  vr = await probe(page);
+  ok(vr.used === false, 'a runner from before version numbers: the execution host is not used (code runs in the app instead)');
+  ok(/out of date/.test(vr.note) && /before version numbers/.test(vr.note) && /needs version \d+ or newer/.test(vr.note) && /Redeploy the runner project \(codemini-runner\)/.test(vr.note), 'the one-time notice says the runner is out of date, why, and what to do', vr.note.slice(0, 260));
+  ok(vr.info.exec && vr.info.exec.version === 0, 'a missing version counts as 0');
+  ok(vr.check.state === 'outdated' && /^The runner is out of date/.test(vr.check.message), 'Check runner on an old runner: says it is out of date', vr.check.message);
+  // The runner is redeployed: the next check sees it and the app uses it at once (no waiting out the retry delay, no reload).
+  await page.unroute(RUNNER + '/config.js');
+  const again = await page.evaluate(async () => { const c = await window.CodeMiniRunner.checkRunner(); return { c, used: await window.CodeMiniExec.use('console') }; });
+  ok(again.c.state === 'ok' && again.used === true, 'after the runner is redeployed, Check runner finds it and the host is used straight away', JSON.stringify(again.c).slice(0, 160));
+  await ctx.close();
+
+  ({ ctx, page, errors } = await open(browser, RUNNER));
+  await serveConfig(page, asConfig(realVersion - 1, '2026-01-02'));
+  vr = await probe(page);
+  ok(vr.used === false && vr.check.state === 'outdated' && vr.check.version === realVersion - 1 && vr.check.build === '2026-01-02', 'a numbered but older runner is refused too', JSON.stringify(vr.check).slice(0, 220));
+  ok(new RegExp('version ' + (realVersion - 1) + ', built 2026-01-02').test(vr.note), 'the notice names the version and build it found', vr.note.slice(0, 200));
+  await ctx.close();
+
+  ({ ctx, page, errors } = await open(browser, RUNNER));
+  await serveConfig(page, asConfig(99999, '<img src=x onerror=alert(1)>'));
+  vr = await probe(page);
+  ok(vr.info.exec && vr.info.exec.version === 0 && vr.info.exec.build === '', 'hostile values from a runner (a huge version, markup as the build) are dropped, not kept', JSON.stringify(vr.info.exec));
+  ok(!/[<>]|onerror/.test(vr.note + vr.check.message), 'and they never reach the notice or the Settings message');
+  await ctx.close();
+
   console.log('\n[runner unreachable: the code still runs, and says why]');
   ({ ctx, page, errors } = await open(browser, 'http://localhost:8767'));
   run = await openConsole(page, 'JavaScript');

@@ -1204,6 +1204,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="settings-item"><div class="settings-item-info"><strong>Console</strong><span>Where code typed into the Console (JavaScript, Python, PHP, Ruby) runs. The editor's Run button, the bottom Console's input field and the editor's Debug follow this setting too. Isolated runs it on the separate origin; it cannot read CodeMini's storage or call its functions, and it also cannot touch CodeMini's page (the DOM). Normal runs it inside CodeMini itself.</span></div><div class="settings-control"><select data-setting="isolationConsole"><option title="Follow Isolation Mode above">Use global</option><option title="Always isolate the Console">Isolated</option><option title="Never isolate the Console">Normal</option></select></div></div>
           <div class="settings-item"><div class="settings-item-info"><strong>Terminal</strong><span>Where code the Terminal runs (the js, python, php and ruby commands, and running script files) executes. Commands like ls and cat are CodeMini's own and are not affected.</span></div><div class="settings-control"><select data-setting="isolationTerminal"><option title="Follow Isolation Mode above">Use global</option><option title="Always isolate the Terminal">Isolated</option><option title="Never isolate the Terminal">Normal</option></select></div></div>
           <div class="settings-item"><div class="settings-item-info"><strong>Notebooks</strong><span>Where Python, R and SQL notebook cells and their scratchpad run. Isolated runs them on the separate origin: they cannot read CodeMini's storage or call its functions, and they share one Python session with this window's Console and Terminal. Normal runs them inside CodeMini itself.</span></div><div class="settings-control"><select data-setting="isolationNotebooks"><option title="Follow Isolation Mode above">Use global</option><option title="Always isolate notebooks">Isolated</option><option title="Never isolate notebooks">Normal</option></select></div></div>
+          <div class="settings-item"><div class="settings-item-info"><strong>Runner version</strong><span id="runnerVersionText">Not checked yet. The runner is deployed separately from CodeMini, so it can be older than this version. Check which one is deployed.</span></div><div class="settings-control"><button type="button" class="settings-danger-btn" id="btnCheckRunner" style="color: var(--text-main); background: var(--bg-panel); border-color: var(--border-color);">Check runner</button></div></div>
 
           <h3 class="settings-category-title">Manage Trust</h3>
           <div id="trustManager"></div>
@@ -1547,6 +1548,23 @@ document.addEventListener('DOMContentLoaded', () => {
             if (['range', 'color', 'text', 'number'].includes(input.type)) input.addEventListener('input', updateHandler);
           });
           
+          // Check runner: asks the deployed runner which version it is (js/viewers/runner-client.js) and says so, in words, without running anything.
+          const btnCheckRunner = document.getElementById('btnCheckRunner');
+          if (btnCheckRunner) {
+            btnCheckRunner.addEventListener('click', async () => {
+              const out = document.getElementById('runnerVersionText');
+              const R = window.CodeMiniRunner;
+              if (!out || !R || typeof R.checkRunner !== 'function') return;
+              btnCheckRunner.disabled = true; out.style.color = ''; out.textContent = 'Checking the runner...';
+              try {
+                const r = await R.checkRunner();
+                out.textContent = r.message;   // textContent only; the message is built from a checked integer and a short plain string
+                out.style.color = r.state === 'ok' ? 'var(--color-success, #3fb950)' : (r.state === 'outdated' ? 'var(--color-danger)' : '');
+              } catch (e) { out.textContent = 'The check failed: ' + ((e && e.message) || String(e)); }
+              btnCheckRunner.disabled = false;
+            });
+          }
+
           // Clear UI Caches Logic
           const btnClearUI = document.getElementById('btnClearUIState');
           if (btnClearUI) {

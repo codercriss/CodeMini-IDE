@@ -46,7 +46,9 @@ By default (Settings > Security > Isolation Mode: Isolated), code you run does n
 | Terminal `js`, `python -c`, `php -r`, `ruby -e`, script files | the same host | Terminal |
 | Python, R and SQL notebook cells and their scratchpads | the same host | Notebooks |
 
-Each surface follows the global mode unless you override it (Use global, Isolated, Normal). If the runner cannot be reached, the code falls back to running inside the app, with a note, and the shield icon turns amber. The runner is a **separate deployment**: redeploy it (`cd runner && vercel --prod`) whenever `runner/` changes, together with the app. Details and limits are in `SECURITY.md`; the design is in `docs/HANDOVER.md` and `docs/PHASE3.md`.
+Each surface follows the global mode unless you override it (Use global, Isolated, Normal). If the runner cannot be reached, the code falls back to running inside the app, with a note, and the shield icon turns amber.
+
+**The runner has a version.** Because it is deployed separately, it can be older than the app (deployed in the wrong order, or not at all). Both runner pages say their version when the app connects (`runner/config.js`), and the app does not run code on a runner older than it needs: it runs the code inside the app instead and says so once, with the reason ("the runner is out of date ... Redeploy the runner project"). **Settings > Security > Check runner** shows which version is deployed without running anything. Always deploy the runner first, then the app. The runner is a **separate deployment**: redeploy it (`cd runner && vercel --prod`) whenever `runner/` changes, together with the app. Details and limits are in `SECURITY.md`; the design is in `docs/HANDOVER.md` and `docs/PHASE3.md`.
 
 ## Project structure
 
@@ -80,6 +82,7 @@ Each surface follows the global mode unless you override it (Use global, Isolate
     ├── git-token.test.js   Where the GitHub token lives: device-key encryption, migrations, fallbacks, lost key, reloads (tests/lib/fake-idb.js)
     ├── git-push.test.js    Push as one real push: plan (incremental, full, squash, merges), commit messages and order, deletions, binary files, empty repositories, failures leaving GitHub untouched, the unpushed count; against a fake GitHub that is strict about what the Git Data API accepts
     ├── paths.test.js       The helper every test uses to find the runner (inside the app folder or beside it) and to report a missing hidden file plainly (tests/lib/paths.js)
+    ├── runner-version.test.js  The runner's version handshake: the app never needs more than the runner has, a bump is written down, both pages send the version, hostile values are cut down, Settings uses textContent only
     ├── my-keys.test.js     My Keys record format, password rules, validation and wiring checks
     ├── file-lock.test.js   Locked files and folders: locks, encrypted text, legacy upgrade, wiring checks
     ├── app-info.test.js    Keeps version, links and About page consistent with the repo
