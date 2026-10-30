@@ -13,7 +13,7 @@
 //                                                   opts: trusted, autoInstall, raw (return the result text, no capture), sep
 //                 prompt-reply{pid, value}         the answer to an exec-prompt
 //                 reset{id, lang}                  forget a language's state (python: a fresh namespace; sql: a fresh database; r: a fresh environment)
-//   host -> app   ready / hello-ack
+//   host -> app   ready / hello-ack{version, build}   (the runner's level and build date, see config.js)
 //                 exec-out{id, kind, text}         output as it happens: stdout stderr log info warn error html
 //                 exec-prompt{id, pid, text}       Python's ainput(): the app asks the person and replies
 //                 exec-done{id, value, plots, error, ms}
@@ -366,7 +366,7 @@
             if (hostOrigin) return;
             if (typeof d.nonce !== 'string' || d.nonce.length < 16 || d.nonce.length > 128) return;
             hostOrigin = e.origin; nonce = d.nonce;
-            send({ cmRunner: 1, op: 'hello-ack' });
+            send({ cmRunner: 1, op: 'hello-ack', version: (CFG.version | 0), build: String(CFG.build || '') });   // see config.js: lets the app tell an out-of-date runner
             return;
         }
         if (!hostOrigin) return;

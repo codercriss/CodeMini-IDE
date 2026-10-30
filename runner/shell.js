@@ -125,7 +125,7 @@
             if (hostOrigin) return;                                // the first valid hello pins the host for this load
             if (typeof d.nonce !== 'string' || d.nonce.length < 16 || d.nonce.length > 128) return;
             hostOrigin = e.origin; nonce = d.nonce;
-            send({ cmRunner: 1, op: 'hello-ack' });
+            send({ cmRunner: 1, op: 'hello-ack', version: (CFG.version | 0), build: String(CFG.build || '') });   // see config.js: lets the app tell an out-of-date runner
             // A pop-out has no further need of the link back to the app, and the page inside it could use it (to
             // navigate the app's tab). We keep our own reference to talk to the app; the page gets no window.opener.
             if (popout) { try { window.opener = null; } catch (err) { /* read-only in some browsers */ } }
