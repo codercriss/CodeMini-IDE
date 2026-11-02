@@ -49,13 +49,13 @@ The preview still works, just not isolated.
 
 ## Settings
 
-Settings > Security > Isolation: **Isolation Mode** (Isolated, recommended, or Normal) for everything, and **Live Preview** (Use global / Isolated / Normal) to override it for previews. The preview's gear menu offers the same Live Preview choice. Console, Terminal and Notebooks are listed as not yet available. Changing it takes effect at once: an open preview rebuilds.
+Settings > Security > Isolation: **Isolation Mode** (Isolated, recommended, or Same origin) for everything, and **Live Preview** (Use global / Isolated / Same origin) to override it for previews. The preview's gear menu offers the same Live Preview choice. Console, Terminal and Notebooks are listed as not yet available. Changing it takes effect at once: an open preview rebuilds.
 
 Escape hatches in the browser's `localStorage`:
 
 | Key | Effect |
 | --- | --- |
-| `codemini_runner` = `off` | forces Normal (not isolated) everywhere, whatever Settings says; an escape hatch |
+| `codemini_runner` = `off` | forces Same origin (not isolated) everywhere, whatever Settings says; an escape hatch |
 | `codemini_runner_url` | **localhost only**: use a local runner while developing, e.g. `http://localhost:8766` |
 
 ## Run it locally
