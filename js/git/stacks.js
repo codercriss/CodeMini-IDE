@@ -704,7 +704,34 @@ window.reportBinRestoreFailures = function(failed) {
   }, () => { if (typeof closeGenModal === 'function') closeGenModal(); });
 };
 
+// Restoring moves things back into live files, so it asks first (Empty Bin already did). Uses the shared dialog;
+// text is plain text there, so file names in it are safe. Without the dialog it falls back to confirm().
+window.confirmBinRestore = function(opts, onConfirm) {
+  if (typeof window.showCustomModal === 'function') {
+    window.showCustomModal({ title: opts.title, text: opts.text, submitText: opts.submitText }, onConfirm);
+  } else if (confirm(opts.text)) onConfirm();
+};
+
+// Pure: the question asked before Restore All.
+window.binRestoreAllText = function(count) {
+  return count === 1
+    ? 'Restore the 1 item in the Recycle Bin to where it was deleted from?'
+    : `Restore all ${count} items in the Recycle Bin to where they were deleted from?`;
+};
+
 window.restoreAllBin = function() {
+  if (!window.recycleBin || window.recycleBin.length === 0) return;
+  const currentDb = typeof db !== 'undefined' ? db: null;
+  if (!currentDb) return;
+
+  window.confirmBinRestore({
+    title: 'Restore All Items',
+    text: window.binRestoreAllText(window.recycleBin.length),
+    submitText: 'Restore All'
+  }, () => window.doRestoreAllBin());
+};
+
+window.doRestoreAllBin = function() {
   if (!window.recycleBin || window.recycleBin.length === 0) return;
 
   // Isolate database dynamically to current active context
@@ -728,24 +755,21 @@ window.toggleTrashExpand = function(id, event) {
   window.renderStacks();
 };
 
-window.restoreBinItem = function(index, event) {
-  if (event) event.stopPropagation();
-  const currentDb = typeof db !== 'undefined' ? db: null;
-  if (!currentDb) return;
-
-  const file = window.recycleBin[index];
-  if (!file) return;
-  const byId = new Map(window.recycleBin.map(t => [t.id, t]));
+// Pure: what restoring one bin item brings back. { items, ancestors, descendants } - `items` is the item itself, any
+// trashed folders above it (so it is not restored as an orphan) and, for a folder, everything still in the trash beneath it.
+window.planBinItemRestore = function(file, bin) {
+  const byId = new Map(bin.map(t => [t.id, t]));
 
   // Restoring a single item shouldn't come back as an orphan if its parent
   // folder is still in the trash - walk up and restore any trashed ancestors
   // first, so it always has somewhere to actually live once restored.
-  const toRestore = [file];
+  const items = [file];
+  const ancestors = [], descendants = [];
   const seen = new Set([file.id]);
   let parentId = file.parentId;
   while (byId.has(parentId) && !seen.has(parentId)) {
     const parent = byId.get(parentId);
-    toRestore.push(parent);
+    items.push(parent); ancestors.push(parent);
     seen.add(parentId);
     parentId = parent.parentId;
   }
@@ -755,13 +779,47 @@ window.restoreBinItem = function(index, event) {
   // contents - the natural counterpart action.
   if (file.type === 'folder' || file.type === 'workspace') {
     const getDescendants = (pid) => {
-      const children = window.recycleBin.filter(t => t.parentId === pid);
+      const children = bin.filter(t => t.parentId === pid);
       let result = [...children];
       children.forEach(c => { if (c.type === 'folder' || c.type === 'workspace') result.push(...getDescendants(c.id)); });
       return result;
     };
-    getDescendants(file.id).forEach(d => { if (!seen.has(d.id)) { toRestore.push(d); seen.add(d.id); } });
+    getDescendants(file.id).forEach(d => { if (!seen.has(d.id)) { items.push(d); descendants.push(d); seen.add(d.id); } });
   }
+  return { items, ancestors, descendants };
+};
+
+// Pure: the question asked before restoring one item, including anything that comes back with it.
+window.binRestoreItemText = function(file, plan) {
+  let text = `Restore "${file.name}" to where it was deleted from?`;
+  if (plan.descendants.length) text += ` The ${plan.descendants.length} item${plan.descendants.length === 1 ? '' : 's'} inside it in the bin will be restored too.`;
+  if (plan.ancestors.length === 1) text += ` Its folder "${plan.ancestors[0].name}" is also in the bin and will be restored with it.`;
+  else if (plan.ancestors.length > 1) text += ` Its ${plan.ancestors.length} parent folders are also in the bin and will be restored with it.`;
+  return text;
+};
+
+window.restoreBinItem = function(index, event) {
+  if (event) event.stopPropagation();
+  const currentDb = typeof db !== 'undefined' ? db: null;
+  if (!currentDb) return;
+
+  const file = window.recycleBin[index];
+  if (!file) return;
+
+  window.confirmBinRestore({
+    title: 'Restore Item',
+    text: window.binRestoreItemText(file, window.planBinItemRestore(file, window.recycleBin)),
+    submitText: 'Restore'
+  }, () => window.doRestoreBinItem(file));
+};
+
+// `file` is the bin record itself, not an index: the bin can change while the dialog is open (auto-clear, a delete).
+window.doRestoreBinItem = function(file) {
+  const currentDb = typeof db !== 'undefined' ? db: null;
+  if (!currentDb) return;
+  if (!window.recycleBin || window.recycleBin.indexOf(file) === -1) return;
+
+  const toRestore = window.planBinItemRestore(file, window.recycleBin).items;
 
   window.restoreItemsToDB(toRestore, currentDb, (restored, failed) => {
     restored.forEach(f => {

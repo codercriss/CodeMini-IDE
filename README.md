@@ -87,6 +87,7 @@ Each surface follows the global mode unless you override it (Use global, Isolate
     ├── file-lock.test.js   Locked files and folders: locks, encrypted text, legacy upgrade, wiring checks
     ├── app-info.test.js    Keeps version, links and About page consistent with the repo
     ├── release-history.test.js  Keeps the in-app version history (Settings > Updates) in step with CHANGELOG.md and the app version (no browser needed)
+    ├── bin-restore-confirm.test.js  Stacks > Recycle Bin: Restore and Restore All ask first, and nothing leaves the bin until you confirm (no browser needed)
     ├── pwa.test.js         Manifest, icons, shortcuts (must match the ?action= handlers in app.js), screenshots, <head> links and precache list agree
     ├── update-state.test.js  Update flow in pwa.js: shared state, toast, manual vs scheduled checks, Auto Check Updates (no browser needed)
     ├── sw.test.js          Service worker strategy: network-first, timeout, offline fallback (no browser needed)

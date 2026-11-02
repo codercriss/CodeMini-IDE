@@ -2,6 +2,14 @@
 
 The app currently reports itself as v1.4.0 (Settings > About / Updates).
 
+## Unreleased
+
+### Changed
+- **Stacks > Recycle Bin: restoring now asks first.** The Restore All icon and each item's Restore icon used to put files back at once; a mis-tap on a phone could not be undone. Both now open the same confirmation dialog Empty Bin uses (Cancel does nothing). Restore All says how many items will go back. Restoring one item names it, and says when more comes back with it: the items inside a folder that are still in the bin, or the trashed parent folders it needs so it is not restored as an orphan. The restore itself is unchanged, and it works on the bin as it is when you confirm, so an item that was deleted for good while the dialog was open is skipped instead of restoring the wrong one.
+
+### Tests
+- New `tests/bin-restore-confirm.test.js` (17 checks, no browser, in `npm test`): nothing leaves the bin until Confirm, Cancel changes nothing, the texts (plural, singular, folder contents, parent folders), a bin that changed while the dialog was open, hostile names stay plain text, the `confirm()` fallback, and that the bin's buttons call the asking functions. Checked by breaking the code three ways and watching a test fail each time.
+
 ## 1.4.0 (2026-10-31)
 
 **Highlights.** Code you run is now isolated from your files, GitHub token and My Keys vault: the Console, Terminal, editor Run and Debug, and Python, R and SQL notebooks run on a separate origin (the preview runner), not inside CodeMini. Push sends your commits as real commits and moves the branch once. The runner announces its version and the app tells you when it is out of date (Settings > Security > Check runner). R plots work, in both modes. webR is pinned to a release. The isolation choice is now called "Same origin" instead of "Normal". The repository moved to `github.com/codercriss/CodeMini-IDE`.
