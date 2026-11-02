@@ -828,11 +828,41 @@ document.addEventListener('DOMContentLoaded', () => {
   const _L = (k) => (_info.links && _info.links[k]) || '#';
   const _V = _info.version || '1.0.0';
 
-  // Version history shown in Settings > Updates. Newest first; the first entry is the current release and starts open.
+  // Version history shown in Settings > Updates and the Version History tab. Newest first; the first entry starts open.
+  // Keep it in step with CHANGELOG.md: one entry per "## x.y.z" heading, same order (tests/release-history.test.js fails if not).
+  // `current` is worked out from APP_INFO.version, so a version bump only needs a new entry at the top.
   // Text is trusted, static markup (it carries <strong> and entities), so it is not escaped.
   const _RELEASES = [
     {
-      version: _V, icon: 'ri-install-line', current: true, date: 'Latest release',
+      version: '1.4.0', icon: 'ri-shield-check-line', date: '31 Oct 2026',
+      summary: 'Code you run is isolated from your files, token and keys. Push is now a real push.',
+      features: [
+        '<strong>Isolated code execution:</strong> the Console, Terminal, editor Run and Debug, and Python, R and SQL notebooks now run on a separate origin (the preview runner), so they cannot read your files, GitHub token or My Keys vault.',
+        '<strong>Push is one real push:</strong> your own commits and messages arrive on GitHub, the branch moves once at the end, and a failure midway leaves GitHub exactly as it was. Only changed files are uploaded, and files you deleted locally are deleted there too.',
+        '<strong>Clearer Source Control:</strong> the Remote tab says what Push will send, the unpushed-commit count now goes down after a push, and Fetch, Pull and Push show live progress.',
+        '<strong>Runner version check:</strong> the app notices a runner that is out of date and says why. Settings &rsaquo; Security &rsaquo; Check runner tests it without running anything.',
+        '<strong>Stop really stops:</strong> in the isolated Console, Stop now ends a running command. R plots now show up, in both modes, and webR is pinned to release v0.6.0.',
+        '<strong>&ldquo;Same origin&rdquo; replaces &ldquo;Normal&rdquo;</strong> as the name of the non-isolated mode. Your saved settings keep working.',
+        '<strong>Workspaces, audited:</strong> fixed Documents that never saved inside a workspace, lost edits when switching, paste and recycle-bin restore going to the wrong place, ghost databases, and a deleted workspace reopening at launch.',
+        '<strong>New addresses:</strong> the app is now at codemini-ide.vercel.app and the repository at github.com/codercriss/CodeMini-IDE. Your data stays with the old address, so export from it first.',
+        '<strong>Smaller fixes:</strong> the notebook cell menu is no longer cut off in premium themes, and long repository names in the Remote tab no longer end after the owner.'
+      ]
+    },
+    {
+      version: '1.3.2', icon: 'ri-lock-2-line', date: 'Oct 2026',
+      summary: 'A security release: isolated previews, safe file names, and properly encrypted locks and token.',
+      features: [
+        '<strong>Isolated Live Preview:</strong> the previewed page runs on a separate origin and can no longer reach your storage, vault or files. A new Isolation setting (Settings &rsaquo; Security) lets you choose per surface, and a shield in the preview shows the status.',
+        '<strong>Console and Terminal on the runner:</strong> JavaScript, Python, PHP and Ruby typed there can run on the isolated host, with an automatic fallback and a one-time note if it cannot be reached.',
+        '<strong>File names can no longer run script:</strong> hostile names in zips, clones and imports are escaped everywhere, and Markdown, documents and saved output are filtered through an allowlist.',
+        '<strong>Locked files and folders</strong> now use a salted PBKDF2 verifier and AES-256-GCM, instead of storing a password. Older locks upgrade by themselves.',
+        '<strong>GitHub token encrypted</strong> with a device key (CodeMini Shield). It no longer needs My Keys to be unlocked and survives a reload. Older copies migrate on their own.',
+        '<strong>Fixed:</strong> small dialogs showing the previous dialog&rsquo;s message, the Console Trusted toggle and Variables Explorer, Archive &ldquo;Extract all&rdquo;, SQL &ldquo;Copy table&rdquo; copying only the header, and &ldquo;Yesterday&rdquo; being wrong in the Explorer after midnight.',
+        '<strong>Preview fixes:</strong> auto-reload now updates pages that link other files, the Storage Manager no longer breaks after an in-place rewrite, and the preview console input fills its row.'
+      ]
+    },
+    {
+      version: '1.3.1', icon: 'ri-key-2-line', date: 'Earlier release',
       summary: 'My Keys: an encrypted vault for your API keys, tokens and passwords.',
       features: [
         '<strong>My Keys:</strong> a new sidebar in the activity menu, with Add Keys, My Keys and Config tabs.',
@@ -843,16 +873,28 @@ document.addEventListener('DOMContentLoaded', () => {
       ]
     },
     {
-      version: '1.2.0', icon: 'ri-install-line', current: false, date: 'Earlier release',
-      summary: 'CodeMini is now a proper installable app.',
+      version: '1.2.0', icon: 'ri-notification-3-line', date: 'Earlier release',
+      summary: 'App shortcuts, a real update system and a Notifications tab.',
       features: [
-        '<strong>Install App:</strong> add CodeMini to your device from the More menu or your browser.',
         '<strong>App shortcuts:</strong> long-press or right-click the installed icon for New File, Terminal, Search and Settings.',
-        '<strong>Update notice &amp; notifications:</strong> new versions are announced in a toast, here, and in Now Island.'
+        '<strong>Update state:</strong> Settings &rsaquo; Updates shows live status (up to date, checking, installed, could not check) with Check for updates and Reload now. Hourly re-checks now follow Auto Check Updates.',
+        '<strong>Notifications in Now Island:</strong> a real tab with unread counts, a full-screen viewer, and update notices that stay until you delete them.',
+        '<strong>Version history:</strong> collapsible release cards in Settings &rsaquo; Updates, and a View all versions tab.'
       ]
     },
     {
-      version: '1.0.0', icon: 'ri-rocket-line', current: false, date: 'April 2026',
+      version: '1.1.0', icon: 'ri-install-line', date: 'Earlier release',
+      summary: 'CodeMini became a proper installable app.',
+      features: [
+        '<strong>Install App:</strong> add CodeMini to your device from the More menu or your browser, with a full icon set including maskable and Apple touch icons.',
+        '<strong>Better offline:</strong> the service worker falls back to the cached copy on a flaky connection, and any page opens the offline app shell.',
+        '<strong>Update notice:</strong> an &ldquo;updated, Reload&rdquo; toast that never reloads by itself, so unsaved edits are safe.',
+        '<strong>Preview panels:</strong> the DOM Inspector and Network Monitor now push the preview up like the Console, one panel at a time.',
+        '<strong>About &amp; Feedback:</strong> real links to the licence, privacy policy, repository and issue tracker, and Send Feedback now opens an email to the maintainer.'
+      ]
+    },
+    {
+      version: '1.0.0', icon: 'ri-rocket-line', date: 'April 2026',
       summary: 'The first release of CodeMini: an offline-first IDE that runs entirely in your browser.',
       features: [
         '<strong>Live Preview:</strong> Seamless side-by-side HTML/JS/CSS rendering.',
@@ -861,7 +903,7 @@ document.addEventListener('DOMContentLoaded', () => {
         '<strong>Enhanced Notebooks:</strong> Pyodide integration and Java environment.'
       ]
     }
-  ];
+  ].map(r => Object.assign({}, r, { current: r.version === _V }));
 
   // How many releases the Updates page lists before pointing at the full "Version History" tab.
   const _RELEASES_SHOWN = 6;
@@ -1246,7 +1288,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div style="text-align: center; margin-bottom: 25px;">
               <img src="icons/icon.png" alt="CodeMini Logo" style="width: 64px; height: 64px; object-fit: contain; border-radius: 7px; margin-bottom: 15px; margin-top: 10px;">
               <h2 style="margin: 0; font-size: 20px; color: var(--text-main);">CodeMini IDE</h2>
-              <div style="color: var(--text-muted); font-size: 14px; margin-top: 5px;">Version ${_V} (Build ${_info.build || '2026.04'})</div>
+              <div style="color: var(--text-muted); font-size: 14px; margin-top: 5px;">Version ${_V} (Build ${_info.build || '2026.10'})</div>
             </div>
             <p><strong>CodeMini</strong> is a state-of-the-art, highly portable browser-based coding environment designed for developers who need power on the go. Built with an offline-first philosophy, your code lives securely in your browser's IndexedDB, requiring zero server roundtrips for your daily workflow.</p>
             <h4 style="margin: 20px 0 10px 0; border-bottom: 1px solid var(--border-color); padding-bottom: 5px; color: var(--accent-blue);">Core Technologies</h4>
