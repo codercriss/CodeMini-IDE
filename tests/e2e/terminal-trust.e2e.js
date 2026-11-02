@@ -25,7 +25,7 @@ const ok = (c, n, x) => { c ? (pass++, console.log('  PASS', n)) : (fail++, cons
   await ev(() => document.getElementById('terminalIconItem').click()); await sleep(800);
   ok(await ev(() => !!document.querySelector('.term-input')), 'terminal tab opened');
   // This suite is about Workspace Trust, and its check is a side effect on the app's own window (window.__termRan). Isolated mode
-  // (the default) runs scripts on the runner instead, by design, so pin the Terminal to Normal here.
+  // (the default) runs scripts on the runner instead, by design, so pin the Terminal to Same origin here (its saved value is 'Normal').
   await ev(() => window.saveSetting('isolationTerminal', 'Normal'));
 
   await ev(() => window.saveSetting('workspaceTrustEmptyWindow', false)); // root becomes restricted

@@ -1669,7 +1669,7 @@ json.dumps({
     if (e.target.closest('.tb-interrupt')) {
         window.kernelInterrupted = true; 
         // A Python cell (or install) running on the runner's host is really ended: shutting the host down rejects the waiting run, which the cell then
-        // reports as "[Execution Interrupted]". Code running inside the app (Normal mode, R, SQL) cannot be interrupted from here, as before.
+        // reports as "[Execution Interrupted]". Code running inside the app (Same origin mode, R, SQL) cannot be interrupted from here, as before.
         { const hw = (typeof _getWinId === 'function') ? _getWinId() : null, hr = hw && window._nbHostRun && window._nbHostRun[hw];
           if (hr && window.CodeMiniExec) { hr.interrupted = true; window.CodeMiniExec.kill(hw); } }
         const statusCircle = pane.querySelector('.status-circle'); 

@@ -1088,7 +1088,7 @@ _res
                 if (stopBtn.classList.contains('disabled')) return;
                 // Isolated: the command runs on the runner's host, so Stop can really end it. Shutting the host down rejects the waiting run, which then
                 // reports "[Execution Interrupted]" in its own block (and finishes the command normally); the next command starts a fresh host.
-                // Normal: code running inside CodeMini cannot be interrupted from here, so Stop only releases the UI, as it always did.
+                // Same origin: code running inside CodeMini cannot be interrupted from here, so Stop only releases the UI, as it always did.
                 if (inFlightRun && window.CodeMiniExec) { inFlightRun.interrupted = true; window.CodeMiniExec.kill(activeWinId); return; }
                 
                 setKernelRunning(false);

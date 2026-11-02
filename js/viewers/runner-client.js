@@ -13,9 +13,9 @@
 // ordinary message events whose source is the preview frame, so the existing preview code needs no changes.
 // Control messages must carry the per-frame nonce; anything else from the frame is ignored.
 //
-// Settings: Settings > Security > Isolation (read through window.getIsolationSettings(): a global Isolated/Normal choice
+// Settings: Settings > Security > Isolation (read through window.getIsolationSettings(): a global Isolated/Same origin choice
 // and a per-surface override). Default is Isolated. Escape hatches in localStorage: codemini_runner = "off" forces
-// Normal everywhere; on localhost only, codemini_runner_url points at a local runner for development. The runner can
+// Same origin everywhere; on localhost only, codemini_runner_url points at a local runner for development. The runner can
 // never be the app's own origin.
 (function () {
     'use strict';
@@ -171,7 +171,7 @@
     }
 
     async function ensure(iframe, surface) {
-        // Normal mode chosen for this surface: leave the runner (if this frame was using it) and report "off".
+        // Same origin mode chosen for this surface: leave the runner (if this frame was using it) and report "off".
         if (modeFor(surface || 'preview') === 'normal') {
             var running = sessions.get(iframe);
             if (running) { failAll(running, 'isolation switched off'); sessions.delete(iframe); iframe.dataset.cmRunner = ''; iframe.src = 'about:blank'; }

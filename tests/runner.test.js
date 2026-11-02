@@ -273,7 +273,7 @@ const hello = (s, origin, nonce) => s.send(s.host, origin || IDE, { cmRunner: 1,
   await t('codemini_runner=off still forces Normal everywhere, even over an explicit Isolated override', () => {
     assert.strictEqual(client({ ls: { codemini_runner: 'off' }, settings: { global: 'runner', surfaces: { preview: 'runner' } } }).R.modeFor('preview'), 'normal');
   });
-  await t('Normal mode: ensure() makes no attempt, leaves the frame alone, and reports "off"', async () => {
+  await t('Same origin mode: ensure() makes no attempt, leaves the frame alone, and reports "off"', async () => {
     const c = client({ settings: { global: 'normal', surfaces: { preview: null } } });
     assert.strictEqual(await c.R.ensure(c.iframe), false); assert.strictEqual(c.R.status(), 'off'); assert.strictEqual(c.iframe.src, undefined);
     assert.strictEqual(c.R.diagnostics().mode, 'normal');

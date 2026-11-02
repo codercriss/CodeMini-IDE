@@ -14,7 +14,7 @@
 //     app is backgrounded. Locking drops the key and the decrypted entries and rebuilds the DOM.
 //
 // WHAT IT CANNOT PROTECT AGAINST (said plainly in Config > "How your keys are protected")
-//   - Code that runs in Normal mode, or after a fallback (previews, Console, Terminal, editor Run, notebooks) shares this origin. While the
+//   - Code that runs in Same origin mode, or after a fallback (previews, Console, Terminal, editor Run, notebooks) shares this origin. While the
 //     vault is unlocked, or a value is revealed, such code could read what is on screen. The page also keeps
 //     Shield's crypto primitives and this module's JSON primitives are captured at load so later
 //     monkey-patching cannot hook them, and nothing here exposes a way to read entries, but it cannot hide
@@ -546,7 +546,7 @@
                     </ul>
                     <div class="keys-sec-title" style="margin-top:12px">What it cannot protect against</div>
                     <ul class="keys-notes-list warn">
-                        <li>Code that runs in Normal mode, or after a fallback (the shield turns amber), shares the app's page: previews, the Console, the Terminal, the editor's Run and notebooks can then reach an unlocked vault. In Isolated mode they run on a separate origin and cannot. Keep the vault locked while running code you don't trust in Normal mode.</li>
+                        <li>Code that runs in Same origin mode, or after a fallback (the shield turns amber), shares the app's page: previews, the Console, the Terminal, the editor's Run and notebooks can then reach an unlocked vault. In Isolated mode they run on a separate origin and cannot. Keep the vault locked while running code you don't trust in Same origin mode.</li>
                         <li>Malware, screen recording, or someone watching your screen.</li>
                         <li>A weak password. Copying a key also places it on your clipboard, where other apps can read it.</li>
                     </ul>

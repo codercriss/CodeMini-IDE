@@ -225,8 +225,8 @@ const previewFrame = (page, origin) => page.frames().find(f => f.url().startsWit
   const nWait = ctx.waitForEvent('page', { timeout: 8000 });
   await page.evaluate(() => document.getElementById('lpPopOutBtn').click());
   const nPopup = await nWait.catch(() => null);
-  ok(!!nPopup, 'Normal mode: pop-out still opens a new tab');
-  if (nPopup) { await sleep(1500); ok((await nPopup.evaluate(() => document.body.innerText)).includes('Rewritten here'), 'Normal mode: and it shows the page'); await nPopup.close(); }
+  ok(!!nPopup, 'Same origin mode: pop-out still opens a new tab');
+  if (nPopup) { await sleep(1500); ok((await nPopup.evaluate(() => document.body.innerText)).includes('Rewritten here'), 'Same origin mode: and it shows the page'); await nPopup.close(); }
   await ctx.close();
 
   console.log('\n[Settings > Security, the gear menu, and the status bar icon]');
@@ -242,24 +242,25 @@ const previewFrame = (page, origin) => page.frames().find(f => f.url().startsWit
 
   await evp(() => document.getElementById('settingsIconItem').click()); await sleep(900);
   await evp(() => document.querySelector('.settings-sidebar-item[data-tab="security"]').click()); await sleep(300);
-  const ui = await evp(() => { const g = document.querySelector('select[data-setting="isolationMode"]'), p = document.querySelector('select[data-setting="isolationPreview"]'); return { g: g && g.value, p: p && p.value, gOpts: g && [...g.options].map(o => o.textContent), pOpts: p && [...p.options].map(o => o.textContent), disabled: [...document.querySelectorAll('select[disabled]')].filter(x => /not yet available/.test(x.textContent)).length, labels: [...document.querySelectorAll('.settings-item-info strong')].map(x => x.textContent).filter(t => /^(Isolation Mode|Live Preview|Console|Terminal|Notebooks)$/.test(t)) }; });
+  const ui = await evp(() => { const g = document.querySelector('select[data-setting="isolationMode"]'), p = document.querySelector('select[data-setting="isolationPreview"]'); return { g: g && g.value, p: p && p.value, gOpts: g && [...g.options].map(o => o.textContent), pOpts: p && [...p.options].map(o => o.textContent), gVals: g && [...g.options].map(o => o.value), pVals: p && [...p.options].map(o => o.value), disabled: [...document.querySelectorAll('select[disabled]')].filter(x => /not yet available/.test(x.textContent)).length, labels: [...document.querySelectorAll('.settings-item-info strong')].map(x => x.textContent).filter(t => /^(Isolation Mode|Live Preview|Console|Terminal|Notebooks)$/.test(t)) }; });
   ok(ui.g === 'Isolated' && ui.p === 'Use global', 'Security tab: Isolation Mode = Isolated, Live Preview = Use global', ui);
-  ok(JSON.stringify(ui.gOpts) === '["Isolated","Normal"]' && JSON.stringify(ui.pOpts) === '["Use global","Isolated","Normal"]', 'with the right choices');
+  ok(JSON.stringify(ui.gOpts) === '["Isolated","Same origin"]' && JSON.stringify(ui.pOpts) === '["Use global","Isolated","Same origin"]', 'with the right choices, the second one worded "Same origin"');
+  ok(JSON.stringify(ui.gVals) === '["Isolated","Normal"]' && JSON.stringify(ui.pVals) === '["Use global","Isolated","Normal"]', 'and the saved values are unchanged ("Normal"), so saved settings keep working');
   ok(ui.labels.join() === 'Isolation Mode,Live Preview,Console,Terminal,Notebooks' && ui.disabled === 0, 'Console, Terminal and Notebooks are all real settings now; none is listed as not yet available', ui);
 
   await evp(() => { const g = document.querySelector('select[data-setting="isolationMode"]'); g.value = 'Normal'; g.dispatchEvent(new Event('change', { bubbles: true })); }); await sleep(3000);
   ok(await evp(() => window.appSettings.isolationMode) === 'Normal' && await evp(() => Object.keys(localStorage).some(k => /isolationMode$/.test(k) && localStorage.getItem(k) === 'Normal')), 'choosing Normal is saved');
   ok((await isRunner()) === '' || (await evp(() => document.getElementById('lpIframe').src.startsWith('blob:http://localhost:8765/'))), 'an open preview switches to the same-origin page at once (no manual reload)', await evp(() => document.getElementById('lpIframe').src.slice(0, 40)));
-  ok(/Normal mode/.test(await badge()), 'and the icon says Normal mode', await badge());
+  ok(/Same origin mode/.test(await badge()), 'and the icon says Same origin mode', await badge());
   const nf = previewFrame(page, 'http://localhost:8765');
-  ok(!!nf && await nf.evaluate(() => typeof window.top.CodeMiniShield) === 'object', 'in Normal mode the page can reach the app (the old behaviour, as chosen)');
+  ok(!!nf && await nf.evaluate(() => typeof window.top.CodeMiniShield) === 'object', 'in Same origin mode the page can reach the app (the old behaviour, as chosen)');
 
   console.log('\n[per-surface override from the gear menu]');
   await evp(() => document.getElementById('lpSettingsBtn').click()); await sleep(300);
-  ok(await evp(() => document.getElementById('lpIsoGlobalTag').textContent) === 'currently Normal', 'the gear menu shows what the global setting currently is');
+  ok(await evp(() => document.getElementById('lpIsoGlobalTag').textContent) === 'currently Same origin', 'the gear menu shows what the global setting currently is');
   ok(await evp(() => document.querySelector('input[name="lpIsoPref"]:checked').value) === 'Use global', 'and "Use the global setting" is selected');
   await evp(() => document.querySelector('input[name="lpIsoPref"][value="Isolated"]').click()); await sleep(4500);
-  ok(await isRunner() === RUNNER && /Isolated/.test(await badge()), 'Isolated for Live Preview beats a global Normal');
+  ok(await isRunner() === RUNNER && /Isolated/.test(await badge()), 'Isolated for Live Preview beats a global Same origin');
   ok(await evp(() => window.appSettings.isolationPreview) === 'Isolated' && await evp(() => document.querySelector('select[data-setting="isolationPreview"]').value) === 'Isolated', 'and it is the same setting as in the Security tab');
   const rf = previewFrame(page, RUNNER);
   ok(!!rf && await rf.evaluate(() => document.getElementById('t') && document.getElementById('t').textContent) === 'Hello isolated', 'with the page rendered in the runner');
@@ -269,7 +270,7 @@ const previewFrame = (page, origin) => page.frames().find(f => f.url().startsWit
   ok(await isRunner() === RUNNER, 'switching the global mode back to Isolated returns the preview to the runner');
   ok(await evp(() => document.getElementById('lpIsoGlobalTag').textContent) === 'currently Isolated', 'and the gear menu follows');
   await evp(() => window.saveSetting('isolationPreview', 'Normal')); await sleep(3000);
-  ok(await evp(() => document.getElementById('lpIframe').src.startsWith('blob:http://localhost:8765/')), 'Normal for Live Preview beats a global Isolated');
+  ok(await evp(() => document.getElementById('lpIframe').src.startsWith('blob:http://localhost:8765/')), 'Same origin for Live Preview beats a global Isolated');
   const resetOk = await evp(() => { window.saveSetting('isolationPreview', 'Use global'); return window.getIsolationSettings(); });
   ok(resetOk.global === 'runner' && resetOk.surfaces.preview === null, 'getIsolationSettings reports the effective choice', resetOk);
   const bad2 = errors.filter(e => !/monaco|pyodide|loadPyodide|initSqlJs|Failed to fetch|net::|require is not defined/i.test(e));
@@ -277,7 +278,7 @@ const previewFrame = (page, origin) => page.frames().find(f => f.url().startsWit
   await ctx.close();
 
   console.log('\n[auto-reload while typing: both modes, both strategies]');
-  for (const [name, extra] of [['Normal / Full Navigation', { codemini_runner: 'off' }], ['Normal / Legacy', { codemini_runner: 'off', codemini_preview_reload_mode: 'legacy' }], ['Isolated / Full Navigation', {}], ['Isolated / Legacy', { codemini_preview_reload_mode: 'legacy' }]]) {
+  for (const [name, extra] of [['Same origin / Full Navigation', { codemini_runner: 'off' }], ['Same origin / Legacy', { codemini_runner: 'off', codemini_preview_reload_mode: 'legacy' }], ['Isolated / Full Navigation', {}], ['Isolated / Legacy', { codemini_preview_reload_mode: 'legacy' }]]) {
     ({ ctx, page, errors } = await open(browser, RUNNER, extra));
     await page.evaluate(() => document.getElementById('playIconItem').click()); await sleep(4500);
     const typeText = (text) => page.evaluate((text) => { window.__liveText = '<!doctype html><html><head><link rel="stylesheet" href="style.css"></head><body><h1 id="t">' + text + '</h1><script src="app.js"></script></body></html>'; window.autoSaveFile('rn1', window.__liveText, document.querySelector('.tab[data-file-id="rn1"]')); }, text);
@@ -346,7 +347,7 @@ const previewFrame = (page, origin) => page.frames().find(f => f.url().startsWit
   ({ ctx, page } = await open(browser, RUNNER, { codemini_runner: 'off' }));
   await page.evaluate(() => document.getElementById('playIconItem').click()); await sleep(2500);
   ok(await page.evaluate(() => document.getElementById('lpIframe').src.startsWith('blob:http://localhost:8765/')), 'codemini_runner=off uses same-origin previews at once');
-  ok(await page.evaluate(() => /Normal mode/.test(document.getElementById('lpIsolation').title)), 'and says so');
+  ok(await page.evaluate(() => /Same origin mode/.test(document.getElementById('lpIsolation').title)), 'and says so');
   await ctx.close();
   ({ ctx, page } = await open(browser, APP));
   await page.evaluate(() => document.getElementById('playIconItem').click()); await sleep(2500);

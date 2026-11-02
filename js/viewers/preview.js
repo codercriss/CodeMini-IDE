@@ -324,7 +324,7 @@
             </div>
             <div class="lp-settings-group">
                 <div class="lp-settings-label">Isolation</div>
-                <div class="lp-settings-desc">Where the preview runs. Isolated (recommended) runs it on a separate origin, so it cannot read CodeMini's storage or call its functions; Normal runs it inside CodeMini's own origin. The same choice, for everything, is in Settings &gt; Security.</div>
+                <div class="lp-settings-desc">Where the preview runs. Isolated (recommended) runs it on a separate origin, so it cannot read CodeMini's storage or call its functions; Same origin runs it inside CodeMini itself. The same choice, for everything, is in Settings &gt; Security.</div>
                 <label class="lp-settings-radio-row">
                     <input type="radio" name="lpIsoPref" value="Use global">
                     <span>Use the global setting <span class="lp-settings-tag" id="lpIsoGlobalTag"></span></span>
@@ -335,7 +335,7 @@
                 </label>
                 <label class="lp-settings-radio-row">
                     <input type="radio" name="lpIsoPref" value="Normal">
-                    <span>Normal (same origin)</span>
+                    <span>Same origin</span>
                 </label>
             </div>
         </div>
@@ -526,7 +526,7 @@
         const look = {
             isolated: ['ri-shield-check-line', 'var(--color-success, #3fb950)', 'Isolated: this preview runs on a separate origin and cannot read CodeMini\'s storage or call its functions.'],
             fallback: ['ri-error-warning-line', 'var(--color-warning, #d29922)', 'Not isolated: the preview runner could not be used, so this preview runs inside the app\'s own origin.' + (window.CodeMiniRunner && window.CodeMiniRunner.lastError() ? ' Reason: ' + window.CodeMiniRunner.lastError() : '')],
-            off: ['ri-error-warning-line', 'var(--text-muted)', 'Normal mode: previews run inside the app\'s own origin and can read its storage. Change it in Settings > Security > Isolation.'],
+            off: ['ri-error-warning-line', 'var(--text-muted)', 'Same origin mode: previews run inside the app\'s own origin and can read its storage. Change it in Settings > Security > Isolation.'],
             unavailable: ['ri-error-warning-line', 'var(--text-muted)', 'Isolation is not configured: previews run inside the app\'s own origin.']
         }[st];
         if (!look) { lpIsolation.style.display = 'none'; return; }
@@ -543,8 +543,8 @@
         if (!d) return 'The preview runner is not loaded.';
         const head = { isolated: 'Isolated: this preview runs on a separate origin and cannot read CodeMini\'s storage or call its functions.',
             fallback: 'Not isolated: the preview runner could not be used, so this preview runs inside the app\'s own origin and can read its storage.',
-            off: 'Normal mode: this preview runs inside the app\'s own origin and can read its storage. Change it in Settings > Security > Isolation, or in this panel\'s gear menu.', unavailable: 'Isolation is not configured.' }[d.status] || 'Isolation status is not known yet. Open a preview first.';
-        return [head, d.lastError ? 'Reason: ' + d.lastError : '', 'Mode: ' + (d.mode === 'normal' ? 'Normal' : 'Isolated'), 'Runner: ' + d.runner, 'App: ' + d.app, 'Online: ' + d.online].filter(Boolean).join('\n');
+            off: 'Same origin mode: this preview runs inside the app\'s own origin and can read its storage. Change it in Settings > Security > Isolation, or in this panel\'s gear menu.', unavailable: 'Isolation is not configured.' }[d.status] || 'Isolation status is not known yet. Open a preview first.';
+        return [head, d.lastError ? 'Reason: ' + d.lastError : '', 'Mode: ' + (d.mode === 'normal' ? 'Same origin' : 'Isolated'), 'Runner: ' + d.runner, 'App: ' + d.app, 'Online: ' + d.online].filter(Boolean).join('\n');
     }
     function toggleIsolationNote(force) {
         const host = document.getElementById('livePreviewContainer');
@@ -572,7 +572,7 @@
         const pref = ['Use global', 'Isolated', 'Normal'].includes(st.isolationPreview) ? st.isolationPreview : 'Use global';
         lpIsoRadios.forEach(r => { r.checked = r.value === pref; });
         const tag = document.getElementById('lpIsoGlobalTag');
-        if (tag) tag.textContent = 'currently ' + (st.isolationMode === 'Normal' ? 'Normal' : 'Isolated');
+        if (tag) tag.textContent = 'currently ' + (st.isolationMode === 'Normal' ? 'Same origin' : 'Isolated');
     }
     lpIsoRadios.forEach(r => r.addEventListener('change', () => { if (r.checked && typeof window.saveSetting === 'function') window.saveSetting('isolationPreview', r.value); }));
     syncIsolationRadios();
@@ -787,7 +787,7 @@
     // survives a reload, even their session state) came straight back after a "factory" reset. Never touches
     // the IDE's own keys (codemini_*, codemini-*) or databases (CodeMiniDB*) - the callers handle those, with
     // their profile protections - nor any other domain's data.
-    // Previewed pages' data can live in two places: this app's own origin (Normal mode, the code below) and the preview
+    // Previewed pages' data can live in two places: this app's own origin (Same origin mode, the code below) and the preview
     // runner's origin (Isolated), which only the runner can clear. Both are cleared; one failing does not stop the other.
     window.wipePreviewStorage = function(opts) {
         const domain = (opts && opts.domain) || '';

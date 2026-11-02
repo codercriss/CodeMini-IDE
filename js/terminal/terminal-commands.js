@@ -28,7 +28,7 @@ window.getTerminalCommands = function(
     }
 
     // Isolated mode (Settings > Security > Terminal): code the Terminal runs executes on the runner's execution host, away from CodeMini.
-    // Resolves {events, res}, or null when the in-app engine should run it (Normal mode, or the runner could not be used).
+    // Resolves {events, res}, or null when the in-app engine should run it (Same origin mode, or the runner could not be used).
     const isolatedRun = (lang, code, opts) => window.CodeMiniExec
         ? window.CodeMiniExec.runCollected('terminal', { lang, code, opts: Object.assign({ trusted: true }, opts) },
             (note) => printTerm(`<span style="color:var(--term-yellow); font-style:italic;">${window.CodeMiniEscape.html(note)}</span>`, true))

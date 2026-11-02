@@ -137,12 +137,30 @@ t('Settings > Security > Console says that the editor Run, the bottom Console in
   const l = read('js/core/settings-profile.js').split('\n').find((x) => x.includes('data-setting="isolationConsole"'));
   assert.ok(/editor's Run button/.test(l) && /Debug/.test(l));
 });
-t('My Keys > Config no longer says that code always shares the app page; it names Normal mode and Isolated mode', () => {
+t('My Keys > Config no longer says that code always shares the app page; it names Same origin mode and Isolated mode', () => {
   const src = read('js/core/my-keys.js');
   assert.ok(!/Code you run inside CodeMini \(previews, notebooks, terminal\) shares the app's page\./.test(src));
   const i = src.indexOf('What it cannot protect against');
   const note = src.slice(i, i + 900);
-  assert.ok(/Normal mode/.test(note) && /Isolated mode/.test(note));
+  assert.ok(/Same origin mode/.test(note) && /Isolated mode/.test(note));
+});
+t('the isolation choice is called "Same origin" on screen, and its saved value stays "Normal" so saved settings keep working', () => {
+  const rows = read('js/core/settings-profile.js').split('\n').filter((l) => /data-setting="isolation(Mode|Preview|Console|Terminal|Notebooks)"/.test(l));
+  assert.strictEqual(rows.length, 5, 'the five isolation dropdowns');
+  for (const l of rows) {
+    assert.ok(/<option value="Normal"[^>]*>Same origin<\/option>/.test(l), 'each dropdown shows "Same origin" and keeps the value "Normal": ' + l.slice(0, 90));
+    assert.ok(!/>Normal</.test(l), 'no dropdown may still show "Normal"');
+  }
+  // Nothing else on screen may call it Normal either (the document editor\'s "Normal" paragraph style, page width and margins are a different thing).
+  const offenders = [];
+  for (const f of walk('js', [])) {
+    if (f === 'js/viewers/docs.js') continue;
+    read(f).split('\n').forEach((line, i) => {
+      if (/^\s*\/\//.test(line)) return;
+      if (/Normal mode|Normal runs|Normal \(same origin\)|to Normal\b|fall back to Normal|\? 'Normal'|>Normal</.test(line)) offenders.push(f + ':' + (i + 1));
+    });
+  }
+  assert.deepStrictEqual(offenders, [], 'still says "Normal" for the isolation choice');
 });
 t('SECURITY.md has none of the statements that phase 3 made false', () => {
   const s = read('SECURITY.md');

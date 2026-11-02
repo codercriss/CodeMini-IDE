@@ -258,7 +258,7 @@ async function _debugHostVars(ext, winId) {
 }
 
 // Runs a debug session's code on the host. Resolves true when the host handled it (the log and the Variables panel are updated here), false when the
-// in-app engine must be used (Normal mode, or the runner is unavailable: a one-time note then explains why).
+// in-app engine must be used (Same origin mode, or the runner is unavailable: a one-time note then explains why).
 async function _debugOnHost(lang, code, winId) {
     if (!window.CodeMiniExec) return false;
     const esc = (t) => CodeMiniEscape.html(String(t));
@@ -1897,7 +1897,7 @@ window.printToBottomConsole = function(text, type = 'normal') {
 
 // Runs the editor's Run button and the bottom Console's input field on the runner's per-window host (the same host as the Console and the
 // Terminal of this window), so the code cannot touch the app's storage or functions. Resolves true when the host handled it (even when it
-// failed: a failure is reported, never silently re-run inside the app), false when the in-app engine must be used (Normal mode, or the runner
+// failed: a failure is reported, never silently re-run inside the app), false when the in-app engine must be used (Same origin mode, or the runner
 // is unavailable: then a one-time note explains why).
 window._bpHostRun = window._bpHostRun || {};
 async function _runOnHost(code, ext, winId) {
@@ -2132,7 +2132,7 @@ document.addEventListener('DOMContentLoaded', () => {
         stopBtn.addEventListener('click', () => {
             if (stopBtn.classList.contains('disabled')) return;
             // A run on the runner's host is really ended: shutting the host down rejects the waiting run, which reports "[Execution Interrupted]" itself.
-            // Code running inside the app (Normal mode) cannot be interrupted from here, so for it Stop only releases the UI, as it always did.
+            // Code running inside the app (Same origin mode) cannot be interrupted from here, so for it Stop only releases the UI, as it always did.
             const hostRun = window._bpHostRun && window._bpHostRun[_getEditorWinId()];
             if (hostRun && window.CodeMiniExec) { hostRun.interrupted = true; window.CodeMiniExec.kill(_getEditorWinId()); return; }
             window._bpConsoleRunningState[_getEditorWinId()] = false;

@@ -34,7 +34,7 @@
             return api.run(req, onOut, onAsk);
         },
         // For callers that print everything at the end (the Terminal). Resolves {events, res}, or null when the in-app engine
-        // should be used (Normal mode, or the runner is unavailable: `notify` then gets the one-time explanation).
+        // should be used (Same origin mode, or the runner is unavailable: `notify` then gets the one-time explanation).
         async runCollected(surface, req, notify) {
             if (!(await window.CodeMiniExec.use(surface))) {
                 var note = window.CodeMiniExec.fallbackNotice(surface);

@@ -893,7 +893,7 @@ async function _nbHostScratch(winId, code) {
 async function _nbHostSqlExec(winId, sql) {
     const res = await window.CodeMiniExec.run(winId, { lang: 'sql', code: sql, opts: {} }, () => {}, () => Promise.resolve(''));
     // The host answers BadRequest to a language it does not know: that happens when the deployed runner is older than this app (the two deploy separately).
-    if (res.error) throw new Error(res.error.name === 'BadRequest' ? 'The runner did not accept this SQL: it is too long, or the deployed runner is older than this version and does not know SQL yet. Redeploy the runner, or set Settings > Security > Notebooks to Normal.' : (res.error.message || 'SQL error'));
+    if (res.error) throw new Error(res.error.name === 'BadRequest' ? 'The runner did not accept this SQL: it is too long, or the deployed runner is older than this version and does not know SQL yet. Redeploy the runner, or set Settings > Security > Notebooks to Same origin.' : (res.error.message || 'SQL error'));
     let sets;
     try { sets = JSON.parse(res.value && res.value.type === 'sql' ? res.value.text : '[]'); } catch (e) { return []; }
     if (!Array.isArray(sets)) return [];
@@ -933,7 +933,7 @@ async function _nbHostRInstall(winId, pkgs) {
         if (window._nbHostRun[winId] === run) delete window._nbHostRun[winId];
     }
 }
-const _NB_OLD_RUNNER_R = 'The runner did not accept this R code: it is too long, or the deployed runner is older than this version and does not know R yet. Redeploy the runner, or set Settings > Security > Notebooks to Normal.';
+const _NB_OLD_RUNNER_R = 'The runner did not accept this R code: it is too long, or the deployed runner is older than this version and does not know R yet. Redeploy the runner, or set Settings > Security > Notebooks to Same origin.';
 
 async function _nbUseHost(winId) {
     return !!(window.CodeMiniExec && await window.CodeMiniExec.use('notebooks', winId));

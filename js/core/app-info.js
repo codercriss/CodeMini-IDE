@@ -8,7 +8,7 @@
     const REPO = 'https://github.com/codercriss/CodeMini-IDE';
     window.APP_INFO = Object.freeze({
         name: 'CodeMini IDE',
-        version: '1.3.2',
+        version: '1.4.0',
         build: '2026.04',
         copyright: 'Christian Forson',
         license: 'MIT',
