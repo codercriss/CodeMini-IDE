@@ -4599,3 +4599,29 @@ body.compact-explorer .tree-view-item {
 .versions-page { padding: 16px; height: 100%; overflow-y: auto; color: var(--text-main); }
 .versions-title { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 20px; color: var(--accent-blue); }
 .versions-sub { margin: 0 0 16px; font-size: 13px; color: var(--text-muted); }
+
+/* ---- Quick Open (js/core/quick-open.js): the title-bar search island ---- */
+#topSearchIsland.qo { padding-bottom: 4px; }
+.qo-hint { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 8px 14px; background: var(--bg-white); border-bottom: 1px solid var(--border-color); font-size: 11px; color: var(--text-muted); }
+.qo-hint-chip { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; padding: 1px 2px; border-radius: 3px; }
+.qo-hint-chip:hover { color: var(--text-main); }
+.qo-hint-chip.active { color: var(--accent-blue); font-weight: 600; }
+.qo-hint-chip kbd { font-family: var(--font-mono); font-size: 11px; font-weight: 700; padding: 0 5px; border: 1px solid var(--border-color); border-radius: 3px; background: var(--bg-panel); color: var(--text-main); }
+.qo-section { display: flex; align-items: center; gap: 8px; padding: 8px 14px 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.4px; color: var(--text-muted); background: var(--bg-white); }
+.qo-count { font-weight: 600; padding: 0 6px; border-radius: 8px; background: var(--bg-panel); }
+.qo-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 14px; cursor: pointer; font-size: 13px; color: var(--text-main); border-left: 2px solid transparent; }
+.qo-item.selected { background: var(--hover-blue); border-left-color: var(--accent-blue); }
+.qo-main { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.qo-icon { display: inline-flex; align-items: center; justify-content: center; width: 18px; flex: none; font-size: 16px; }
+.qo-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qo-detail { font-size: 10px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 45%; direction: rtl; text-align: right; }
+.qo-detail-in { direction: ltr; unicode-bidi: isolate; }
+.qo-hl { color: var(--accent-blue); font-weight: 700; }
+.qo-kbd { padding: 1px 6px; font-size: 10px; box-shadow: none; flex: none; }
+.qo-empty { padding: 18px 14px 4px; text-align: center; font-size: 13px; color: var(--text-muted); }
+.qo-tip, .qo-note { padding: 4px 14px 14px; text-align: center; font-size: 11px; color: var(--text-muted); }
+.qo-note { padding-top: 14px; font-size: 12px; }
+@media (max-width: 768px) {
+    .qo-item { min-height: 44px; }
+    .qo-hint-chip { padding: 6px 4px; }
+}

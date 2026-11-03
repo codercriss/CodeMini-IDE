@@ -45,6 +45,7 @@ const STATIC_ASSETS = [
     '/js/notebook/environments.js',
     '/js/viewers/preview.js',
     '/js/viewers/pdf-viewer.js',
+    '/js/core/quick-open.js',
     '/js/core/script.js',
     '/js/core/workspace-trust.js',
     '/js/core/help-feedback.js',

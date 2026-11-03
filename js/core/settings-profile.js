@@ -1195,6 +1195,8 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="settings-item"><div class="settings-item-info"><strong>Run & Advance</strong><span>Run cell and select next</span></div><div class="settings-control"><span class="kbd-badge">Shift + Enter</span></div></div>
 
           <h3 class="settings-category-title">Navigation & Formatting</h3>
+          <div class="settings-item"><div class="settings-item-info"><strong>Quick Open</strong><span>Jump to a file by typing part of its name (type &gt; for commands, : for a line, # for a workspace)</span></div><div class="settings-control"><span class="kbd-badge">Ctrl + P</span></div></div>
+          <div class="settings-item"><div class="settings-item-info"><strong>Command Palette</strong><span>Open Quick Open in command mode</span></div><div class="settings-control"><span class="kbd-badge">F1</span></div></div>
           <div class="settings-item"><div class="settings-item-info"><strong>Toggle Sidebar</strong><span>Show or hide the explorer sidebar</span></div><div class="settings-control"><span class="kbd-badge">Ctrl + B</span></div></div>
           <div class="settings-item"><div class="settings-item-info"><strong>Open Terminal</strong><span>Open (or focus) a terminal tab</span></div><div class="settings-control"><span class="kbd-badge">Ctrl + &#96;</span></div></div>
           <div class="settings-item"><div class="settings-item-info"><strong>Search Across Files</strong><span>Open the sidebar's project-wide search</span></div><div class="settings-control"><span class="kbd-badge">Ctrl + Shift + F</span></div></div>
