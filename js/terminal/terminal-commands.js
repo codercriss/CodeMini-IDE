@@ -100,6 +100,7 @@ window.getTerminalCommands = function(
         'python': 'Execute a Python script (Pyodide)',
         'ruby': 'Execute a Ruby script (Opal)',
         'php': 'Execute a PHP script (php-wasm)',
+        'git': 'Version control on this workspace: status, add, commit, log, diff, branch, checkout, merge, stash, tag (run "git help")',
         'npm': 'Install packages from unpkg to workspace',
         'open': 'Open file in the CodeMini text editor',
         'tabs': 'List all currently open editor tabs',
@@ -176,6 +177,7 @@ window.getTerminalCommands = function(
                 'Text & Data': ['cat', 'grep', 'head', 'tail', 'write', 'mini', 'hexdump', 'sort', 'uniq', 'wc', 'diff', 'markdown', 'csv2json', 'json2csv', 'formatjson', 'extracturls', 'minifyjs'],
                 'System & Network': ['clear', 'history', 'whoami', 'hostname', 'uname', 'ping', 'curl', 'wget', 'sysinfo', 'uptime', 'battery', 'storage', 'geolocate', 'weather', 'ssh', 'ps', 'kill', 'jobs', 'fg', 'bg'],
                 'Execution': ['run', 'sh', 'bash', 'zsh', 'js', 'python', 'ruby', 'php', 'npm', 'open', 'tabs', 'closetab'],
+                'Version Control': ['git'],
                 'Utilities': ['sync', 'help', 'man', 'exit', 'echo', 'date', 'calc', 'timer', 'urlencode', 'urldecode', 'base64', 'uuid', 'roll', 'rot13', 'cowsay', 'qr', 'encrypt', 'decrypt', 'cmatrix', 'alias', 'env', 'restart']
             };
 
@@ -266,6 +268,29 @@ window.getTerminalCommands = function(
             }
 
             printTerm(`<span style="color:var(--term-green)">Terminal and Explorer successfully synced to Workspace: ${targetWs.name}</span>`, true);
+        },
+
+        // `git` shares its repository with the Source Control panel (see terminal-git.js). It works on the database
+        // this terminal is bound to, which `sync` can move and which may differ from the Explorer's.
+        git: async (args) => {
+            if (!window.CodeMiniGitCli) return printTerm('git: Source Control did not load');
+            await window.CodeMiniGitCli.run(args.slice(1), {
+                rootId: termState.folderStack[0].id,
+                cwd: termState.folderStack.slice(1).map(f => f.name),
+                printHtml: (html) => printTerm(html, true),
+                withDb: (fn) => new Promise((resolve, reject) => {
+                    window.openExistingCodeMiniDb(getIsolatedDb(), (dbInst) => {
+                        Promise.resolve().then(() => fn(dbInst)).then(resolve, reject).finally(() => { try { dbInst.close(); } catch (e) {} });
+                    }, (err) => reject(err || new Error('This terminal\'s workspace no longer exists.')));
+                }),
+                // Only redraw when the Explorer is looking at the same database the command changed.
+                onChanged: () => {
+                    if (typeof db === 'undefined' || !db || db.name !== getIsolatedDb()) return;
+                    if (typeof loadFilesFromDB === 'function') loadFilesFromDB();
+                    if (typeof window.renderGitPanel === 'function') window.renderGitPanel();
+                    if (typeof window.gitUpdateStatusBranch === 'function') window.gitUpdateStatusBranch();
+                }
+            });
         },
 
         uname: async (args) => {

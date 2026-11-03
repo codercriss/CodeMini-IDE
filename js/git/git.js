@@ -355,7 +355,7 @@ async function gitGetWorkingTree(database) {
 // exists. Does its own small transaction per missing folder (sequentially
 // awaited) rather than reusing a caller's open transaction - IndexedDB
 // transactions auto-commit once idle, so awaiting inside one is unsafe.
-async function gitEnsureFolderPath(database, dirPath) {
+async function gitEnsureFolderPath(database, dirPath, rootIdOverride) {
     // The top-level sentinel differs by database: the outer profile db's own
     // top level really is 'root', but a workspace's own separate database
     // uses that workspace's own id instead (see enterWorkspace in app.js,
@@ -363,7 +363,9 @@ async function gitEnsureFolderPath(database, dirPath) {
     // it) - folderStack[0].id is what the rest of the app already treats as
     // "top level for whichever db is currently active", so it's read here
     // rather than assuming the literal string.
-    const rootId = (typeof folderStack !== 'undefined' && folderStack[0] && folderStack[0].id) || 'root';
+    // rootIdOverride: the terminal's `git` works on its own database, which need not be the one the Explorer
+    // has open, so it passes that database's top-level id instead of this global one.
+    const rootId = rootIdOverride || (typeof folderStack !== 'undefined' && folderStack[0] && folderStack[0].id) || 'root';
     if (!dirPath || dirPath === '/') return rootId;
     const parts = dirPath.split('/').filter(Boolean);
     let parentId = rootId;
@@ -385,7 +387,7 @@ async function gitEnsureFolderPath(database, dirPath) {
 // changes the working tree: discard, branch checkout, merge, stash pop, and
 // restore-to-commit, so "what does discard do" and "what does switching
 // branches do" are answered by the same, single, well-tested code path.
-async function gitApplyTree(database, targetTree) {
+async function gitApplyTree(database, targetTree, rootIdOverride) {
     const allFiles = await gitGetAllFiles(database);
     const pathMap = gitBuildPathMap(allFiles);
     const pathToFile = new Map();
@@ -397,13 +399,13 @@ async function gitApplyTree(database, targetTree) {
     for (const path of targetTree.keys()) {
         if (pathToFile.has(path)) continue;
         const dirPath = path.substring(0, path.lastIndexOf('/')) || '/';
-        if (!dirParentIds.has(dirPath)) dirParentIds.set(dirPath, await gitEnsureFolderPath(database, dirPath));
+        if (!dirParentIds.has(dirPath)) dirParentIds.set(dirPath, await gitEnsureFolderPath(database, dirPath, rootIdOverride));
     }
 
     // The workspace/profile root for this database - never a candidate for
     // pruning, whatever its real id is (see gitEnsureFolderPath for why this
     // isn't always the literal string 'root').
-    const rootId = (typeof folderStack !== 'undefined' && folderStack[0] && folderStack[0].id) || 'root';
+    const rootId = rootIdOverride || (typeof folderStack !== 'undefined' && folderStack[0] && folderStack[0].id) || 'root';
 
     // Pass 2: one write transaction for every add/update/remove.
     return new Promise((resolve) => {
@@ -443,7 +445,7 @@ async function gitApplyTree(database, targetTree) {
             } else {
                 const dirPath = path.substring(0, path.lastIndexOf('/')) || '/';
                 store.put({
-                    id: gitNewId('gf'), parentId: dirParentIds.get(dirPath) || (typeof folderStack !== 'undefined' && folderStack[0] && folderStack[0].id) || 'root',
+                    id: gitNewId('gf'), parentId: dirParentIds.get(dirPath) || rootIdOverride || (typeof folderStack !== 'undefined' && folderStack[0] && folderStack[0].id) || 'root',
                     name: data.name, type: 'file', content: data.content,
                     encoding: data.encoding || 'text', timestamp: Date.now()
                 });

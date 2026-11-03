@@ -33,7 +33,7 @@ It is built to be usable on a phone as well as a laptop.
 | **Editor** | Monaco with Emmet, multiple windows and profiles, each with isolated storage and UI state |
 | **Notebooks** | In-browser kernels for Python (Pyodide), R (WebR), SQL (SQLite) and Ruby, with plot and table output |
 | **Consoles** | JavaScript, Python, PHP and Ruby consoles, plus an integrated terminal with shell-style commands |
-| **Git and GitHub** | Clone/import, commit, pull and push with your own token, called straight from the browser |
+| **Git and GitHub** | Clone/import, commit, pull and push with your own token, called straight from the browser. The terminal has a `git` command that works on the same repository |
 | **Viewers** | PDF, Word documents, images, audio, video and archives open in tabs |
 | **Safe by default** | Code you run executes on a separate origin and cannot read your files, token or keys |
 | **Private** | My Keys, an AES-256-GCM encrypted vault for API keys and passwords, never uploaded |
@@ -63,7 +63,7 @@ It is built to be usable on a phone as well as a laptop.
 
 - **Code editor** powered by Monaco, with Emmet support
 - **Notebooks** with in-browser kernels for Python (Pyodide), R (WebR), SQL (sql.js) and Ruby
-- **Consoles** for JavaScript, Python, PHP and Ruby, and an **integrated terminal** with a set of shell-style commands
+- **Consoles** for JavaScript, Python, PHP and Ruby, and an **integrated terminal** with a set of shell-style commands, including **`git`** (status, add, commit, log, diff, show, branch, switch/checkout, restore, reset, merge, stash, tag, reflog; run `git help`). It shares commits, branches, stashes and staging with the Source Control panel. Push, pull, fetch, clone, rebase, cherry-pick and revert stay in the panel
 - **PHP and web previews** that run in the browser, with Console, Network and Inspector panels
 
 ### Manage your work
@@ -217,6 +217,7 @@ The suite name is a substring: `runner` matches both `runner.e2e.js` and `runner
 | `app-info.test.js` | Keeps version, links and About page consistent with the repo |
 | `release-history.test.js` | Keeps the in-app version history in step with `CHANGELOG.md` and the app version |
 | `bin-restore-confirm.test.js` | Stacks > Recycle Bin: Restore and Restore All ask first |
+| `terminal-git.test.js` | The terminal's `git` command against the real `git.js` and an in-memory database: every subcommand, the repository shared with the panel, no silent loss (switch, reset, merge, stash), conflicts, workspace roots, escaped output |
 | `pwa.test.js` | Manifest, icons, shortcuts, screenshots, `<head>` links and precache list agree |
 | `update-state.test.js` | Update flow in `pwa.js`: shared state, toast, manual vs scheduled checks |
 | `sw.test.js` | Service worker strategy: network-first, timeout, offline fallback |
@@ -232,6 +233,7 @@ The suite name is a substring: `runner` matches both `runner.e2e.js` and `runner
 | --- | --- |
 | `workspace-trust.e2e.js` | Trust prompt, Restricted Mode, banner, settings and persistence |
 | `terminal-trust.e2e.js` | Terminal refuses to run files in a restricted workspace |
+| `terminal-git.e2e.js` | `git` typed into the real terminal: quoting, pipes, folders, branch switching with the Explorer and status bar, a merge conflict, stash, history after a reload |
 | `regressions-1-3-2.e2e.js` | The 1.3.2 fixes: shared dialog text, Console Trusted toggle, Variables Explorer Refresh, SQL copy table, archive Extract all, date labels |
 | `theme-flash.e2e.js` | Saved theme, accent and opacity applied from the first frame (no flash) |
 | `preloader.e2e.js` | Startup overlay timing, minimum/maximum display, fade-out |
