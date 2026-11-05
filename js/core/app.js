@@ -1256,23 +1256,28 @@ function clipboardPlan(clip, openDbName) {
 window.clipboardPlan = clipboardPlan;
 
 // sourceDbOverride: the database the items are in, when that is not the open one (Paste from another database).
-async function transferToExternalDBDeep(targets, targetDbName, action, targetRootId = 'root', sourceDbOverride) {
+// where: the destination's name, for the sentence in the name-clash dialog ("Copying "a.txt" to Workspace A").
+// A name that is already taken at the destination asks Replace / Skip / Rename (js/core/name-conflicts.js) for each
+// clash BEFORE anything is written; Stop changes nothing. Resolves to { stopped } once planned - the writes then
+// finish in the background, as they always did.
+async function transferToExternalDBDeep(targets, targetDbName, action, targetRootId = 'root', sourceDbOverride, where) {
     const sourceDbName = sourceDbOverride || db.name;
     const isSameDb = sourceDbName === targetDbName;
 
-    const allFiles = await new Promise((res, rej) => {
-        const req = indexedDB.open(sourceDbName, CODEMINI_DB_VERSION); req.onupgradeneeded = (e) => { ensureCodeMiniSchema(e.target.result); };
+    const readAllFrom = (dbName) => new Promise((res, rej) => {
+        const req = indexedDB.open(dbName, CODEMINI_DB_VERSION); req.onupgradeneeded = (e) => { ensureCodeMiniSchema(e.target.result); };
         req.onsuccess = (e) => {
             const tempDb = e.target.result;
             const tx = tempDb.transaction('filesystem', 'readonly');
             tx.objectStore('filesystem').getAll().onsuccess = ev => {
                 tempDb.close();
-                res(ev.target.result);
+                res(ev.target.result || []);
             };
-            tx.onerror = () => { tempDb.close(); rej("Failed to read source DB"); };
+            tx.onerror = () => { tempDb.close(); rej("Failed to read " + dbName); };
         };
-        req.onerror = () => rej("Failed to open source DB");
+        req.onerror = () => rej("Failed to open " + dbName);
     });
+    const allFiles = await readAllFrom(sourceDbName);
 
     const getDescendants = (parentId) => {
         let children = allFiles.filter(f => f.parentId === parentId);
@@ -1282,6 +1287,7 @@ async function transferToExternalDBDeep(targets, targetDbName, action, targetRoo
         });
         return result;
     };
+    const descendantsOfRoot = (r) => (r.type === 'folder' || r.type === 'workspace') ? getDescendants(r.id) : [];
 
     // rootTargets = the directly selected items; descendants are their children.
     // Each is re-resolved against the allFiles snapshot just fetched above (by
@@ -1295,53 +1301,60 @@ async function transferToExternalDBDeep(targets, targetDbName, action, targetRoo
     // (often still empty, from file-creation time) .content in `targets`, and
     // transferring it as-is clones that stale snapshot instead of what's
     // actually saved, landing an emptied-out copy at the destination.
-    let rootTargets = [];
-    let descendants = [];
-    let itemNames = [];
-    targets.forEach(t => {
-        const fresh = allFiles.find(f => f.id === t.id) || t;
-        rootTargets.push(fresh);
-        itemNames.push(fresh.name);
-        if (fresh.type === 'folder' || fresh.type === 'workspace') descendants.push(...getDescendants(fresh.id));
+    const rootTargets = targets.map(t => allFiles.find(f => f.id === t.id) || t);
+
+    // What is already at the destination, and what to do about each clash. Nothing is written yet.
+    const targetExisting = isSameDb ? allFiles : await readAllFrom(targetDbName);
+    const protectIds = isSameDb ? rootTargets.flatMap(r => [r.id, ...descendantsOfRoot(r).map(d => d.id)]) : [];
+    const plan = await CodeMiniConflicts.planPlacement({
+        items: rootTargets.map(t => CodeMiniConflicts.toItem(t, { count: descendantsOfRoot(t).length })),
+        existing: targetExisting, parentId: targetRootId,
+        ignoreIds: isSameDb && action === 'move' ? rootTargets.map(t => t.id) : [],
+        protectIds, verb: action === 'copy' ? 'copying' : 'moving', where
     });
+    if (plan.stopped) { window.showSuccessToast('Cancelled. Nothing was changed.'); return { stopped: true }; }
+
+    const kept = plan.entries.filter(e => e.action !== 'skip');
+    const removedAll = kept.flatMap(e => e.removed || []);
+    const tail = CodeMiniConflicts.describeCounts(plan.counts);
+    const pastTense = action === 'copy' ? 'Copied' : 'Moved';
+    if (kept.length === 0) { window.showSuccessToast(`Nothing was ${pastTense.toLowerCase()}${tail}`); return { stopped: false }; }
+    const itemNames = kept.map(e => e.item.name);
+    const itemsText = itemNames.slice(0, 3).join(', ') + (itemNames.length > 3 ? ` and ${itemNames.length - 3} more` : '');
+    const keptRoots = kept.map(e => e.item.record);
+    const nameFor = new Map(kept.map(e => [e.item.id, e.name]));
 
     // For same-DB moves we only need to update parentId on root items (descendants stay put).
-    // For cross-DB moves or copies we need to transfer everything.
     if (isSameDb && action === 'move') {
         const req = indexedDB.open(sourceDbName, CODEMINI_DB_VERSION); req.onupgradeneeded = (e) => { ensureCodeMiniSchema(e.target.result); };
         req.onsuccess = (e) => {
             const sameDb = e.target.result;
             const tx = sameDb.transaction('filesystem', 'readwrite');
             const store = tx.objectStore('filesystem');
-            const existingFiles = allFiles;
 
-            rootTargets.forEach(t => {
-                const updated = { ...t, parentId: targetRootId, timestamp: Date.now() };
-                updated.name = window.getUniqueFileName(
-                    existingFiles.filter(f => f.id !== t.id),
-                    targetRootId, updated.name, updated.type
-                );
-                store.put(updated);
+            kept.forEach(entry => {
+                (entry.removed || []).forEach(r => store.delete(r.id));
+                store.put({ ...entry.item.record, parentId: targetRootId, timestamp: Date.now(), name: entry.name });
             });
 
             tx.oncomplete = () => {
                 sameDb.close();
-                const actionText = 'Moved';
-                const itemsText = itemNames.slice(0, 3).join(', ') + (itemNames.length > 3 ? ` and ${itemNames.length - 3} more` : '');
-                window.showSuccessToast(`${actionText} ${itemsText} successfully`);
+                CodeMiniConflicts.afterReplace(removedAll, sourceDbName);
+                window.showSuccessToast(`Moved ${itemsText} successfully${tail}`);
                 if (typeof loadFilesFromDB === 'function') loadFilesFromDB();
                 if (window.renderStacks) window.renderStacks();
                 if (typeof window.refreshAllOpenBreadcrumbs === 'function') window.refreshAllOpenBreadcrumbs();
             };
         };
         req.onerror = () => console.error("Failed to open DB for same-DB move");
-        return;
+        return { stopped: false };
     }
 
-    // Cross-DB transfer (move or copy) — include root items + all descendants
-    let filesToTransfer = [];
-    rootTargets.forEach(t => filesToTransfer.push({ ...t, isTargetRoot: true }));
-    filesToTransfer.push(...descendants);
+    // Cross-DB transfer (move or copy), and any copy: the kept root items + all their descendants.
+    const seenIds = new Set(keptRoots.map(r => r.id));
+    const keptDescendants = [];
+    keptRoots.forEach(r => descendantsOfRoot(r).forEach(d => { if (!seenIds.has(d.id)) { seenIds.add(d.id); keptDescendants.push(d); } }));
+    const filesToTransfer = [...keptRoots.map(t => ({ ...t, isTargetRoot: true })), ...keptDescendants];
 
     const targetReq = indexedDB.open(targetDbName, CODEMINI_DB_VERSION);
     targetReq.onupgradeneeded = (e) => { ensureCodeMiniSchema(e.target.result); };
@@ -1351,43 +1364,37 @@ async function transferToExternalDBDeep(targets, targetDbName, action, targetRoo
         const tx = targetDb.transaction('filesystem', 'readwrite');
         const store = tx.objectStore('filesystem');
 
-        store.getAll().onsuccess = (ev) => {
-            const existingTargetFiles = ev.target.result || [];
-            let idMap = {};
+        removedAll.forEach(r => store.delete(r.id)); // Replace: what was there goes first
+        const idMap = {};
+        filesToTransfer.forEach(f => {
+            let newFile = { ...f, timestamp: Date.now() };
+            const isRoot = newFile.isTargetRoot;
+            delete newFile.isTargetRoot;
 
-            filesToTransfer.forEach(f => {
-                let newFile = { ...f, timestamp: Date.now() };
-                const isRoot = newFile.isTargetRoot;
-                delete newFile.isTargetRoot;
+            if (action === 'copy') {
+                const newId = Date.now().toString() + Math.random().toString(36).substring(2);
+                idMap[f.id] = newId;
+                newFile.id = newId;
+            }
 
-                if (action === 'copy') {
-                    const newId = Date.now().toString() + Math.random().toString(36).substring(2);
-                    idMap[f.id] = newId;
-                    newFile.id = newId;
-                }
+            if (isRoot) {
+                newFile.parentId = targetRootId;
+                newFile.name = nameFor.get(f.id);
+            } else if (action === 'copy') {
+                newFile.parentId = idMap[f.parentId] || f.parentId;
+            }
 
-                if (isRoot) {
-                    newFile.parentId = targetRootId;
-                    newFile.name = window.getUniqueFileName(existingTargetFiles, targetRootId, newFile.name, newFile.type);
-                    existingTargetFiles.push(newFile);
-                } else if (action === 'copy') {
-                    newFile.parentId = idMap[f.parentId] || f.parentId;
-                }
-
-                store.put(newFile);
-            });
-        };
+            store.put(newFile);
+        });
 
         tx.oncomplete = () => {
             targetDb.close();
-
-            const actionText = action === 'copy' ? 'Copied' : 'Moved';
-            const itemsText = itemNames.slice(0, 3).join(', ') + (itemNames.length > 3 ? ` and ${itemNames.length - 3} more` : '');
-            window.showSuccessToast(`${actionText} ${itemsText} successfully`);
+            CodeMiniConflicts.afterReplace(removedAll, targetDbName);
+            window.showSuccessToast(`${pastTense} ${itemsText} successfully${tail}`);
 
             if (action === 'move') {
-                // Delete root targets + all their descendants from the source DB
-                const allToDelete = [...rootTargets, ...descendants];
+                // Delete only what actually moved (a skipped item stays where it is) + all its descendants from the source DB
+                const allToDelete = [...keptRoots, ...keptDescendants];
                 const deleteReq = indexedDB.open(sourceDbName, CODEMINI_DB_VERSION); deleteReq.onupgradeneeded = (e) => { ensureCodeMiniSchema(e.target.result); };
                 deleteReq.onsuccess = (delEv) => {
                     const sourceDb = delEv.target.result;
@@ -1406,6 +1413,7 @@ async function transferToExternalDBDeep(targets, targetDbName, action, targetRoo
             }
         };
     };
+    return { stopped: false };
 }
 
 function showContextMenu(e, file) {
@@ -1578,11 +1586,11 @@ function showContextMenu(e, file) {
     const rootDbName = db.name;
     if (file.parentId !== currentRootId && file.id !== 'root' && file.id !== 'workspace-root') {
         addOption('ri-arrow-up-circle-line', 'Move to Root', () => {
-            transferToExternalDBDeep(targets, rootDbName, 'move', currentRootId);
+            transferToExternalDBDeep(targets, rootDbName, 'move', currentRootId, undefined, 'the root');
         });
 
         addOption('ri-file-transfer-line', 'Copy to Root', () => {
-            transferToExternalDBDeep(targets, rootDbName, 'copy', currentRootId);
+            transferToExternalDBDeep(targets, rootDbName, 'copy', currentRootId, undefined, 'the root');
         });
     }
 
@@ -1618,15 +1626,15 @@ function showContextMenu(e, file) {
         menu.appendChild(sep);
 
         otherProfiles.forEach(p => {
-            addOption('ri-file-copy-2-line', `Copy to ${p.name}`, () => transferToExternalDBDeep(targets, p.db, 'copy', 'root'));
-            addOption('ri-drag-move-2-line', `Move to ${p.name}`, () => transferToExternalDBDeep(targets, p.db, 'move', 'root'));
+            addOption('ri-file-copy-2-line', `Copy to ${p.name}`, () => transferToExternalDBDeep(targets, p.db, 'copy', 'root', undefined, p.name));
+            addOption('ri-drag-move-2-line', `Move to ${p.name}`, () => transferToExternalDBDeep(targets, p.db, 'move', 'root', undefined, p.name));
         });
 
         otherWorkspaces.forEach(ws => {
             const wsDbName = ws.resolvedDb;
             const wsRootId = ws.id === 'root' ? 'root' : ws.id;
-            addOption('ri-file-copy-2-line', `Copy to ${ws.name}`, () => transferToExternalDBDeep(targets, wsDbName, 'copy', wsRootId));
-            addOption('ri-drag-move-2-line', `Move to ${ws.name}`, () => transferToExternalDBDeep(targets, wsDbName, 'move', wsRootId));
+            addOption('ri-file-copy-2-line', `Copy to ${ws.name}`, () => transferToExternalDBDeep(targets, wsDbName, 'copy', wsRootId, undefined, ws.name));
+            addOption('ri-drag-move-2-line', `Move to ${ws.name}`, () => transferToExternalDBDeep(targets, wsDbName, 'move', wsRootId, undefined, ws.name));
         });
 
         const sep2 = document.createElement('div');
@@ -1637,91 +1645,16 @@ function showContextMenu(e, file) {
     const clip = window.workspaceClipboardRegistry[activeWinId];
     if (!isMulti && file.type === 'folder' && clip) {
         addOption('ri-clipboard-line', 'Paste', async () => {
-            const actionText = clip.action === 'copy' ? 'Copied' : 'Moved';
-            const itemNames = clip.files.map(f => f.name).slice(0, 3).join(', ');
-            
             // Compared with, and written to, the database that is OPEN (inside a workspace that is the workspace's
             // own) - not the window's outer one, which this used: pasting inside a workspace was sent to the outer
             // database under a parent folder that only exists in the workspace, and pasting between a workspace
             // and CodeMini was treated as a same-database paste.
+            // Same database or not, a paste is one transfer. A name already taken in the folder asks Replace / Skip /
+            // Rename inside it (a copy pasted into its own folder is just numbered, as before).
             const plan = window.clipboardPlan(clip, db.name);
-            if (plan.crossDb) {
-                transferToExternalDBDeep(clip.files, db.name, plan.action, file.id, clip.sourceDb);
-                if (clip.action === 'cut') delete window.workspaceClipboardRegistry[activeWinId];
-                return;
-            }
-
-            if (clip.action === 'cut') { 
-                const tx = db.transaction('filesystem', 'readwrite');
-                const store = tx.objectStore('filesystem');
-                store.getAll().onsuccess = (ev) => {
-                    const existingFiles = ev.target.result || [];
-                    clip.files.forEach(clipFile => {
-                        // Re-resolved against existingFiles (fetched fresh just above) rather
-                        // than mutating clip.files as captured at Cut time - autosave writes
-                        // straight to IndexedDB and never updates the clipboard's cached copy,
-                        // so a file edited since it was cut could have gone stale here, and
-                        // store.put()-ing it as-is would overwrite the real, up-to-date DB
-                        // record with that stale one. New plain object (not the array's own
-                        // reference) so the uniqueness check below can safely exclude just
-                        // this item's old entry without a duplicate ending up in existingFiles.
-                        const updated = { ...(existingFiles.find(f => f.id === clipFile.id) || clipFile), parentId: file.id, timestamp: Date.now() };
-                        updated.name = window.getUniqueFileName(existingFiles.filter(f => f.id !== updated.id), file.id, updated.name, updated.type);
-                        store.put(updated);
-                        existingFiles.push(updated);
-                    });
-                };
-                tx.oncomplete = () => { 
-                    loadFilesFromDB(); 
-                    delete window.workspaceClipboardRegistry[activeWinId];
-                    window.showSuccessToast(`Moved ${itemNames} successfully`);
-                    if (typeof window.refreshAllOpenBreadcrumbs === 'function') window.refreshAllOpenBreadcrumbs();
-                };
-            } else if (clip.action === 'copy') { 
-                const txRead = db.transaction('filesystem', 'readonly');
-                const allSourceFiles = await new Promise(res => {
-                    txRead.objectStore('filesystem').getAll().onsuccess = e => res(e.target.result);
-                });
-                
-                const txWrite = db.transaction('filesystem', 'readwrite');
-                const store = txWrite.objectStore('filesystem');
-                
-                store.getAll().onsuccess = (ev) => {
-                    const existingFiles = ev.target.result || [];
-                    const filesToTransfer = [];
-                    const getDescendants = (parentId, newParentId) => {
-                        let children = allSourceFiles.filter(f => f.parentId === parentId);
-                        children.forEach(c => {
-                            let newId = Date.now().toString() + Math.random().toString(36).substring(2);
-                            let clone = {...c, id: newId, parentId: newParentId, timestamp: Date.now()};
-                            clone.name = window.getUniqueFileName(existingFiles, newParentId, clone.name, clone.type);
-                            filesToTransfer.push(clone);
-                            existingFiles.push(clone);
-                            if (c.type === 'folder' || c.type === 'workspace') getDescendants(c.id, newId);
-                        });
-                    };
-
-                    clip.files.forEach(clipFile => {
-                        // Same staleness fix as the cut path above - clip.files was captured
-                        // at Copy time, allSourceFiles was just fetched fresh.
-                        const freshClipFile = allSourceFiles.find(f => f.id === clipFile.id) || clipFile;
-                        let newId = Date.now().toString() + Math.random().toString(36).substring(2);
-                        let rootClone = { ...freshClipFile, id: newId, parentId: file.id, timestamp: Date.now() };
-                        rootClone.name = window.getUniqueFileName(existingFiles, file.id, rootClone.name, rootClone.type);
-                        filesToTransfer.push(rootClone);
-                        existingFiles.push(rootClone);
-                        if (freshClipFile.type === 'folder' || freshClipFile.type === 'workspace') {
-                            getDescendants(freshClipFile.id, newId);
-                        }
-                    });
-
-                    filesToTransfer.forEach(f => store.put(f));
-                    txWrite.oncomplete = () => {
-                        loadFilesFromDB();
-                        window.showSuccessToast(`Copied ${itemNames} successfully`);
-                    };
-                };
-            }
+            const result = await transferToExternalDBDeep(clip.files, db.name, plan.action, file.id, clip.sourceDb || db.name, file.name);
+            // A cut that went ahead is spent; if the person pressed Stop it stays on the clipboard to try again.
+            if (clip.action === 'cut' && !(result && result.stopped)) delete window.workspaceClipboardRegistry[activeWinId];
         });
     }
 

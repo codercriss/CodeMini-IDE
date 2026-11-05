@@ -52,6 +52,7 @@ const STATIC_ASSETS = [
     '/js/core/app-info.js',
     '/js/core/shield.js',
     '/js/core/html-escape.js',
+    '/js/core/name-conflicts.js',
     '/js/viewers/runner-client.js',
     '/js/viewers/exec-client.js',
     '/js/core/my-keys.js',

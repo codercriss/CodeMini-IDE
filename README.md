@@ -217,6 +217,7 @@ The suite name is a substring: `runner` matches both `runner.e2e.js` and `runner
 | `app-info.test.js` | Keeps version, links and About page consistent with the repo |
 | `release-history.test.js` | Keeps the in-app version history in step with `CHANGELOG.md` and the app version |
 | `bin-restore-confirm.test.js` | Stacks > Recycle Bin: Restore and Restore All ask first |
+| `name-conflicts.test.js` | The Replace / Skip / Rename planner: what is asked and when, apply-to-all, Stop, and what can never be replaced (locked items, anything holding the source, a name taken inside the same batch) |
 | `quick-open.test.js` | Quick Open's fuzzy matching (letter positions, word starts, camelCase), ranking, `> : @ #` and `name:line` parsing, the recent list, and speed on 5,000 files |
 | `terminal-git.test.js` | The terminal's `git` command against the real `git.js` and an in-memory database: every subcommand, the repository shared with the panel, no silent loss (switch, reset, merge, stash), conflicts, workspace roots, escaped output |
 | `pwa.test.js` | Manifest, icons, shortcuts, screenshots, `<head>` links and precache list agree |
@@ -234,6 +235,7 @@ The suite name is a substring: `runner` matches both `runner.e2e.js` and `runner
 | --- | --- |
 | `workspace-trust.e2e.js` | Trust prompt, Restricted Mode, banner, settings and persistence |
 | `terminal-trust.e2e.js` | Terminal refuses to run files in a restricted workspace |
+| `name-conflicts.e2e.js` | The clash dialog in the real app: Copy/Cut + Paste through the Explorer's right-click menus, multi-select with apply-to-all and Stop, drag-and-drop, imports of files, folders and JSON exports, a workspace in another database, the Recycle Bin, locked files, open tabs, phone size |
 | `quick-open.e2e.js` | Ctrl+P / F1, fuzzy search, keyboard navigation, `>` `:` `@` modes, recent files, open to the side, `name:line`, hostile file names, phone-size rows |
 | `terminal-git.e2e.js` | `git` typed into the real terminal: quoting, pipes, folders, branch switching with the Explorer and status bar, a merge conflict, stash, history after a reload |
 | `regressions-1-3-2.e2e.js` | The 1.3.2 fixes: shared dialog text, Console Trusted toggle, Variables Explorer Refresh, SQL copy table, archive Extract all, date labels |

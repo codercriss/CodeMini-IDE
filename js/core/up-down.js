@@ -177,7 +177,7 @@ async function handleDropItems(items) {
             }
             
             const { content, encoding } = await readFileAsAppropriate(file);
-            filesToSave.push({ name: file.name, path: currentPath, type: 'file', content: content, encoding: encoding });
+            filesToSave.push({ name: file.name, path: currentPath, type: 'file', content: content, encoding: encoding, modified: file.lastModified });
         } else if (entry.isDirectory) {
             filesToSave.push({ name: entry.name, path: currentPath, type: 'folder' });
             const reader = entry.createReader();
@@ -259,12 +259,22 @@ async function processFileList(files) {
             parts.pop(); 
             path = parts.join('/');
         }
-        filesToSave.push({ name: file.name, path: path, type: 'file', content: content, encoding: encoding });
+        filesToSave.push({ name: file.name, path: path, type: 'file', content: content, encoding: encoding, modified: file.lastModified });
     }
     if (filesToSave.length > 0) {
         await saveExtractedFiles(filesToSave, targetParentId, targetDb);
     }
     if (trustRoute) trustRoute.finish();
+}
+
+// Everything in a database's filesystem store, read in its own transaction (a question to the person can then take
+// as long as it likes before the writing transaction is opened).
+function readAllRecords(database) {
+    return new Promise(resolve => {
+        const req = database.transaction('filesystem', 'readonly').objectStore('filesystem').getAll();
+        req.onsuccess = (ev) => resolve(ev.target.result || []);
+        req.onerror = () => resolve([]);
+    });
 }
 
 async function saveExtractedFiles(filesToSave, rootParentId, explicitDb) {
@@ -273,112 +283,166 @@ async function saveExtractedFiles(filesToSave, rootParentId, explicitDb) {
     // captured it before its own async gap), falling back to the live
     // global only for callers with no such gap of their own.
     const executingDbInstance = explicitDb || db;
+
+    // What is being brought in, as the top-level things that land directly in the destination folder: a file
+    // with no path is itself one; anything inside folders belongs to its first folder (a whole dropped or
+    // extracted folder is ONE item). Those are the only things that can clash - what is inside a folder that
+    // is new, replaced or renamed lands in a fresh folder.
+    const topKey = (f) => f.path ? 'd:' + f.path.split('/')[0] : (f.type === 'folder' ? 'd:' + f.name : 'f:' + f.name);
+    const tops = new Map();
+    filesToSave.forEach(f => {
+        const key = topKey(f);
+        if (!tops.has(key)) tops.set(key, { key, name: key.slice(2), type: key[0] === 'd' ? 'folder' : 'file', count: 0, timestamp: null, size: null });
+        const t = tops.get(key);
+        if (f.type === 'folder') return;
+        t.count++;
+        if (typeof f.modified === 'number') t.timestamp = Math.max(t.timestamp || 0, f.modified);
+        if (t.type === 'file') t.size = CodeMiniConflicts.sizeOfRecord(f);
+    });
+    const topList = [...tops.values()];
+
+    const existingAtStart = await readAllRecords(executingDbInstance);
+    const dest = existingAtStart.find(r => r.id === rootParentId);
+    const plan = await CodeMiniConflicts.planPlacement({
+        // Synthetic ids: an imported item is a NEW record, never "the same one" as something already stored.
+        items: topList.map((t, i) => ({ id: '__import_' + i, name: t.name, type: t.type, timestamp: t.timestamp, size: t.size, count: t.type === 'folder' ? t.count : null, key: t.key })),
+        existing: existingAtStart, parentId: rootParentId, verb: 'importing', where: dest ? dest.name : ''
+    });
+    if (plan.stopped) { if (window.showSuccessToast) window.showSuccessToast('Import cancelled. Nothing was changed.'); return; }
+    const skipKeys = new Set(plan.entries.filter(e => e.action === 'skip').map(e => e.item.key));
+    const nameForKey = new Map(plan.entries.map(e => [e.item.key, e.name]));
+    const removedAll = plan.entries.flatMap(e => e.removed || []);
+    const toSave = filesToSave.filter(f => !skipKeys.has(topKey(f)));
+    if (toSave.length === 0) { if (window.showSuccessToast) window.showSuccessToast('Nothing was imported' + CodeMiniConflicts.describeCounts(plan.counts)); return; }
+
     const tx = executingDbInstance.transaction('filesystem', 'readwrite');
     const store = tx.objectStore('filesystem');
-    
-    return new Promise(resolve => {
-        store.getAll().onsuccess = (ev) => {
-            const existingFiles = ev.target.result || [];
-            let pathMap = { "": rootParentId };
-            
-            const getOrCreatePath = (pathString) => {
-                if (!pathString) return rootParentId;
-                if (pathMap[pathString]) return pathMap[pathString];
-                
-                let currentPath = "";
-                let currentParent = rootParentId;
-                const parts = pathString.split('/');
-                
-                for (let dir of parts) {
-                    currentPath = currentPath ? currentPath + '/' + dir : dir;
-                    if (!pathMap[currentPath]) {
-                        let newId = Date.now().toString() + Math.random().toString(36).substring(2);
-                        // FIX: Auto-number folders dynamically during deep drops
-                        let safeDirName = window.getUniqueFileName(existingFiles, currentParent, dir, 'folder');
-                        
-                        let newFolder = { id: newId, parentId: currentParent, name: safeDirName, type: 'folder', timestamp: Date.now() };
-                        store.put(newFolder);
-                        existingFiles.push(newFolder);
-                        pathMap[currentPath] = newId;
-                    }
-                    currentParent = pathMap[currentPath];
-                }
-                return currentParent;
-            };
 
-            filesToSave.forEach(fItem => {
-                let parentId = getOrCreatePath(fItem.path);
-                let id = Date.now().toString() + Math.random().toString(36).substring(2);
-                
-                if (fItem.type === 'folder') {
-                    let fullPath = fItem.path ? fItem.path + '/' + fItem.name : fItem.name;
-                    if (!pathMap[fullPath]) {
-                        let safeFolderName = window.getUniqueFileName(existingFiles, parentId, fItem.name, 'folder');
-                        let newFolder = { id: id, parentId: parentId, name: safeFolderName, type: 'folder', timestamp: Date.now() };
-                        pathMap[fullPath] = id;
-                        store.put(newFolder);
-                        existingFiles.push(newFolder);
-                    }
-                } else {
-                    let safeFileName = window.getUniqueFileName(existingFiles, parentId, fItem.name, 'file');
-                    let newFile = { id: id, parentId: parentId, name: safeFileName, type: 'file', content: fItem.content, encoding: fItem.encoding, timestamp: Date.now() };
-                    store.put(newFile);
-                    existingFiles.push(newFile);
+    return new Promise(resolve => {
+        const existingFiles = existingAtStart.filter(r => !removedAll.some(x => x.id === r.id));
+        removedAll.forEach(r => store.delete(r.id)); // Replace: what was there goes first
+        let pathMap = { "": rootParentId };
+
+        const getOrCreatePath = (pathString) => {
+            if (!pathString) return rootParentId;
+            if (pathMap[pathString]) return pathMap[pathString];
+
+            let currentPath = "";
+            let currentParent = rootParentId;
+            const parts = pathString.split('/');
+
+            for (let dir of parts) {
+                currentPath = currentPath ? currentPath + '/' + dir : dir;
+                if (!pathMap[currentPath]) {
+                    let newId = Date.now().toString() + Math.random().toString(36).substring(2);
+                    // The first folder is the item the person decided about (it may have been renamed); deeper
+                    // ones are inside a fresh folder, and are only numbered against duplicates within the import.
+                    let safeDirName = currentParent === rootParentId && nameForKey.has('d:' + dir) ? nameForKey.get('d:' + dir) : window.getUniqueFileName(existingFiles, currentParent, dir, 'folder');
+
+                    let newFolder = { id: newId, parentId: currentParent, name: safeDirName, type: 'folder', timestamp: Date.now() };
+                    store.put(newFolder);
+                    existingFiles.push(newFolder);
+                    pathMap[currentPath] = newId;
                 }
-            });
+                currentParent = pathMap[currentPath];
+            }
+            return currentParent;
         };
 
-        tx.oncomplete = () => { 
+        toSave.forEach(fItem => {
+            let parentId = getOrCreatePath(fItem.path);
+            let id = Date.now().toString() + Math.random().toString(36).substring(2);
+            const atTop = parentId === rootParentId;
+
+            if (fItem.type === 'folder') {
+                let fullPath = fItem.path ? fItem.path + '/' + fItem.name : fItem.name;
+                if (!pathMap[fullPath]) {
+                    let safeFolderName = atTop && nameForKey.has('d:' + fItem.name) ? nameForKey.get('d:' + fItem.name) : window.getUniqueFileName(existingFiles, parentId, fItem.name, 'folder');
+                    let newFolder = { id: id, parentId: parentId, name: safeFolderName, type: 'folder', timestamp: Date.now() };
+                    pathMap[fullPath] = id;
+                    store.put(newFolder);
+                    existingFiles.push(newFolder);
+                }
+            } else {
+                let safeFileName = atTop && nameForKey.has('f:' + fItem.name) ? nameForKey.get('f:' + fItem.name) : window.getUniqueFileName(existingFiles, parentId, fItem.name, 'file');
+                let newFile = { id: id, parentId: parentId, name: safeFileName, type: 'file', content: fItem.content, encoding: fItem.encoding, timestamp: Date.now() };
+                store.put(newFile);
+                existingFiles.push(newFile);
+            }
+        });
+
+        tx.oncomplete = () => {
+            CodeMiniConflicts.afterReplace(removedAll, executingDbInstance.name);
             if (db === executingDbInstance) loadFilesFromDB();
+            const tail = CodeMiniConflicts.describeCounts(plan.counts);
+            if (tail && window.showSuccessToast) window.showSuccessToast('Imported' + tail);
             resolve();
         };
     });
 }
 
-// Robust JSON Restoration 
+// Robust JSON Restoration
 async function importJsonData(data, targetParentId, explicitDb) {
     const executingDbInstance = explicitDb || db;
+
+    // This path used to write records with whatever names the export held and never looked at what
+    // was already in the target folder, so restoring an export twice (or into a folder that already
+    // had a same-named item) left identically-named siblings. Read the target DB first, then ask about each
+    // clash (Replace / Skip / Rename) before anything is written.
+    const existingFiles = await readAllRecords(executingDbInstance);
+    const dataIds = new Set(data.map(d => d.id));
+    // The root level items of the import batch land directly in the target folder, so they're the only kind
+    // that can clash (children live inside a brand-new folder).
+    const roots = data.filter(item => !dataIds.has(item.parentId));
+    const childrenOf = new Map();
+    data.forEach(d => { if (dataIds.has(d.parentId)) { if (!childrenOf.has(d.parentId)) childrenOf.set(d.parentId, []); childrenOf.get(d.parentId).push(d); } });
+    const within = (rootItem) => { const out = [], stack = [rootItem.id]; while (stack.length) (childrenOf.get(stack.pop()) || []).forEach(c => { out.push(c); stack.push(c.id); }); return out; };
+    const dest = existingFiles.find(r => r.id === targetParentId);
+    const plan = await CodeMiniConflicts.planPlacement({
+        // Synthetic ids: an exported record's id is not the id of anything stored here, even if they look equal.
+        items: roots.map((r, i) => ({ id: '__import_' + i, name: r.name, type: r.type === 'file' ? 'file' : 'folder', timestamp: r.timestamp, size: CodeMiniConflicts.sizeOfRecord(r), count: r.type === 'file' ? null : within(r).length, record: r })),
+        existing: existingFiles, parentId: targetParentId, verb: 'importing', where: dest ? dest.name : ''
+    });
+    if (plan.stopped) { if (window.showSuccessToast) window.showSuccessToast('Import cancelled. Nothing was changed.'); return; }
+    const entryOfRoot = new Map(plan.entries.map(e => [e.item.record.id, e]));
+    const skippedIds = new Set();
+    plan.entries.filter(e => e.action === 'skip').forEach(e => { skippedIds.add(e.item.record.id); within(e.item.record).forEach(c => skippedIds.add(c.id)); });
+    const removedAll = plan.entries.flatMap(e => e.removed || []);
+
     const tx = executingDbInstance.transaction('filesystem', 'readwrite');
     const store = tx.objectStore('filesystem');
-    
+
     return new Promise(resolve => {
         tx.oncomplete = () => {
+            CodeMiniConflicts.afterReplace(removedAll, executingDbInstance.name);
             if (db === executingDbInstance) loadFilesFromDB();
+            const tail = CodeMiniConflicts.describeCounts(plan.counts);
+            if (tail && window.showSuccessToast) window.showSuccessToast('Imported' + tail);
             resolve();
         };
 
-        // This path used to write records with whatever names the export held and never looked at what
-        // was already in the target folder, so restoring an export twice (or into a folder that already
-        // had a same-named item) left identically-named siblings. Read the target DB first, like
-        // saveExtractedFiles does.
-        store.getAll().onsuccess = (ev) => {
-            const existingFiles = ev.target.result || [];
-            let idMap = {};
-            let dataIds = new Set(data.map(d => d.id));
-            
-            data.forEach(item => {
-                idMap[item.id] = Date.now().toString() + Math.random().toString(36).substring(2);
-            });
-            
-            data.forEach(item => {
-                let newItem = { ...item };
-                newItem.id = idMap[item.id];
-                
-                // If parent exists in the imported JSON package, maintain relative hierarchy
-                if (dataIds.has(item.parentId)) {
-                    newItem.parentId = idMap[item.parentId];
-                } else {
-                    // It's a root level item of the import batch: it lands directly in the target
-                    // folder, so it's the only kind that can clash (children live inside a brand-new
-                    // folder). Recorded in existingFiles so two batch roots can't clash either.
-                    newItem.parentId = targetParentId;
-                    newItem.name = window.getUniqueFileName(existingFiles, targetParentId, item.name, item.type === 'file' ? 'file' : 'folder');
-                    existingFiles.push(newItem);
-                }
-                newItem.timestamp = Date.now();
-                store.put(newItem);
-            });
-        };
+        removedAll.forEach(r => store.delete(r.id)); // Replace: what was there goes first
+        let idMap = {};
+        data.forEach(item => {
+            idMap[item.id] = Date.now().toString() + Math.random().toString(36).substring(2);
+        });
+
+        data.forEach(item => {
+            if (skippedIds.has(item.id)) return;
+            let newItem = { ...item };
+            newItem.id = idMap[item.id];
+
+            // If parent exists in the imported JSON package, maintain relative hierarchy
+            if (dataIds.has(item.parentId)) {
+                newItem.parentId = idMap[item.parentId];
+            } else {
+                newItem.parentId = targetParentId;
+                newItem.name = entryOfRoot.get(item.id).name;
+            }
+            newItem.timestamp = Date.now();
+            store.put(newItem);
+        });
+        // Nothing left to write (everything was skipped): a transaction with no requests still completes.
     });
 }
 

@@ -665,25 +665,60 @@ window.restoreItemsToDB = function(items, database, onDone) {
   if (!pending) { if (onDone) onDone(restored, failed); return; }
   const groupDone = () => { if (--pending === 0 && onDone) onDone(restored, failed); };
 
-  const into = (target, list, closeAfter) => {
+  // Each root item goes back to the folder it came out of. A name already taken there asks Replace / Skip / Rename
+  // (js/core/name-conflicts.js); a skipped item, and everything inside a skipped folder, stays in the bin. The
+  // name check needs an answer from the person, so the live items are read first and the write comes after.
+  const into = async (target, list, closeAfter) => {
+    const finish = (ok, written) => { (ok ? restored : failed).push(...(ok ? written : list)); if (closeAfter) target.close(); groupDone(); };
+    let live;
+    try {
+      live = await new Promise((res, rej) => {
+        const rq = target.transaction('filesystem', 'readonly').objectStore('filesystem').getAll();
+        rq.onsuccess = (ev) => res(ev.target.result || []);
+        rq.onerror = () => rej(rq.error);
+      });
+    } catch (e) { finish(false); return; }
+
+    const batchIds = new Set(list.map(f => f.id));
+    const roots = list.filter(f => !batchIds.has(f.parentId));
+    const C = window.CodeMiniConflicts;
+    const nameOf = new Map(), skipped = new Set();
+    let removedAll = [], counts = null;
+    if (C && roots.length) {
+      const inside = (r) => { const out = []; const stack = [r.id]; while (stack.length) { const id = stack.pop(); list.filter(x => x.parentId === id).forEach(c => { out.push(c); stack.push(c.id); }); } return out; };
+      const plan = await C.planPlacement({
+        // Synthetic ids: the item being restored is not "the same record" as a live one, even if the ids look equal.
+        items: roots.map((f, i) => C.toItem(f, { id: '__restore_' + i, destParentId: f.parentId || 'root', count: f.type === 'file' ? null : inside(f).length })),
+        existing: live, parentId: 'root', verb: 'restoring'
+      });
+      if (plan.stopped) { groupDone(); if (closeAfter) target.close(); return; } // Stop: everything stays in the bin
+      counts = plan.counts;
+      plan.entries.forEach(e => {
+        const rec = e.item.record;
+        if (e.action === 'skip') { skipped.add(rec.id); inside(rec).forEach(c => skipped.add(c.id)); }
+        else { nameOf.set(rec.id, e.name); removedAll.push(...(e.removed || [])); }
+      });
+    }
+    const toWrite = list.filter(f => !skipped.has(f.id));
+
     const tx = target.transaction('filesystem', 'readwrite');
     const store = tx.objectStore('filesystem');
-    store.getAll().onsuccess = (ev) => {
-      const live = ev.target.result || [];
-      const batchIds = new Set(list.map(f => f.id));
-      list.forEach(orig => {
-        // A copy: the bin's own record is left untouched, so an item that fails to restore is still intact.
-        const f = Object.assign({}, orig);
-        delete f.deletedAt; delete f._db; delete f._daysLeft;
-        if (!batchIds.has(f.parentId)) {
-          f.name = window.getUniqueFileName(live, f.parentId || 'root', f.name, f.type === 'file' ? 'file' : 'folder');
-        }
-        store.put(f);
-        live.push(f);
-      });
+    removedAll.forEach(r => store.delete(r.id)); // Replace: what was there goes first
+    toWrite.forEach(orig => {
+      // A copy: the bin's own record is left untouched, so an item that fails to restore is still intact.
+      const f = Object.assign({}, orig);
+      delete f.deletedAt; delete f._db; delete f._daysLeft;
+      if (!batchIds.has(f.parentId)) {
+        f.name = C ? nameOf.get(orig.id) : window.getUniqueFileName(live, f.parentId || 'root', f.name, f.type === 'file' ? 'file' : 'folder');
+      }
+      store.put(f);
+      live.push(f);
+    });
+    tx.oncomplete = () => {
+      if (C && removedAll.length) C.afterReplace(removedAll, target.name);
+      if (counts && window.showSuccessToast) { const tail = C.describeCounts(counts); if (tail) window.showSuccessToast('Restored' + tail); }
+      finish(true, toWrite);
     };
-    const finish = (ok) => { (ok ? restored : failed).push(...list); if (closeAfter) target.close(); groupDone(); };
-    tx.oncomplete = () => finish(true);
     tx.onerror = () => finish(false);
     tx.onabort = () => finish(false);
   };

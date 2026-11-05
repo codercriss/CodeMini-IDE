@@ -2077,7 +2077,7 @@ body {
     }
 
     #topSearchIsland {
-        top: 120px !important;
+        /* top is set from the top bar's real position by quick-open.js (it differs on iOS, Android and with the window bar hidden) */
         max-height: 60vh !important;
     }
 
@@ -4612,7 +4612,9 @@ body.compact-explorer .tree-view-item {
 .qo-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 14px; cursor: pointer; font-size: 13px; color: var(--text-main); border-left: 2px solid transparent; }
 .qo-item.selected { background: var(--hover-blue); border-left-color: var(--accent-blue); }
 .qo-main { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.qo-icon { display: inline-flex; align-items: center; justify-content: center; width: 18px; flex: none; font-size: 16px; }
+.qo-icon { display: inline-flex; align-items: center; justify-content: center; width: 20px; flex: none; font-size: 16px; }
+.qo-icon .file-icon { font-size: 18px; }
+.qo-enter { font-size: 13px; color: var(--text-muted); opacity: 0.7; margin-left: 6px; flex: none; }
 .qo-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .qo-detail { font-size: 10px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 45%; direction: rtl; text-align: right; }
 .qo-detail-in { direction: ltr; unicode-bidi: isolate; }
@@ -4624,4 +4626,33 @@ body.compact-explorer .tree-view-item {
 @media (max-width: 768px) {
     .qo-item { min-height: 44px; }
     .qo-hint-chip { padding: 6px 4px; }
+}
+
+/* ---- Name conflicts (js/core/name-conflicts.js): Replace / Skip / Rename ---- */
+.cf-backdrop { z-index: 10049; }
+.island-modal.cf-modal { z-index: 10050; max-width: 460px; gap: 12px; max-height: 90vh; overflow-y: auto; }
+.cf-lead { margin: 0; font-size: 13px; line-height: 1.45; color: var(--text-muted); overflow-wrap: anywhere; }
+.cf-compare { display: flex; flex-direction: column; border: 1px solid var(--border-color); border-radius: 4px; }
+.cf-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; }
+.cf-row + .cf-row { border-top: 1px dashed var(--border-color); }
+.cf-icon { display: inline-flex; width: 22px; flex: none; justify-content: center; font-size: 18px; padding-top: 2px; }
+.cf-info { min-width: 0; flex: 1; }
+.cf-top { display: flex; align-items: center; gap: 8px; }
+.cf-tag { font-size: 10px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; color: var(--text-muted); }
+.cf-badge { font-size: 10px; font-weight: 700; padding: 0 6px; border-radius: 8px; background: var(--bg-panel); color: var(--text-muted); }
+.cf-badge.newer { color: var(--accent-new); }
+.cf-badge.older { color: var(--icon-yellow); }
+.cf-name { font-size: 13px; font-weight: 600; color: var(--text-main); overflow-wrap: anywhere; margin-top: 2px; }
+.cf-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.cf-notes { display: flex; flex-direction: column; gap: 4px; }
+.cf-note { font-size: 11px; color: var(--text-muted); overflow-wrap: anywhere; }
+.cf-note.warn { color: var(--icon-yellow); }
+.cf-apply { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-main); cursor: pointer; padding: 2px 0; }
+.island-modal.cf-modal .cf-apply input[type="checkbox"] { width: 16px; height: 16px; padding: 0; margin: 0; flex: none; accent-color: var(--accent-blue); cursor: pointer; }
+.cf-actions { flex-wrap: wrap; }
+.island-modal.cf-modal .cf-replace { color: var(--color-danger); }
+.island-modal.cf-modal button:disabled { opacity: 0.45; cursor: not-allowed; }
+@media (max-width: 768px) {
+    .island-modal.cf-modal { width: 94%; padding: 16px; }
+    .island-modal.cf-modal .cf-actions button { flex: 1 1 auto; min-height: 42px; }
 }

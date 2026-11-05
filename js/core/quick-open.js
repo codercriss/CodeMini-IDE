@@ -142,6 +142,8 @@
     const W = typeof window !== 'undefined' ? window : root;
     W.CodeMiniQuickOpen = api;
 
+    // The icon the Explorer gives a folder and a workspace alike (see createFileElement in app.js).
+    const FOLDER_ICON = 'ri-folder-2-line file-icon icon-folder';
     const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
     // Text with the matched letters wrapped in <b>, built from nodes so the text stays text.
     function highlighted(text, positions, offset) {
@@ -287,16 +289,21 @@
         folderStack = [folderStack[0]].concat(chain);
         if (typeof W.loadFilesFromDB === 'function') W.loadFilesFromDB();
     }
-    function openWorkspace(ws) {
-        if (typeof W.initDatabase !== 'function') return;
-        W.initDatabase(ws.db || ('CodeMiniDB_ws_' + ws.id), () => {
-            folderStack = [{ id: ws.id, name: ws.name, isWorkspaceRoot: true, parentDb: curWindow() && curWindow().db }];
-            if (typeof W.loadFilesFromDB === 'function') W.loadFilesFromDB();
-        });
-    }
+    // enterWorkspace (app.js) is what clicking a workspace in the Explorer runs: it opens the workspace's own
+    // database (CodeMiniDB_WS_<id>), resets the breadcrumb to it and refreshes the tabs and sidebars.
+    function openWorkspace(ws) { if (typeof W.enterWorkspace === 'function') W.enterWorkspace(ws); }
 
     // ---- the island ----
     const state = { rows: [], selected: 0, token: 0, query: '' };
+    // The island hangs from the bottom edge of the top bar, wherever that is: lower with the window bar showing (28px
+    // on desktop and Android, taller on iOS, which reserves room for the status bar), higher with it hidden, and it
+    // follows when the window bar is toggled, the phone is rotated or the keyboard resizes the page. A fixed offset
+    // (it was 80px, and 120px on every phone) is only right for one of those.
+    function positionIsland() {
+        const box = document.getElementById('topSearchIsland'), bar = document.querySelector('.top-menu');
+        if (!box || !bar) return;
+        box.style.top = Math.round(bar.getBoundingClientRect().bottom + (W.scrollY || 0) + 2) + 'px';
+    }
     const island = () => document.getElementById('topSearchIsland');
     const input = () => document.querySelector('.top-center .search-bar input');
 
@@ -317,6 +324,7 @@
         const main = el('div', 'qo-main');
         if (r.iconNode) main.appendChild(r.iconNode); else if (r.icon) { const w = el('span', 'qo-icon'); w.appendChild(el('i', r.icon)); main.appendChild(w); }
         const label = el('span', 'qo-label'); label.appendChild(r.labelNode || document.createTextNode(r.label)); main.appendChild(label);
+        if (r.enter) { const go = el('i', 'ri-external-link-line qo-enter'); go.title = 'Open workspace'; main.appendChild(go); }
         row.appendChild(main);
         if (r.detail) { // outer box is right-to-left so a long path is cut at its start; the inner span keeps the text itself left-to-right
             const d = el('span', 'qo-detail'); d.title = r.detailTitle || r.detail;
@@ -328,6 +336,7 @@
     function render() {
         const box = island(); if (!box) return;
         box.textContent = '';
+        positionIsland();
         box.classList.add('qo');
         box.setAttribute('role', 'listbox');
         const parsed = parseQuery(state.query);
@@ -391,7 +400,7 @@
             kind: 'command', icon: h.item.icon, labelNode: highlighted(h.item.name, h.positions, 0), keys: h.item.keys, run: () => h.item.run()
         }));
         const wsRows = (text, limit) => rankByName(W.workspacesList || [], text, (w) => w.name || '').slice(0, limit).map((h) => ({
-            kind: 'workspace', icon: 'ri-briefcase-line', labelNode: highlighted(h.item.name, h.positions, 0), run: () => openWorkspace(h.item)
+            kind: 'workspace', icon: FOLDER_ICON, enter: true, labelNode: highlighted(h.item.name, h.positions, 0), run: () => openWorkspace(h.item)
         }));
 
         if (parsed.mode === 'commands') {
@@ -426,14 +435,14 @@
             const cr = cmdRows('', 6); if (cr.length) sections.push({ title: 'COMMANDS', count: commandList().length, rows: cr });
             const wr = wsRows('', SHOW_OTHER); if (wr.length) sections.push({ title: 'WORKSPACES', count: wr.length, rows: wr });
             const folders = (data.folders || []).sort((a, b) => (a.path < b.path ? -1 : 1)).slice(0, SHOW_OTHER);
-            if (folders.length) sections.push({ title: 'FOLDERS', count: (data.folders || []).length, rows: folders.map((f) => ({ kind: 'folder', icon: 'ri-folder-2-line', label: f.name, detail: f.path, run: () => openFolder(f.id) })) });
+            if (folders.length) sections.push({ title: 'FOLDERS', count: (data.folders || []).length, rows: folders.map((f) => ({ kind: 'folder', icon: FOLDER_ICON, label: f.name, detail: f.path, run: () => openFolder(f.id) })) });
         } else {
             const hits = rankFiles(data.files, parsed.text, loadRecents());
             if (hits.length) sections.push({ title: 'FILES', count: hits.length, rows: hits.slice(0, SHOW_FILES).map((h) => fileRow(h)) });
             const cr = cmdRows(parsed.text, SHOW_OTHER); if (cr.length) sections.push({ title: 'COMMANDS', count: cr.length, rows: cr });
             const wr = wsRows(parsed.text, SHOW_OTHER); if (wr.length) sections.push({ title: 'WORKSPACES', count: wr.length, rows: wr });
             const fh = rankByName(data.folders || [], parsed.text, (f) => f.name).slice(0, SHOW_OTHER);
-            if (fh.length) sections.push({ title: 'FOLDERS', count: fh.length, rows: fh.map((h) => ({ kind: 'folder', icon: 'ri-folder-2-line', labelNode: highlighted(h.item.name, h.positions.filter((p) => p >= h.item.path.length - h.item.name.length).map((p) => p - (h.item.path.length - h.item.name.length)), 0), detail: h.item.path, run: () => openFolder(h.item.id) })) });
+            if (fh.length) sections.push({ title: 'FOLDERS', count: fh.length, rows: fh.map((h) => ({ kind: 'folder', icon: FOLDER_ICON, labelNode: highlighted(h.item.name, h.positions.filter((p) => p >= h.item.path.length - h.item.name.length).map((p) => p - (h.item.path.length - h.item.name.length)), 0), detail: h.item.path, run: () => openFolder(h.item.id) })) });
         }
         return { sections, note };
     }
@@ -452,6 +461,7 @@
 
     function open(prefill) {
         const inp = input(), box = island(); if (!inp || !box) return;
+        positionIsland();
         box.style.display = 'flex';
         inp.focus();
         if (prefill !== undefined) inp.value = prefill; else inp.select();
@@ -462,6 +472,11 @@
     function init() {
         const inp = input(), box = island(); if (!inp || !box) return;
         trackRecents();
+        positionIsland();
+        W.addEventListener('resize', positionIsland);
+        W.addEventListener('orientationchange', positionIsland);
+        if (W.visualViewport) W.visualViewport.addEventListener('resize', positionIsland);
+        new MutationObserver(positionIsland).observe(document.body, { attributes: true, attributeFilter: ['class'] }); // hide-window-bar, zen mode...
         inp.setAttribute('autocomplete', 'off'); inp.setAttribute('spellcheck', 'false');
         inp.setAttribute('role', 'combobox'); inp.setAttribute('aria-controls', 'topSearchIsland');
         inp.addEventListener('keydown', (e) => {

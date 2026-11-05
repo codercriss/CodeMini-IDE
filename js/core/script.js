@@ -1583,28 +1583,40 @@ window.restoreActivityState = function() {
     });
 }
 
-window.moveFileInDB = function(fileId, newParentId) {
+// Drag-and-drop move into a folder (or back to the root). A name already taken there asks Replace / Skip / Rename
+// (js/core/name-conflicts.js) before anything is written, so the read, the question and the write are separate steps.
+window.moveFileInDB = async function(fileId, newParentId) {
     if (!db) return;
-    const tx = db.transaction('filesystem', 'readwrite');
+    const database = db; // the question can take a while; keep writing to the database the drag started in
+    let allFiles;
+    try {
+        allFiles = await new Promise((res, rej) => {
+            const req = database.transaction('filesystem', 'readonly').objectStore('filesystem').getAll();
+            req.onsuccess = (ev) => res(ev.target.result || []); req.onerror = () => rej(req.error);
+        });
+    } catch (e) { return; }
+    const file = allFiles.find(f => f.id === fileId);
+    if (!file || file.parentId === newParentId || file.id === newParentId) return;
+
+    const dest = allFiles.find(f => f.id === newParentId);
+    const plan = await CodeMiniConflicts.planPlacement({
+        items: [CodeMiniConflicts.toItem(file, { count: CodeMiniConflicts.descendantsOf(allFiles, file.id).length })],
+        existing: allFiles, parentId: newParentId,
+        ignoreIds: [file.id], protectIds: [file.id, ...CodeMiniConflicts.descendantsOf(allFiles, file.id).map(d => d.id)],
+        verb: 'moving', where: dest ? dest.name : 'the root'
+    });
+    const entry = plan.entries[0];
+    if (plan.stopped || !entry || entry.action === 'skip') return;
+
+    let tx;
+    try { tx = database.transaction('filesystem', 'readwrite'); } catch (e) { return; }
     const store = tx.objectStore('filesystem');
-    
-    store.getAll().onsuccess = (ev) => {
-        const allFiles = ev.target.result || [];
-        const file = allFiles.find(f => f.id === fileId);
-        
-        if (file && file.parentId !== newParentId) {
-            if (file.id === newParentId) return;
-            
-            // Fix: Check for duplicate names in the target location and auto-number
-            file.name = window.getUniqueFileName(allFiles, newParentId, file.name, file.type);
-            file.parentId = newParentId;
-            file.timestamp = Date.now();
-            
-            store.put(file).onsuccess = () => {
-                if (typeof loadFilesFromDB === 'function') loadFilesFromDB();
-                if (typeof window.refreshAllOpenBreadcrumbs === 'function') window.refreshAllOpenBreadcrumbs();
-            };
-        }
+    (entry.removed || []).forEach(r => store.delete(r.id));
+    store.put({ ...file, name: entry.name, parentId: newParentId, timestamp: Date.now() });
+    tx.oncomplete = () => {
+        CodeMiniConflicts.afterReplace(entry.removed, database.name);
+        if (typeof loadFilesFromDB === 'function') loadFilesFromDB();
+        if (typeof window.refreshAllOpenBreadcrumbs === 'function') window.refreshAllOpenBreadcrumbs();
     };
 };
 

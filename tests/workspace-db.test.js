@@ -11,6 +11,8 @@ let n = 0; const t = async (name, fn) => { await fn(); n++; console.log('  ok', 
 const slice = (src, from, to) => { const i = src.indexOf(from); const j = src.indexOf(to, i + 1); assert(i >= 0 && j > i, `cannot find ${from}`); return src.slice(i, j); };
 const plain = (x) => JSON.parse(JSON.stringify(x));
 const tick = () => new Promise((r) => setImmediate(r));
+// Wait for an asynchronous result instead of guessing how many event-loop turns it needs.
+const until = async (fn) => { for (let i = 0; i < 300 && !fn(); i++) await tick(); };
 
 // ---- a tiny fake IndexedDB: a registry of databases, each with a 'filesystem' store ----------------------------
 function makeIdb(initial = {}) {
@@ -19,12 +21,23 @@ function makeIdb(initial = {}) {
     name, closed: false, close() { this.closed = true; },
     objectStoreNames: { contains: () => true },
     transaction() {
-      const staged = []; const tx = { oncomplete: null, onerror: null, onabort: null };
-      tx.objectStore = () => ({
-        getAll() { const req = {}; setImmediate(() => { req.result = Object.values(dbs[name].records); req.onsuccess && req.onsuccess({ target: req }); setImmediate(() => { if (indexedDB.failing.has(name)) { tx.onabort && tx.onabort(); return; } staged.forEach((r) => { dbs[name].records[r.id] = r; }); tx.oncomplete && tx.oncomplete(); }); }); return req; },
-        get(id) { const req = {}; setImmediate(() => { req.result = dbs[name].records[id]; req.onsuccess && req.onsuccess({ target: req }); setImmediate(() => { staged.forEach((r) => { dbs[name].records[r.id] = r; }); tx.oncomplete && tx.oncomplete(); }); }); return req; },
-        put(rec) { staged.push(JSON.parse(JSON.stringify(rec))); const req = {}; setImmediate(() => req.onsuccess && req.onsuccess({ target: req })); return req; }
+      // A transaction commits once every request issued in it has settled (reads, puts and deletes alike), like a
+      // real one. A write-only transaction therefore completes too; a failing database aborts instead of committing.
+      const staged = []; let pending = 0, finished = false; const tx = { oncomplete: null, onerror: null, onabort: null };
+      const settle = () => setImmediate(() => {
+        if (pending > 0 || finished) return; finished = true;
+        if (indexedDB.failing.has(name)) { tx.onabort && tx.onabort(); return; }
+        staged.forEach((op) => { if (op.del) delete dbs[name].records[op.id]; else dbs[name].records[op.rec.id] = op.rec; });
+        tx.oncomplete && tx.oncomplete();
       });
+      const request = (work) => { const req = {}; pending++; setImmediate(() => { work(req); pending--; settle(); }); return req; };
+      tx.objectStore = () => ({
+        getAll() { return request((req) => { req.result = Object.values(dbs[name].records); req.onsuccess && req.onsuccess({ target: req }); }); },
+        get(id) { return request((req) => { req.result = dbs[name].records[id]; req.onsuccess && req.onsuccess({ target: req }); }); },
+        put(rec) { staged.push({ rec: JSON.parse(JSON.stringify(rec)) }); return request((req) => { req.onsuccess && req.onsuccess({ target: req }); }); },
+        delete(id) { staged.push({ del: true, id }); return request((req) => { req.onsuccess && req.onsuccess({ target: req }); }); }
+      });
+      settle(); // a transaction that issues no request at all still completes, as a real one does
       return tx;
     }
   });
@@ -223,7 +236,7 @@ const mkTab = (o) => ({ dataset: Object.assign({}, o.dataset), classList: { cont
     const idb = makeIdb({ CodeMiniDB: {}, WS1: {} }); const c = binEnv(idb);
     const bin = [{ id: 'f1', parentId: 'w1', name: 'notes.md', type: 'file', _db: 'WS1', deletedAt: 5, _daysLeft: 3 }]; let res;
     c.window.restoreItemsToDB(bin, idb.handle('CodeMiniDB'), (r, f) => { res = { r, f }; });
-    await tick(); await tick(); await tick(); await tick();
+    await until(() => res);
     assert.deepStrictEqual(Object.keys(idb.dbs.WS1.records), ['f1']); assert.deepStrictEqual(Object.keys(idb.dbs.CodeMiniDB.records), []);
     const rec = idb.dbs.WS1.records.f1; assert(!('_db' in rec) && !('deletedAt' in rec) && !('_daysLeft' in rec), 'bookkeeping fields are not stored');
     assert.strictEqual(res.r.length, 1); assert.strictEqual(res.f.length, 0);
@@ -232,7 +245,7 @@ const mkTab = (o) => ({ dataset: Object.assign({}, o.dataset), classList: { cont
     const idb = makeIdb({ CodeMiniDB: {} }); const c = binEnv(idb);
     const item = { id: 'f1', parentId: 'w1', name: 'a.txt', type: 'file', _db: 'WS_GONE', deletedAt: 7 }; let res;
     c.window.restoreItemsToDB([item], idb.handle('CodeMiniDB'), (r, f) => { res = { r, f }; });
-    await tick(); await tick();
+    await until(() => res);
     assert.strictEqual(res.r.length, 0); assert.strictEqual(res.f.length, 1);
     assert.deepStrictEqual(plain(idb.created), []); assert.strictEqual(item.deletedAt, 7); assert.strictEqual(item._db, 'WS_GONE');
   });
@@ -240,21 +253,70 @@ const mkTab = (o) => ({ dataset: Object.assign({}, o.dataset), classList: { cont
     const idb = makeIdb({ CodeMiniDB: {}, WS1: {} }); const c = binEnv(idb); let res;
     c.window.restoreItemsToDB([{ id: 'a', parentId: 'root', name: 'a', type: 'file' }, { id: 'b', parentId: 'w', name: 'b', type: 'file', _db: 'WS1' }, { id: 'c', parentId: 'w', name: 'c', type: 'file', _db: 'GONE' }],
       idb.handle('CodeMiniDB'), (r, f) => { res = { r, f }; });
-    for (let i = 0; i < 8; i++) await tick();
+    await until(() => res);
     assert.deepStrictEqual(plain(res.r.map((x) => x.id).sort()), ['a', 'b']); assert.deepStrictEqual(plain(res.f.map((x) => x.id)), ['c']);
   });
   await t('a write that fails leaves the item in the bin (reported as failed, not restored)', async () => {
     const idb = makeIdb({ CodeMiniDB: {}, WS1: {} }); idb.failing.add('WS1'); const c = binEnv(idb);
     const item = { id: 'f1', parentId: 'w1', name: 'a.txt', type: 'file', _db: 'WS1', deletedAt: 9 }; let res;
     c.window.restoreItemsToDB([item], idb.handle('CodeMiniDB'), (r, f) => { res = { r, f }; });
-    for (let i = 0; i < 6; i++) await tick();
+    await until(() => res);
     assert.strictEqual(res.r.length, 0); assert.strictEqual(res.f.length, 1); assert.deepStrictEqual(Object.keys(idb.dbs.WS1.records), []);
   });
-  await t('a restored item that clashes with a name already there is auto-numbered, as before', async () => {
+  await t('a restored item that clashes with a name already there is auto-numbered when the name-conflict module is not loaded (the old behavior)', async () => {
     const idb = makeIdb({ CodeMiniDB: { x: { id: 'x', parentId: 'root', name: 'index.html', type: 'file' } } }); const c = binEnv(idb); let done = false;
     c.window.restoreItemsToDB([{ id: 'y', parentId: 'root', name: 'index.html', type: 'file' }], idb.handle('CodeMiniDB'), () => { done = true; });
-    for (let i = 0; i < 6; i++) await tick();
+    await until(() => done);
     assert(done); assert.strictEqual(idb.dbs.CodeMiniDB.records.y.name, 'index(1).html');
+  });
+  // With the name-conflict module loaded, a clash asks instead of numbering: Replace / Skip / Rename / Stop.
+  const NC = require('../js/core/name-conflicts.js');
+  const withAnswers = (idb, answers) => {
+    const c = binEnv(idb); const asked = [], replaced = []; let n = 0;
+    c.window.CodeMiniConflicts = {
+      planPlacement: (o) => NC.planPlacement(Object.assign({}, o, { ask: async (info) => { asked.push(info); return answers[Math.min(n++, answers.length - 1)]; } })),
+      toItem: NC.toItem, describeCounts: NC.describeCounts, afterReplace: (removed, dbn) => replaced.push({ ids: removed.map((r) => r.id), dbn })
+    };
+    return { c, asked, replaced };
+  };
+  const liveDb = () => ({ CodeMiniDB: { y: { id: 'y', parentId: 'root', name: 'index.html', type: 'file', content: 'live', timestamp: 100 } } });
+  const binned = { id: 'x', parentId: 'root', name: 'index.html', type: 'file', content: 'binned', timestamp: 50, deletedAt: 9 };
+  const restore = async (c, idb, items) => { let res; c.window.restoreItemsToDB(items, idb.handle('CodeMiniDB'), (r, f) => { res = { r, f }; }); await until(() => res); return res; };
+  await t('restore + clash: Skip leaves the item in the bin and the live one untouched', async () => {
+    const idb = makeIdb(liveDb()); const { c, asked } = withAnswers(idb, [{ choice: 'skip' }]);
+    const res = await restore(c, idb, [Object.assign({}, binned)]);
+    assert.strictEqual(res.r.length, 0); assert.strictEqual(res.f.length, 0, 'skipped is neither restored nor failed, so the caller keeps it in the bin');
+    assert.deepStrictEqual(Object.keys(idb.dbs.CodeMiniDB.records), ['y']); assert.strictEqual(idb.dbs.CodeMiniDB.records.y.content, 'live');
+    assert.strictEqual(asked.length, 1); assert.strictEqual(asked[0].verb, 'restoring'); assert.strictEqual(asked[0].item.timestamp, 50); assert.strictEqual(asked[0].existing.timestamp, 100);
+  });
+  await t('restore + clash: Replace deletes the live item (reported for the bin and tab cleanup) and restores the binned one under its own name', async () => {
+    const idb = makeIdb(liveDb()); const { c, replaced } = withAnswers(idb, [{ choice: 'replace' }]);
+    const res = await restore(c, idb, [Object.assign({}, binned)]);
+    assert.strictEqual(res.r.length, 1); assert.deepStrictEqual(Object.keys(idb.dbs.CodeMiniDB.records), ['x']);
+    assert.strictEqual(idb.dbs.CodeMiniDB.records.x.name, 'index.html'); assert.strictEqual(idb.dbs.CodeMiniDB.records.x.content, 'binned');
+    assert.deepStrictEqual(plain(replaced), [{ ids: ['y'], dbn: 'CodeMiniDB' }]);
+  });
+  await t('restore + clash: Rename keeps both, numbering the restored one', async () => {
+    const idb = makeIdb(liveDb()); const { c } = withAnswers(idb, [{ choice: 'rename' }]);
+    const res = await restore(c, idb, [Object.assign({}, binned)]);
+    assert.strictEqual(res.r.length, 1); assert.strictEqual(idb.dbs.CodeMiniDB.records.x.name, 'index(1).html'); assert.strictEqual(idb.dbs.CodeMiniDB.records.y.name, 'index.html');
+  });
+  await t('restore + clash: Stop changes nothing and still reports back', async () => {
+    const idb = makeIdb(liveDb()); const { c } = withAnswers(idb, [{ choice: 'stop' }]);
+    const res = await restore(c, idb, [Object.assign({}, binned)]);
+    assert.strictEqual(res.r.length, 0); assert.strictEqual(res.f.length, 0); assert.deepStrictEqual(Object.keys(idb.dbs.CodeMiniDB.records), ['y']);
+  });
+  await t('restore + clash: skipping a folder leaves everything inside it in the bin too', async () => {
+    const idb = makeIdb({ CodeMiniDB: { f: { id: 'f', parentId: 'root', name: 'src', type: 'folder', timestamp: 1 } } }); const { c } = withAnswers(idb, [{ choice: 'skip' }]);
+    const res = await restore(c, idb, [{ id: 'bf', parentId: 'root', name: 'src', type: 'folder', deletedAt: 1 }, { id: 'bc', parentId: 'bf', name: 'a.js', type: 'file', deletedAt: 1 }, { id: 'ok', parentId: 'root', name: 'free.txt', type: 'file', deletedAt: 1 }]);
+    assert.deepStrictEqual(plain(res.r.map((x) => x.id)), ['ok']); assert.strictEqual(res.f.length, 0);
+    assert.deepStrictEqual(Object.keys(idb.dbs.CodeMiniDB.records).sort(), ['f', 'ok']);
+  });
+  await t('restore + clash: Replace of a folder restores its children under the replaced one', async () => {
+    const idb = makeIdb({ CodeMiniDB: { f: { id: 'f', parentId: 'root', name: 'src', type: 'folder', timestamp: 1 }, g: { id: 'g', parentId: 'f', name: 'old.js', type: 'file', timestamp: 1 } } }); const { c, replaced } = withAnswers(idb, [{ choice: 'replace' }]);
+    const res = await restore(c, idb, [{ id: 'bf', parentId: 'root', name: 'src', type: 'folder', deletedAt: 1 }, { id: 'bc', parentId: 'bf', name: 'a.js', type: 'file', deletedAt: 1 }]);
+    assert.strictEqual(res.r.length, 2); assert.deepStrictEqual(Object.keys(idb.dbs.CodeMiniDB.records).sort(), ['bc', 'bf']);
+    assert.strictEqual(idb.dbs.CodeMiniDB.records.bc.parentId, 'bf'); assert.deepStrictEqual(plain(replaced[0].ids.slice().sort()), ['f', 'g']);
   });
 
   console.log('wiring (source checks)');
@@ -281,11 +343,11 @@ const mkTab = (o) => ({ dataset: Object.assign({}, o.dataset), classList: { cont
   await t('Cut/Copy record the open database as the source; Paste uses it and the planner', () => {
     assert(/action: 'cut', files: targets, sourceDb: db\.name/.test(appSrc)); assert(/action: 'copy', files: targets, sourceDb: db\.name/.test(appSrc));
     assert(/const plan = window\.clipboardPlan\(clip, db\.name\);/.test(appSrc));
-    assert(/transferToExternalDBDeep\(clip\.files, db\.name, plan\.action, file\.id, clip\.sourceDb\)/.test(appSrc));
+    assert(/transferToExternalDBDeep\(clip\.files, db\.name, plan\.action, file\.id, clip\.sourceDb \|\| db\.name, file\.name\)/.test(appSrc), 'a paste is one transfer from the clipboard\'s database, for the same database too (the name clash prompt lives in it)');
     assert(!/transferToExternalDBDeep\(clip\.files, cellActiveWindow\.db/.test(appSrc));
   });
   await t('a transfer can name its source database (paste from another database)', () => {
-    assert(/async function transferToExternalDBDeep\(targets, targetDbName, action, targetRootId = 'root', sourceDbOverride\) \{\s*const sourceDbName = sourceDbOverride \|\| db\.name;/.test(appSrc));
+    assert(/async function transferToExternalDBDeep\(targets, targetDbName, action, targetRootId = 'root', sourceDbOverride, where\) \{\s*const sourceDbName = sourceDbOverride \|\| db\.name;/.test(appSrc));
   });
   await t('a cross-database move closes the moved files\' tabs', () => { assert(/closeTabsForMovedFiles\(allToDelete\.map\(f => f\.id\), sourceDbName\)/.test(appSrc)); });
   await t('global search looks at the open database and closes its connection', () => {

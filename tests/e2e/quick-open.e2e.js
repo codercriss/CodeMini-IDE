@@ -156,6 +156,53 @@ const ok = (c, n, x) => { c ? (pass++, console.log('  PASS', n)) : (fail++, cons
   ok(await ev(() => document.querySelector('#topSearchIsland img') === null && window.__pwn === undefined), 'no element was created from the name and nothing ran');
   await reset();
 
+  console.log('\n[workspaces: the same icons as the Explorer, and they open]');
+  await ev(() => new Promise(res => { const tx = db.transaction('filesystem', 'readwrite'); tx.objectStore('filesystem').put({ id: 'w1', parentId: 'root', name: 'Alpha Project', type: 'workspace', db: 'CodeMiniDB_WS_w1', timestamp: Date.now() }); tx.oncomplete = res; }));
+  await ev(() => loadFilesFromDB()); await sleep(600);
+  await page.keyboard.press('Control+P'); await sleep(400); await type('alpha');
+  const wsRow = await ev(() => { const rows = [...document.querySelectorAll('#topSearchIsland .qo-item')]; const r = rows.find(x => x.querySelector('.qo-label').textContent === 'Alpha Project'); if (!r) return null; const i = r.querySelector('.qo-icon i'); return { icon: i && i.className, enter: !!r.querySelector('.qo-enter') }; });
+  ok(wsRow && /ri-folder-2-line/.test(wsRow.icon) && /icon-folder/.test(wsRow.icon) && /file-icon/.test(wsRow.icon), 'a workspace uses the Explorer\'s folder icon (ri-folder-2-line, file-icon, icon-folder)', wsRow);
+  ok(wsRow && wsRow.enter, 'and the Explorer\'s "enter" arrow, so it still reads as a workspace');
+  const folderIcon = await ev(() => { document.querySelector('.top-center .search-bar input').value = ''; return null; });
+  await type('utils'); const fIcon = await ev(() => { const r = [...document.querySelectorAll('#topSearchIsland .qo-item')].find(x => x.querySelector('.qo-label').textContent === 'utils'); const i = r && r.querySelector('.qo-icon i'); return i && i.className; });
+  ok(fIcon && /ri-folder-2-line/.test(fIcon) && /icon-folder/.test(fIcon), 'a folder uses the same icon', fIcon);
+  ok(!(await ev(() => !!document.querySelector('#topSearchIsland .ri-briefcase-line'))), 'the invented briefcase icon is gone');
+  await type('alpha');
+  await page.keyboard.press('Enter'); await sleep(1500);
+  ok((await ev(() => db.name)) === 'CodeMiniDB_WS_w1', 'choosing a workspace opens its own database, like clicking it in the Explorer', await ev(() => db.name));
+  ok((await ev(() => folderStack[0].name)) === 'Alpha Project', 'and the breadcrumb starts at the workspace', await ev(() => folderStack.map(f => f.name)));
+
+  console.log('\n[the island hangs from the top bar, wherever the bar is]');
+  const gap = () => ev(() => { const m = document.querySelector('.top-menu').getBoundingClientRect(), i = document.getElementById('topSearchIsland').getBoundingClientRect(); return { menuBottom: Math.round(m.bottom), islandTop: Math.round(i.top), gap: Math.round(i.top - m.bottom), shown: document.getElementById('topSearchIsland').style.display === 'flex' }; });
+  const scenario = async (label, setup, viewport) => {
+    await page.setViewportSize(viewport); await ev(setup); await sleep(500);
+    await page.keyboard.press('Escape'); await sleep(100);
+    await page.keyboard.press('Control+P'); await sleep(500);
+    const g = await gap();
+    ok(g.shown && g.gap >= 0 && g.gap <= 6, label, g);
+  };
+  const clear = () => { document.documentElement.classList.remove('is-android', 'is-ios'); document.body.classList.remove('hide-window-bar'); };
+  await scenario('desktop, window bar showing: just under the top bar', clear, { width: 1280, height: 800 });
+  await scenario('desktop, window bar hidden: moves up with the bar', () => { document.documentElement.classList.remove('is-android'); document.body.classList.add('hide-window-bar'); }, { width: 1280, height: 800 });
+  const desk = await gap();
+  await scenario('phone (iOS layout), window bar showing', clear, { width: 390, height: 800 });
+  const ios = await gap();
+  await scenario('phone (iOS layout), window bar hidden', () => { document.body.classList.add('hide-window-bar'); }, { width: 390, height: 800 });
+  const iosHidden = await gap();
+  await scenario('Android, window bar showing (it is shorter there: no 120px gap)', () => { document.documentElement.classList.remove('is-ios'); document.body.classList.remove('hide-window-bar'); document.documentElement.classList.add('is-android'); }, { width: 390, height: 800 });
+  const andr = await gap();
+  await scenario('Android, window bar hidden', () => { document.documentElement.classList.add('is-android'); document.body.classList.add('hide-window-bar'); }, { width: 390, height: 800 });
+  const andrHidden = await gap();
+  ok(desk.islandTop < 60, 'with the bar hidden the island really is higher than the old fixed 80px', desk);
+  ok(andr.islandTop < ios.islandTop, 'on Android the island sits higher than on iOS, whose bars are taller', { andr: andr.islandTop, ios: ios.islandTop });
+  ok(andrHidden.islandTop < andr.islandTop && iosHidden.islandTop < ios.islandTop, 'hiding the window bar raises it on both phones', { andrHidden: andrHidden.islandTop, andr: andr.islandTop, iosHidden: iosHidden.islandTop, ios: ios.islandTop });
+  ok(andr.islandTop < 120 && andrHidden.islandTop < 120, 'neither is stuck at the old 120px');
+  await ev(() => document.body.classList.remove('hide-window-bar'));
+  await sleep(300);
+  ok((await gap()).gap >= 0 && (await gap()).gap <= 6, 'toggling the window bar while the island is open moves it right away', await gap());
+  await ev(clear); await page.setViewportSize({ width: 1280, height: 800 }); await sleep(300);
+  await page.keyboard.press('Escape'); await sleep(200);
+
   console.log('\n[the old behaviors still work]');
   await page.click(input); await sleep(500);
   ok(await isOpen(), 'clicking the search box still opens the island');
