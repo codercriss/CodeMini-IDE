@@ -223,7 +223,20 @@
                 const g = document.getElementById(W.activeGroupId || 'editorGroup1');
                 if (g) Array.from(g.querySelectorAll('.tab')).forEach((tab) => { const b = tab.querySelector('.tab-close'); if (b) b.click(); });
             } },
-            { name: 'Toggle Zen Mode', icon: 'ri-fullscreen-line', run: () => { document.body.classList.toggle('zen-mode'); } }
+            { name: 'Toggle Zen Mode', icon: 'ri-fullscreen-line', run: () => { document.body.classList.toggle('zen-mode'); } },
+            { name: 'Compare Active File With...', icon: 'ri-arrow-left-right-line', run: () => {
+                const tab = W.CodeMiniDiff && W.CodeMiniDiff.activeFileTab();
+                if (!tab) { if (W.showSuccessToast) W.showSuccessToast('Open a code file first, then compare it with another.'); return; }
+                const name = tab.querySelector('span') ? tab.querySelector('span').textContent : 'file';
+                pickFile({ prompt: 'Compare \u201c' + name + '\u201d with...', excludeId: tab.dataset.fileId, onPick: (file) => {
+                    W.CodeMiniDiff.compareFiles({ id: tab.dataset.fileId, name, dbName: tab.dataset.dbName || (curDb() && curDb().name) }, { id: file.id, name: file.name, dbName: curDb() && curDb().name });
+                } });
+            } },
+            { name: 'Compare Active File with Saved', icon: 'ri-git-commit-line', run: () => {
+                const tab = W.CodeMiniDiff && W.CodeMiniDiff.activeFileTab();
+                if (!tab) { if (W.showSuccessToast) W.showSuccessToast('Open a code file first.'); return; }
+                W.CodeMiniDiff.compareWithSaved(tab);
+            } }
         ];
     }
 
@@ -294,7 +307,10 @@
     function openWorkspace(ws) { if (typeof W.enterWorkspace === 'function') W.enterWorkspace(ws); }
 
     // ---- the island ----
-    const state = { rows: [], selected: 0, token: 0, query: '' };
+    const state = { rows: [], selected: 0, token: 0, query: '', pick: null };
+    // A file picker built on the same list: { prompt, excludeId, onPick(file) }. It lasts until the island closes.
+    function pickFile(opts) { state.pick = opts; open(''); }
+    api.pickFile = pickFile;
     // The island hangs from the bottom edge of the top bar, wherever that is: lower with the window bar showing (28px
     // on desktop and Android, taller on iOS, which reserves room for the status bar), higher with it hidden, and it
     // follows when the window bar is toggled, the phone is rotated or the keyboard resizes the page. A fixed offset
@@ -310,6 +326,7 @@
     function header(title, count) { const h = el('div', 'qo-section'); h.appendChild(el('span', '', title)); if (count !== undefined) h.appendChild(el('span', 'qo-count', String(count))); return h; }
     function hintRow(mode) {
         const row = el('div', 'qo-hint');
+        if (state.pick) { row.appendChild(el('span', 'qo-pick', state.pick.prompt)); return row; }
         [['', 'files', 'all'], ['>', 'commands', 'commands'], [':', 'line', 'line'], ['@', 'symbol', 'symbol'], ['#', 'workspace', 'workspace']].forEach(([key, label, m]) => {
             const chip = el('span', 'qo-hint-chip' + (m === mode ? ' active' : ''));
             if (key) chip.appendChild(el('kbd', '', key));
@@ -383,8 +400,10 @@
     async function compute(query) {
         const token = ++state.token;
         state.query = query;
-        const parsed = parseQuery(query);
-        const data = await loadFiles(parsed.mode === 'all' && !parsed.text && !query);
+        const pick = state.pick;
+        const parsed = pick ? { mode: 'all', text: String(query || '').trim() } : parseQuery(query);
+        let data = await loadFiles(parsed.mode === 'all' && !parsed.text && !query);
+        if (pick) data = Object.assign({}, data, { files: data.files.filter((f) => f.id !== pick.excludeId) });
         if (token !== state.token) return null; // a newer keystroke superseded this one
         const sections = []; let note = '';
         const fileRow = (hit, extra) => {
@@ -393,7 +412,7 @@
             return Object.assign({
                 kind: 'file', iconNode: fileIcon(f.name), labelNode: highlighted(f.name, hit.positions.filter((p) => p >= nameStart), nameStart),
                 detail: dir, detailTitle: f.path, detailNode: dir ? highlighted(dir, hit.positions.filter((p) => p < nameStart), 0) : null,
-                run: (o) => openFileById(f.id, { side: o.side, line: parsed.line, col: parsed.col })
+                run: (o) => (pick ? pick.onPick(f) : openFileById(f.id, { side: o.side, line: parsed.line, col: parsed.col }))
             }, extra || {});
         };
         const cmdRows = (text, limit) => rankByName(commandList(), text, (c) => c.name).slice(0, limit).map((h) => ({
@@ -432,16 +451,16 @@
             const seen = new Set(recentFiles.map((f) => f.id));
             const others = data.files.filter((f) => !seen.has(f.id)).sort((a, b) => (a.path < b.path ? -1 : 1)).slice(0, SHOW_EMPTY_FILES);
             if (others.length) sections.push({ title: 'FILES', count: data.files.length - recentFiles.length, rows: others.map((f) => fileRow({ file: f, positions: [] })) });
-            const cr = cmdRows('', 6); if (cr.length) sections.push({ title: 'COMMANDS', count: commandList().length, rows: cr });
-            const wr = wsRows('', SHOW_OTHER); if (wr.length) sections.push({ title: 'WORKSPACES', count: wr.length, rows: wr });
-            const folders = (data.folders || []).sort((a, b) => (a.path < b.path ? -1 : 1)).slice(0, SHOW_OTHER);
+            const cr = pick ? [] : cmdRows('', 6); if (cr.length) sections.push({ title: 'COMMANDS', count: commandList().length, rows: cr });
+            const wr = pick ? [] : wsRows('', SHOW_OTHER); if (wr.length) sections.push({ title: 'WORKSPACES', count: wr.length, rows: wr });
+            const folders = pick ? [] : (data.folders || []).sort((a, b) => (a.path < b.path ? -1 : 1)).slice(0, SHOW_OTHER);
             if (folders.length) sections.push({ title: 'FOLDERS', count: (data.folders || []).length, rows: folders.map((f) => ({ kind: 'folder', icon: FOLDER_ICON, label: f.name, detail: f.path, run: () => openFolder(f.id) })) });
         } else {
             const hits = rankFiles(data.files, parsed.text, loadRecents());
             if (hits.length) sections.push({ title: 'FILES', count: hits.length, rows: hits.slice(0, SHOW_FILES).map((h) => fileRow(h)) });
-            const cr = cmdRows(parsed.text, SHOW_OTHER); if (cr.length) sections.push({ title: 'COMMANDS', count: cr.length, rows: cr });
-            const wr = wsRows(parsed.text, SHOW_OTHER); if (wr.length) sections.push({ title: 'WORKSPACES', count: wr.length, rows: wr });
-            const fh = rankByName(data.folders || [], parsed.text, (f) => f.name).slice(0, SHOW_OTHER);
+            const cr = pick ? [] : cmdRows(parsed.text, SHOW_OTHER); if (cr.length) sections.push({ title: 'COMMANDS', count: cr.length, rows: cr });
+            const wr = pick ? [] : wsRows(parsed.text, SHOW_OTHER); if (wr.length) sections.push({ title: 'WORKSPACES', count: wr.length, rows: wr });
+            const fh = pick ? [] : rankByName(data.folders || [], parsed.text, (f) => f.name).slice(0, SHOW_OTHER);
             if (fh.length) sections.push({ title: 'FOLDERS', count: fh.length, rows: fh.map((h) => ({ kind: 'folder', icon: FOLDER_ICON, labelNode: highlighted(h.item.name, h.positions.filter((p) => p >= h.item.path.length - h.item.name.length).map((p) => p - (h.item.path.length - h.item.name.length)), 0), detail: h.item.path, run: () => openFolder(h.item.id) })) });
         }
         return { sections, note };
@@ -467,12 +486,13 @@
         if (prefill !== undefined) inp.value = prefill; else inp.select();
         W.renderTopSearch(inp.value);
     }
-    W.openQuickOpen = open;
+    W.openQuickOpen = function (prefill) { state.pick = null; open(prefill); };
 
     function init() {
         const inp = input(), box = island(); if (!inp || !box) return;
         trackRecents();
         positionIsland();
+        new MutationObserver(() => { if (box.style.display === 'none') state.pick = null; }).observe(box, { attributes: true, attributeFilter: ['style'] });
         W.addEventListener('resize', positionIsland);
         W.addEventListener('orientationchange', positionIsland);
         if (W.visualViewport) W.visualViewport.addEventListener('resize', positionIsland);
@@ -502,9 +522,9 @@
     document.addEventListener('keydown', (e) => {
         const mod = e.ctrlKey || e.metaKey;
         const key = (e.key || '').toLowerCase();
-        if (mod && !e.shiftKey && !e.altKey && key === 'p') { e.preventDefault(); e.stopPropagation(); open(); }
-        else if (e.key === 'F1' && !mod && !e.altKey && !e.shiftKey) { e.preventDefault(); e.stopPropagation(); open('>'); }
-        else if (mod && e.shiftKey && !e.altKey && key === 'p') { e.preventDefault(); e.stopPropagation(); open('>'); }
+        if (mod && !e.shiftKey && !e.altKey && key === 'p') { e.preventDefault(); e.stopPropagation(); W.openQuickOpen(); }
+        else if (e.key === 'F1' && !mod && !e.altKey && !e.shiftKey) { e.preventDefault(); e.stopPropagation(); W.openQuickOpen('>'); }
+        else if (mod && e.shiftKey && !e.altKey && key === 'p') { e.preventDefault(); e.stopPropagation(); W.openQuickOpen('>'); }
     }, true);
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();

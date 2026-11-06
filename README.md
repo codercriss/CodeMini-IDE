@@ -194,6 +194,15 @@ npm run test:e2e -- preloader # only suites whose file name contains "preloader"
 
 The suite name is a substring: `runner` matches both `runner.e2e.js` and `runner-exec.e2e.js`; use `runner.e2e` or `runner-exec` to pick one. The e2e runner serves the repo on `http://localhost:8765` itself, so nothing else needs to be running. Suites block third-party CDNs and stub Monaco, so they run offline and fast.
 
+**A real Monaco for the editor tests.** The test browser cannot reach the CDN Monaco loads from, so most suites stub it. The diff editor and Quick Open's go-to-line need the real thing, which you can serve locally:
+
+```
+cd /tmp && npm install monaco-editor@0.39.0          # the version index.html loads
+MONACO_DIR=/tmp/node_modules/monaco-editor/min npm run test:e2e -- diff-editor
+```
+
+`tests/e2e/lib/monaco-local.js` serves it in place of the CDN (and gives Monaco's web worker a URL on the test server, because the browser tool cannot intercept a worker's own requests). Those tests open their browser with the service worker blocked, since the app's service worker would otherwise fetch Monaco itself after a reload. Without `MONACO_DIR` the same tests still run; the checks that need a real editor print SKIP.
+
 <details>
 <summary><strong>Unit tests</strong> (<code>tests/*.test.js</code>)</summary>
 
@@ -217,6 +226,7 @@ The suite name is a substring: `runner` matches both `runner.e2e.js` and `runner
 | `app-info.test.js` | Keeps version, links and About page consistent with the repo |
 | `release-history.test.js` | Keeps the in-app version history in step with `CHANGELOG.md` and the app version |
 | `bin-restore-confirm.test.js` | Stacks > Recycle Bin: Restore and Restore All ask first |
+| `diff-editor.test.js` | The diff editor's helpers: where each change is, stepping with wrap-around, the counter text, language from the file name, tab titles |
 | `name-conflicts.test.js` | The Replace / Skip / Rename planner: what is asked and when, apply-to-all, Stop, and what can never be replaced (locked items, anything holding the source, a name taken inside the same batch) |
 | `quick-open.test.js` | Quick Open's fuzzy matching (letter positions, word starts, camelCase), ranking, `> : @ #` and `name:line` parsing, the recent list, and speed on 5,000 files |
 | `terminal-git.test.js` | The terminal's `git` command against the real `git.js` and an in-memory database: every subcommand, the repository shared with the panel, no silent loss (switch, reset, merge, stash), conflicts, workspace roots, escaped output |
@@ -235,6 +245,8 @@ The suite name is a substring: `runner` matches both `runner.e2e.js` and `runner
 | --- | --- |
 | `workspace-trust.e2e.js` | Trust prompt, Restricted Mode, banner, settings and persistence |
 | `terminal-trust.e2e.js` | Terminal refuses to run files in a restricted workspace |
+| `diff-editor.e2e.js` | The diff tab with a real Monaco diff editor: Select for Compare / Compare with Selected, stepping through changes, Unified/Split, Ignore whitespace, Refresh, identical / binary / locked files, the tab's right-click menu and Compare with Saved, Source Control's popup, Open in tab and double-click, the Quick Open compare commands, no restore after a reload, phone layout. Needs `MONACO_DIR` (below); without it the editor checks are reported as SKIP |
+| `quick-open-monaco.e2e.js` | Quick Open's go-to-line (`:42`, `:100:4`, `file.txt:77`) against a real Monaco: cursor, scroll and focus. Needs `MONACO_DIR`; without it, SKIP |
 | `name-conflicts.e2e.js` | The clash dialog in the real app: Copy/Cut + Paste through the Explorer's right-click menus, multi-select with apply-to-all and Stop, drag-and-drop, imports of files, folders and JSON exports, a workspace in another database, the Recycle Bin, locked files, open tabs, phone size |
 | `quick-open.e2e.js` | Ctrl+P / F1, fuzzy search, keyboard navigation, `>` `:` `@` modes, recent files, open to the side, `name:line`, hostile file names, phone-size rows |
 | `terminal-git.e2e.js` | `git` typed into the real terminal: quoting, pipes, folders, branch switching with the Explorer and status bar, a merge conflict, stash, history after a reload |

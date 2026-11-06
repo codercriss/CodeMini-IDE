@@ -1084,9 +1084,18 @@ async function gitRenderDiffHtml(oldContent, newContent, encoding, viewMode) {
     window._gitDiffParts = parts; // stashed for the expand-gap click handler, keyed by the currently open modal only
     return viewMode === 'split' ? gitRenderSideBySideHtml(parts, 3) : gitRenderUnifiedHtml(parts, 3);
 }
-window.gitShowDiff = async function(title, oldContent, newContent, encoding) {
+// meta (optional, from the three gitOpen*Diff callers): { name, key, originalLabel, modifiedLabel, load?, openInTab? } -
+// what the diff editor tab (js/core/diff-editor.js) needs. With openInTab the popup is skipped and the tab opens.
+function gitOpenDiffTab(oldContent, newContent, encoding, meta) {
+    if (!window.CodeMiniDiff || !meta) return false;
+    if (meta.load) window.CodeMiniDiff.openLoaded({ key: meta.key, name: meta.name, originalLabel: meta.originalLabel, modifiedLabel: meta.modifiedLabel, load: meta.load });
+    else window.CodeMiniDiff.openStatic({ key: meta.key, name: meta.name, original: oldContent, modified: newContent, originalLabel: meta.originalLabel, modifiedLabel: meta.modifiedLabel, encoding });
+    return true;
+}
+window.gitShowDiff = async function(title, oldContent, newContent, encoding, meta) {
     let overlay = document.getElementById('gitDiffOverlay');
     if (overlay) overlay.remove();
+    if (meta && meta.openInTab && gitOpenDiffTab(oldContent, newContent, encoding, meta)) return;
     overlay = document.createElement('div');
     overlay.id = 'gitDiffOverlay';
     overlay.className = 'git-diff-overlay';
@@ -1116,7 +1125,7 @@ window.gitShowDiff = async function(title, oldContent, newContent, encoding) {
             const action = viewBtn.dataset.gitDiffAction;
             if (action === 'view-unified' || action === 'view-split') {
                 window._gitDiffViewMode = action === 'view-split' ? 'split' : 'unified';
-                window.gitShowDiff(title, oldContent, newContent, encoding);
+                window.gitShowDiff(title, oldContent, newContent, encoding, meta);
                 return;
             }
             if (action === 'expand-gap') {
@@ -1132,24 +1141,40 @@ window.gitShowDiff = async function(title, oldContent, newContent, encoding) {
         }
     });
     overlay.querySelector('#gitDiffClose').onclick = () => overlay.remove();
+    if (meta && window.CodeMiniDiff) { // "Open in tab", next to the close icon
+        const openTabBtn = document.createElement('i');
+        openTabBtn.className = 'ri-external-link-line git-action-icon'; openTabBtn.id = 'gitDiffOpenTab';
+        openTabBtn.title = 'Open in tab'; openTabBtn.setAttribute('aria-label', 'Open in tab');
+        openTabBtn.onclick = () => { overlay.remove(); gitOpenDiffTab(oldContent, newContent, encoding, meta); };
+        const closeIcon = overlay.querySelector('#gitDiffClose');
+        closeIcon.parentNode.insertBefore(openTabBtn, closeIcon);
+    }
     const html = await gitRenderDiffHtml(oldContent, newContent, encoding, viewMode);
     const bodyEl = document.getElementById('gitDiffBody');
     if (bodyEl) bodyEl.innerHTML = html;
 };
-async function gitOpenChangeDiff(path) {
-    const database = db; const dbName = database.name;
+async function gitLoadChangeDiff(path, database) {
+    const dbName = database.name;
     const config = getGitConfig(dbName); const repo = getGitRepo(dbName);
     const headTree = gitComputeHeadTree(repo, config.currentBranch);
     const workingTree = await gitGetWorkingTree(database);
     const hf = headTree.get(path), wf = workingTree.get(path);
     const name = (wf && wf.name) || (hf && hf.name) || path.split('/').pop();
-    window.gitShowDiff(name, hf ? hf.content : '', wf ? wf.content : '', (wf && wf.encoding) || (hf && hf.encoding));
+    return { name, old: hf ? hf.content : '', new: wf ? wf.content : '', encoding: (wf && wf.encoding) || (hf && hf.encoding) };
+}
+async function gitOpenChangeDiff(path, asTab) {
+    const database = db; const dbName = database.name;
+    const d = await gitLoadChangeDiff(path, database);
+    window.gitShowDiff(d.name, d.old, d.new, d.encoding, {
+        name: d.name, key: `git:${dbName}:work:${path}`, originalLabel: 'HEAD', modifiedLabel: 'Working tree', openInTab: !!asTab,
+        load: async () => { const f = await gitLoadChangeDiff(path, database); return { original: { text: f.old, label: 'HEAD' }, modified: { text: f.new, label: 'Working tree' }, binary: f.encoding === 'base64' }; }
+    });
 }
 // Shows "mine" (target branch's version) vs "theirs" (source branch's
 // version) directly for a conflicted path - the comparison that actually
 // matters while deciding how to resolve, rather than a diff against the
 // working file's own marker-laden content.
-async function gitOpenConflictDiff(path) {
+async function gitOpenConflictDiff(path, asTab) {
     const dbName = db.name;
     const pendingMerge = gitGetPendingMerge(dbName);
     const pendingRebase = gitGetPendingRebase(dbName);
@@ -1166,9 +1191,10 @@ async function gitOpenConflictDiff(path) {
     const sourceTree = gitComputeHeadTree(repo, sourceSha);
     const mine = targetTree.get(path), theirs = sourceTree.get(path);
     const name = (mine && mine.name) || (theirs && theirs.name) || path.split('/').pop();
-    window.gitShowDiff(`${name} (${targetLabel} vs ${sourceLabel})`, mine ? mine.content : '', theirs ? theirs.content : '', (mine && mine.encoding) || (theirs && theirs.encoding));
+    window.gitShowDiff(`${name} (${targetLabel} vs ${sourceLabel})`, mine ? mine.content : '', theirs ? theirs.content : '', (mine && mine.encoding) || (theirs && theirs.encoding),
+        { name, key: `git:${dbName}:conflict:${path}`, originalLabel: targetLabel, modifiedLabel: sourceLabel, openInTab: !!asTab });
 }
-function gitOpenCommitFileDiff(commitSha, path) {
+function gitOpenCommitFileDiff(commitSha, path, asTab) {
     const dbName = db.name;
     const repo = getGitRepo(dbName);
     const commit = repo.objects[commitSha];
@@ -1181,7 +1207,8 @@ function gitOpenCommitFileDiff(commitSha, path) {
     // a branch that has since diverged or been merged elsewhere.
     const beforeTree = gitComputeHeadTree(repo, commit.parents[0] || null);
     const before = beforeTree.get(path);
-    window.gitShowDiff(fileEntry.name, before ? before.content : '', fileEntry.status === 'deleted' ? '' : fileEntry.content, fileEntry.encoding);
+    window.gitShowDiff(fileEntry.name, before ? before.content : '', fileEntry.status === 'deleted' ? '' : fileEntry.content, fileEntry.encoding,
+        { name: fileEntry.name, key: `git:${dbName}:commit:${commitSha}:${path}`, originalLabel: commit.parents[0] ? gitShortSha(commit.parents[0]) : '(none)', modifiedLabel: gitShortSha(commitSha), openInTab: !!asTab });
 }
 
 // --- Staging & committing --------------------------------------------------
@@ -4749,6 +4776,21 @@ window.renderGitPanel = async function() {
 
     injectGitStyles();
 };
+
+// Double-click a changed file, a conflicted file or a file of a commit: open the diff as a tab (a single click shows the popup).
+if (!window._gitDblBound) {
+    window._gitDblBound = true;
+    document.addEventListener('dblclick', (e) => {
+        const el = e.target.closest('[data-git-action]');
+        if (!el) return;
+        const sidebar = document.getElementById('sourceControlSidebar');
+        if (!sidebar || !sidebar.contains(el)) return;
+        const action = el.dataset.gitAction, path = el.dataset.path;
+        if (action === 'diff') gitOpenChangeDiff(path, true);
+        else if (action === 'conflict-diff') gitOpenConflictDiff(path, true);
+        else if (action === 'commit-file-diff') gitOpenCommitFileDiff(el.dataset.commitId, path, true);
+    });
+}
 
 // --- Event delegation (one listener, guarded against double-binding) -------
 if (!window._gitDelegationBound) {

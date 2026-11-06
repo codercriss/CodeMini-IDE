@@ -13,6 +13,16 @@ function createServer(root, opts) {
   const extra = (opts && opts.headers) || {};
   return http.createServer((req, res) => {
     let rel = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+    // With MONACO_DIR set (see lib/monaco-local.js) /__monaco__/ serves a real Monaco, including the bootstrap for its web
+    // worker: a blob worker's own requests cannot be intercepted by the browser tool, so the worker needs a real URL.
+    if (rel.startsWith('/__monaco__/') && process.env.MONACO_DIR) {
+      const sub = rel.slice('/__monaco__/'.length);
+      if (sub === 'worker-loader.js') { res.writeHead(200, { 'Content-Type': 'text/javascript' }).end("self.MonacoEnvironment = { baseUrl: '/__monaco__/' };\nimportScripts('/__monaco__/vs/base/worker/workerMain.js');"); return; }
+      const mf = path.join(process.env.MONACO_DIR, path.normalize(sub));
+      if (!mf.startsWith(process.env.MONACO_DIR)) { res.writeHead(403).end(); return; }
+      fs.readFile(mf, (err, data) => { if (err) { res.writeHead(404).end(); return; } res.writeHead(200, { 'Content-Type': TYPES[path.extname(mf)] || 'application/octet-stream' }).end(data); });
+      return;
+    }
     if (rel.endsWith('/')) rel += 'index.html';
     const file = path.join(root, path.normalize(rel));
     if (!file.startsWith(root)) { res.writeHead(403).end(); return; }

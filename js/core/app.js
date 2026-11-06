@@ -1528,6 +1528,8 @@ function showContextMenu(e, file) {
     // which is what this recorded before: Paste then mistook items from a workspace for ones from the root.
     addOption('ri-scissors-cut-line', 'Cut', () => { window.workspaceClipboardRegistry[activeWinId] = { action: 'cut', files: targets, sourceDb: db.name }; });
     addOption('ri-file-copy-line', 'Copy', () => { window.workspaceClipboardRegistry[activeWinId] = { action: 'copy', files: targets, sourceDb: db.name }; });
+    // Compare (js/core/diff-editor.js): Select for Compare on one file, then Compare with Selected on another.
+    if (!isMulti && window.CodeMiniDiff) window.CodeMiniDiff.explorerOptions(file).forEach(o => addOption(o.icon, o.text, o.handler));
 
     addOption('ri-file-copy-fill', 'Duplicate', async () => {
         const txRead = db.transaction('filesystem', 'readonly');

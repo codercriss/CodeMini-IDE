@@ -1371,6 +1371,10 @@ function teardownPaneResources(tabElement, paneElement) {
     if (tabElement.dataset.type === 'pdf' && typeof window.teardownPdfViewer === 'function') {
         window.teardownPdfViewer(paneElement ? paneElement.id : tabElement.dataset.target);
     }
+
+    if (tabElement.dataset.type === 'diff' && typeof window.teardownDiffEditor === 'function') {
+        window.teardownDiffEditor(paneElement ? paneElement.id : tabElement.dataset.target);
+    }
 }
 window.teardownPaneResources = teardownPaneResources;
 
