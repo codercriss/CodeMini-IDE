@@ -531,6 +531,28 @@ body {
     flex-direction: column;
 }
 
+/* Copy to... / Move to... fly-out: scrolls when there are many destinations, long names are cut with an ellipsis (full text in the tooltip). */
+.context-has-submenu.open {
+    background-color: var(--hover-blue);
+}
+
+.context-submenu.transfer-submenu {
+    max-height: min(320px, 60vh);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.context-submenu.transfer-submenu .dropdown-item {
+    flex: none;
+}
+
+.context-submenu.transfer-submenu .dropdown-item span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 240px;
+}
+
 
 .file-browser-actions {
     display: flex;

@@ -1627,17 +1627,67 @@ function showContextMenu(e, file) {
         sep.style.cssText = "height: 1px; background: var(--border-color); margin: 4px 0;";
         menu.appendChild(sep);
 
-        otherProfiles.forEach(p => {
-            addOption('ri-file-copy-2-line', `Copy to ${p.name}`, () => transferToExternalDBDeep(targets, p.db, 'copy', 'root', undefined, p.name));
-            addOption('ri-drag-move-2-line', `Move to ${p.name}`, () => transferToExternalDBDeep(targets, p.db, 'move', 'root', undefined, p.name));
-        });
-
-        otherWorkspaces.forEach(ws => {
-            const wsDbName = ws.resolvedDb;
-            const wsRootId = ws.id === 'root' ? 'root' : ws.id;
-            addOption('ri-file-copy-2-line', `Copy to ${ws.name}`, () => transferToExternalDBDeep(targets, wsDbName, 'copy', wsRootId, undefined, ws.name));
-            addOption('ri-drag-move-2-line', `Move to ${ws.name}`, () => transferToExternalDBDeep(targets, wsDbName, 'move', wsRootId, undefined, ws.name));
-        });
+        // One "Copy to..." and one "Move to..." entry; tapping either opens a second drop-down that lists every other
+        // profile window and workspace as "Copy to <name>" / "Move to <name>" (was: a pair of entries per destination,
+        // which made this menu very long once there were a few workspaces).
+        const destinations = [
+            ...otherProfiles.map(p => ({ icon: 'ri-window-line', name: p.name, db: p.db, rootId: 'root' })),
+            ...otherWorkspaces.map(ws => ({ icon: 'ri-folder-5-line', name: ws.name, db: ws.resolvedDb, rootId: ws.id === 'root' ? 'root' : ws.id }))
+        ];
+        const openSubmenus = [];
+        const closeSubmenus = (except) => openSubmenus.forEach(({ item, sub }) => { if (sub !== except) { sub.classList.remove('show-submenu'); item.classList.remove('open'); } });
+        // The flyout normally opens to the right of its entry; near the right edge of the screen it flips to the left,
+        // and on a screen too narrow for either it drops directly under the entry. It is kept inside the screen vertically too.
+        const placeSubmenu = (item, sub) => {
+            sub.style.left = '100%'; sub.style.top = '0';
+            const ir = item.getBoundingClientRect(), sw = sub.offsetWidth, sh = sub.offsetHeight, vw = window.innerWidth, vh = window.innerHeight, edge = 5;
+            let left, top = 0;
+            if (ir.right + sw <= vw - edge) left = ir.width;
+            else if (ir.left - sw >= edge) left = -sw;
+            else { left = Math.min(0, vw - edge - sw - ir.left); left = Math.max(left, edge - ir.left); top = ir.height; }
+            if (ir.top + top + sh > vh - edge) top = Math.max(edge - ir.top, vh - edge - sh - ir.top);
+            sub.style.left = left + 'px'; sub.style.top = top + 'px';
+        };
+        const addTransferMenu = (icon, label, action, pastWord) => {
+            const item = document.createElement('div');
+            item.className = 'dropdown-item context-has-submenu';
+            item.innerHTML = `<i class="${icon}"></i> <span>${CodeMiniEscape.html(label)}</span> <i class="ri-arrow-right-s-line" style="margin-left:auto;"></i>`;
+            const sub = document.createElement('div');
+            sub.className = 'context-submenu transfer-submenu';
+            sub.setAttribute('role', 'menu');
+            destinations.forEach((d, i) => {
+                if (i > 0 && destinations[i - 1].icon !== d.icon) {
+                    const rule = document.createElement('div');
+                    rule.style.cssText = 'height: 1px; background: var(--border-color); margin: 4px 0;';
+                    sub.appendChild(rule);
+                }
+                const text = `${label.replace('\u2026', '').trim()} ${d.name}`;
+                const row = document.createElement('div');
+                row.className = 'dropdown-item';
+                row.title = text;
+                row.setAttribute('role', 'menuitem');
+                row.innerHTML = `<i class="${d.icon}"></i> <span>${CodeMiniEscape.html(text)}</span>`;
+                row.onclick = (evt) => {
+                    evt.stopPropagation();
+                    menu.classList.remove('show');
+                    transferToExternalDBDeep(targets, d.db, action, d.rootId, undefined, d.name);
+                };
+                sub.appendChild(row);
+            });
+            item.appendChild(sub);
+            item.onclick = (evt) => {
+                evt.stopPropagation();
+                const opening = !sub.classList.contains('show-submenu');
+                closeSubmenus(opening ? sub : null);
+                sub.classList.toggle('show-submenu', opening);
+                item.classList.toggle('open', opening);
+                if (opening) placeSubmenu(item, sub);
+            };
+            openSubmenus.push({ item, sub });
+            menu.appendChild(item);
+        };
+        addTransferMenu('ri-file-copy-2-line', 'Copy to\u2026', 'copy');
+        addTransferMenu('ri-drag-move-2-line', 'Move to\u2026', 'move');
 
         const sep2 = document.createElement('div');
         sep2.style.cssText = "height: 1px; background: var(--border-color); margin: 4px 0;";

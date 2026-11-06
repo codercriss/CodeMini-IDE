@@ -62,7 +62,7 @@
                 { term: 'Multi-select', body: 'Toggle the multi-select icon in the explorer toolbar to batch move, copy, or delete several items at once.' },
                 { term: 'Drag & drop', body: 'Drag files or folders directly onto another folder in the explorer to move them, or onto the tab bar to open them in a specific editor group.' },
                 { term: 'Move / Copy to Root', body: "Right-click any item to send it straight back to the workspace's (or window's) root folder, no matter how deeply nested it is." },
-                { term: 'Move / Copy to another workspace', body: 'The context menu also lists your other workspaces as direct targets, so you can reorganize files across isolated workspace databases in one step.' }
+                { term: 'Move / Copy to another workspace or profile', body: 'Right-click (or tap and hold) an item and choose Copy to\u2026 or Move to\u2026. A second drop-down lists your other workspaces and profile windows, so you can reorganize files across isolated databases in one step.' }
             ]
         },
         {
