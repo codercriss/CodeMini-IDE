@@ -730,9 +730,10 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="profile-section-group">
               <h3 class="profile-section-title">Workspace Statistics</h3>
               <div class="profile-list">
+                <div class="profile-list-item"><span>Workspace:</span> <select id="statScope" class="profile-stat-select" aria-label="Choose a workspace to see its statistics"></select></div>
                 <div class="profile-list-item"><span>Total Files:</span> <strong id="statFiles">0</strong></div>
                 <div class="profile-list-item"><span>Total Folders:</span> <strong id="statFolders">0</strong></div>
-                <div class="profile-list-item"><span>Total Workspaces:</span> <strong id="statWorkspaces">0</strong></div>
+                <div class="profile-list-item" id="statWorkspacesRow"><span>Total Workspaces:</span> <strong id="statWorkspaces">0</strong></div>
                 <div class="profile-list-item"><span>Storage Used:</span> <strong id="statStorage">0 KB</strong></div>
                 <div class="profile-list-item"><span>Workspace Health:</span> <strong id="statHealth">Good</strong></div>
                 <div class="profile-list-item"><span>Max Terminals:</span> <strong id="statTerms">2</strong></div>
@@ -759,6 +760,38 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================
   // PROFILE STATS ENGINE
   // ==========================================
+  // Which database the statistics describe: "root" (the profile's own top level, as before) or the id of one workspace.
+  // Kept in memory so it survives the profile tab being refreshed; it falls back to "root" if that workspace is gone.
+  window._profileStatsScope = window._profileStatsScope || 'root';
+  let _statsRun = 0; // a newer request makes an older one that finishes late stop writing to the page
+
+  const workspaceDbName = (ws) => ws.db || `CodeMiniDB_WS_${ws.id}`; // same fallback the Move/Copy-to list uses for older records
+
+  // editor.js's openExistingCodeMiniDb when it has loaded; otherwise the same rule here: never create a database that is
+  // not there (indexedDB.open would, and the empty "ghost" it leaves behind blocks deleting that workspace later).
+  function openExistingDb(name, onOpen, onMissing) {
+    if (typeof window.openExistingCodeMiniDb === 'function') { window.openExistingCodeMiniDb(name, onOpen, onMissing); return; }
+    let req;
+    try { req = indexedDB.open(name, (window.CODEMINI_DB_VERSION || 4)); } catch (e) { onMissing(e); return; }
+    req.onupgradeneeded = (e) => { if (e.oldVersion === 0) { try { e.target.transaction.abort(); } catch (err) { /* nothing to abort */ } return; } if (window.ensureCodeMiniSchema) window.ensureCodeMiniSchema(e.target.result); };
+    req.onsuccess = (e) => onOpen(e.target.result);
+    req.onerror = (e) => { if (e && e.preventDefault) e.preventDefault(); onMissing(req.error); };
+  }
+
+  // Fills the picker from the workspaces that exist now and returns the scope to show.
+  function syncStatsPicker() {
+    const sel = document.getElementById('statScope');
+    const list = window.workspacesList || [];
+    let scope = window._profileStatsScope;
+    if (scope !== 'root' && !list.some(w => w.id === scope)) scope = window._profileStatsScope = 'root';
+    if (!sel) return scope;
+    sel.textContent = '';
+    sel.appendChild(new Option('CodeMini (root)', 'root'));
+    list.forEach(w => sel.appendChild(new Option(w.name || 'Untitled workspace', w.id)));
+    sel.value = scope;
+    return scope;
+  }
+
   window.updateProfileStats = function() {
     const sf = document.getElementById('statFiles');
     const sfo = document.getElementById('statFolders');
@@ -768,42 +801,65 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!sf && !sfo && !sws && !ss && !sh) return;
 
+    const scope = syncStatsPicker();
+    const run = ++_statsRun;
+    const wsRow = document.getElementById('statWorkspacesRow');
+    if (wsRow) wsRow.style.display = scope === 'root' ? '' : 'none'; // a workspace holds files and folders, not other workspaces
+
+    const show = (files) => {
+      if (run !== _statsRun) return;
+      let fileCount = 0; let folderCount = 0; let workspaceCount = 0; let storageSize = 0;
+
+      files.forEach(f => {
+        if (f.type === 'file') fileCount++;
+        else if (f.type === 'folder') folderCount++;
+        else if (f.type === 'workspace') workspaceCount++;
+        if (f.content) storageSize += new Blob([f.content]).size;
+      });
+
+      const sizeKB = (storageSize / 1024).toFixed(2);
+      const sizeMB = (storageSize / (1024 * 1024)).toFixed(2);
+
+      let maxMem = (window.appSettings && window.appSettings.maxMemory) ? parseInt(window.appSettings.maxMemory) : 1024;
+      let health = "Good";
+      let healthColor = "var(--term-green)";
+
+      if (sizeMB > maxMem * 0.8) { health = "Warning"; healthColor = "var(--icon-yellow)"; }
+      if (sizeMB >= maxMem) { health = "Critical"; healthColor = "var(--color-danger)"; }
+
+      if (sf) sf.textContent = fileCount;
+      if (sfo) sfo.textContent = folderCount;
+      if (sws) sws.textContent = workspaceCount;
+      if (ss) ss.textContent = sizeKB > 1024 ? sizeMB + ' MB' : sizeKB + ' KB';
+      if (sh) { sh.textContent = health; sh.style.color = healthColor; }
+    };
+    const readAll = (dbInstance) => {
+      try {
+        const tx = dbInstance.transaction('filesystem', 'readonly');
+        tx.objectStore('filesystem').getAll().onsuccess = (ev) => { const files = ev.target.result || []; dbInstance.close(); show(files); };
+      } catch (err) { try { dbInstance.close(); } catch (e) { /* already closed */ } show([]); }
+    };
+
+    if (scope !== 'root') {
+      // A workspace has its own database. Open it only if it exists, so looking at a workspace whose database is gone
+      // does not create an empty one (see openExistingCodeMiniDb in editor.js).
+      const ws = (window.workspacesList || []).find(w => w.id === scope);
+      if (ws) openExistingDb(workspaceDbName(ws), readAll, () => show([]));
+      else show([]);
+      return;
+    }
+
     const dbName = (typeof cellActiveWindow !== 'undefined') ? cellActiveWindow.db : "CodeMiniDB";
     const req = indexedDB.open(dbName, (window.CODEMINI_DB_VERSION || 4)); req.onupgradeneeded = (e) => { if (window.ensureCodeMiniSchema) window.ensureCodeMiniSchema(e.target.result); else { const i = e.target.result; if (!i.objectStoreNames.contains('filesystem')) i.createObjectStore('filesystem', { keyPath: 'id' }); if (!i.objectStoreNames.contains('gitobjects')) i.createObjectStore('gitobjects', { keyPath: 'sha' }); } };
-    req.onsuccess = (e) => {
-      const dbInstance = e.target.result;
-      const tx = dbInstance.transaction('filesystem', 'readonly');
-      tx.objectStore('filesystem').getAll().onsuccess = (ev) => {
-        const files = ev.target.result || [];
-        let fileCount = 0; let folderCount = 0; let workspaceCount = 0; let storageSize = 0;
-
-        files.forEach(f => {
-          if (f.type === 'file') fileCount++;
-          else if (f.type === 'folder') folderCount++;
-          else if (f.type === 'workspace') workspaceCount++;
-          if (f.content) storageSize += new Blob([f.content]).size;
-        });
-
-        const sizeKB = (storageSize / 1024).toFixed(2);
-        const sizeMB = (storageSize / (1024 * 1024)).toFixed(2);
-
-        let maxMem = (window.appSettings && window.appSettings.maxMemory) ? parseInt(window.appSettings.maxMemory) : 1024;
-        let health = "Good";
-        let healthColor = "var(--term-green)";
-
-        if (sizeMB > maxMem * 0.8) { health = "Warning"; healthColor = "var(--icon-yellow)"; }
-        if (sizeMB >= maxMem) { health = "Critical"; healthColor = "var(--color-danger)"; }
-
-        if (sf) sf.textContent = fileCount;
-        if (sfo) sfo.textContent = folderCount;
-        if (sws) sws.textContent = workspaceCount;
-        if (ss) ss.textContent = sizeKB > 1024 ? sizeMB + ' MB' : sizeKB + ' KB';
-        if (sh) { sh.textContent = health; sh.style.color = healthColor; }
-
-        dbInstance.close();
-      };
-    };
+    req.onsuccess = (e) => readAll(e.target.result);
   };
+
+  // Choosing a workspace in the picker (the profile page is rebuilt whenever it is reopened, so this listens on the document).
+  document.addEventListener('change', (e) => {
+    if (!e.target || e.target.id !== 'statScope') return;
+    window._profileStatsScope = e.target.value || 'root';
+    window.updateProfileStats();
+  });
 
   // ==========================================
   // SETTINGS HTML GENERATOR

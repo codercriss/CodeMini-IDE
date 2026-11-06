@@ -1687,6 +1687,25 @@ body {
     color: var(--text-muted);
 }
 
+.profile-stat-select {
+    min-width: 0;
+    max-width: 60%;
+    padding: 4px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-white);
+    color: var(--text-main);
+    font-family: var(--font-main);
+    font-size: 13px;
+    cursor: pointer;
+    outline: none;
+    text-overflow: ellipsis;
+}
+
+.profile-stat-select:focus {
+    border-color: var(--accent-blue);
+}
+
 .profile-list-item strong {
     color: var(--text-main);
     font-weight: 500;
