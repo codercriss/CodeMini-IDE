@@ -142,8 +142,10 @@
     const W = typeof window !== 'undefined' ? window : root;
     W.CodeMiniQuickOpen = api;
 
-    // The icon the Explorer gives a folder and a workspace alike (see createFileElement in app.js).
+    // The icon the Explorer gives a folder (see createFileElement in app.js), and the one its workspace drop-down gives a workspace
+    // (script.js), so a workspace row here no longer looks like a folder row.
     const FOLDER_ICON = 'ri-folder-2-line file-icon icon-folder';
+    const WORKSPACE_ICON = 'ri-folder-5-line file-icon icon-folder';
     const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
     // Text with the matched letters wrapped in <b>, built from nodes so the text stays text.
     function highlighted(text, positions, offset) {
@@ -419,7 +421,7 @@
             kind: 'command', icon: h.item.icon, labelNode: highlighted(h.item.name, h.positions, 0), keys: h.item.keys, run: () => h.item.run()
         }));
         const wsRows = (text, limit) => rankByName(W.workspacesList || [], text, (w) => w.name || '').slice(0, limit).map((h) => ({
-            kind: 'workspace', icon: FOLDER_ICON, enter: true, labelNode: highlighted(h.item.name, h.positions, 0), run: () => openWorkspace(h.item)
+            kind: 'workspace', icon: WORKSPACE_ICON, enter: true, labelNode: highlighted(h.item.name, h.positions, 0), run: () => openWorkspace(h.item)
         }));
 
         if (parsed.mode === 'commands') {

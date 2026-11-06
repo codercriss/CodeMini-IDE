@@ -161,7 +161,7 @@ const ok = (c, n, x) => { c ? (pass++, console.log('  PASS', n)) : (fail++, cons
   await ev(() => loadFilesFromDB()); await sleep(600);
   await page.keyboard.press('Control+P'); await sleep(400); await type('alpha');
   const wsRow = await ev(() => { const rows = [...document.querySelectorAll('#topSearchIsland .qo-item')]; const r = rows.find(x => x.querySelector('.qo-label').textContent === 'Alpha Project'); if (!r) return null; const i = r.querySelector('.qo-icon i'); return { icon: i && i.className, enter: !!r.querySelector('.qo-enter') }; });
-  ok(wsRow && /ri-folder-2-line/.test(wsRow.icon) && /icon-folder/.test(wsRow.icon) && /file-icon/.test(wsRow.icon), 'a workspace uses the Explorer\'s folder icon (ri-folder-2-line, file-icon, icon-folder)', wsRow);
+  ok(wsRow && /ri-folder-5-line/.test(wsRow.icon) && /icon-folder/.test(wsRow.icon) && /file-icon/.test(wsRow.icon), 'a workspace uses the icon of the Explorer\'s workspace drop-down (ri-folder-5-line, file-icon, icon-folder), not the folder icon', wsRow);
   ok(wsRow && wsRow.enter, 'and the Explorer\'s "enter" arrow, so it still reads as a workspace');
   const folderIcon = await ev(() => { document.querySelector('.top-center .search-bar input').value = ''; return null; });
   await type('utils'); const fIcon = await ev(() => { const r = [...document.querySelectorAll('#topSearchIsland .qo-item')].find(x => x.querySelector('.qo-label').textContent === 'utils'); const i = r && r.querySelector('.qo-icon i'); return i && i.className; });
@@ -214,7 +214,7 @@ const ok = (c, n, x) => { c ? (pass++, console.log('  PASS', n)) : (fail++, cons
   await page.setViewportSize({ width: 390, height: 800 }); await sleep(500);
   await page.click(input); await sleep(500);
   const h = await ev(() => { const r = document.querySelector('#topSearchIsland .qo-item'); return r ? r.getBoundingClientRect().height : 0; });
-  ok(h >= 44, 'rows are at least 44px tall for touch', h);
+  ok(h >= 34 && h < 44, 'rows are compact (34px) but still a comfortable touch target', h);
   ok(await ev(() => { const b = document.getElementById('topSearchIsland').getBoundingClientRect(); return b.left >= 0 && b.right <= innerWidth; }), 'the island fits the screen width');
   await ev(() => document.querySelector('#topSearchIsland').dispatchEvent(new Event('touchmove')));
   ok(await ev(() => document.activeElement !== document.querySelector('.top-center .search-bar input')), 'scrolling the list puts the keyboard away');

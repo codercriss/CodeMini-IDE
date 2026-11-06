@@ -531,22 +531,22 @@ body {
     flex-direction: column;
 }
 
-/* Copy to... / Move to... fly-out: scrolls when there are many destinations, long names are cut with an ellipsis (full text in the tooltip). */
+/* Create... / Copy to... / Move to... fly-outs: scrolls when there are many destinations, long names are cut with an ellipsis (full text in the tooltip). */
 .context-has-submenu.open {
     background-color: var(--hover-blue);
 }
 
-.context-submenu.transfer-submenu {
+.context-submenu.adaptive-submenu {
     max-height: min(320px, 60vh);
     overflow-y: auto;
     overscroll-behavior: contain;
 }
 
-.context-submenu.transfer-submenu .dropdown-item {
+.context-submenu.adaptive-submenu .dropdown-item {
     flex: none;
 }
 
-.context-submenu.transfer-submenu .dropdown-item span {
+.context-submenu.adaptive-submenu .dropdown-item span {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -4624,18 +4624,18 @@ body.compact-explorer .tree-view-item {
 
 /* ---- Quick Open (js/core/quick-open.js): the title-bar search island ---- */
 #topSearchIsland.qo { padding-bottom: 4px; }
-.qo-hint { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 8px 14px; background: var(--bg-white); border-bottom: 1px solid var(--border-color); font-size: 11px; color: var(--text-muted); }
+.qo-hint { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; gap: 2px 12px; padding: 5px 12px; background: var(--bg-white); border-bottom: 1px solid var(--border-color); font-size: 11px; color: var(--text-muted); }
 .qo-hint-chip { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; padding: 1px 2px; border-radius: 3px; }
 .qo-hint-chip:hover { color: var(--text-main); }
 .qo-hint-chip.active { color: var(--accent-blue); font-weight: 600; }
 .qo-hint-chip kbd { font-family: var(--font-mono); font-size: 11px; font-weight: 700; padding: 0 5px; border: 1px solid var(--border-color); border-radius: 3px; background: var(--bg-panel); color: var(--text-main); }
-.qo-section { display: flex; align-items: center; gap: 8px; padding: 8px 14px 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.4px; color: var(--text-muted); background: var(--bg-white); }
+.qo-section { display: flex; align-items: center; gap: 8px; padding: 6px 12px 2px; font-size: 11px; font-weight: 700; letter-spacing: 0.4px; color: var(--text-muted); background: var(--bg-white); }
 .qo-count { font-weight: 600; padding: 0 6px; border-radius: 8px; background: var(--bg-panel); }
-.qo-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 14px; cursor: pointer; font-size: 13px; color: var(--text-main); border-left: 2px solid transparent; }
+.qo-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 12px; cursor: pointer; font-size: 13px; color: var(--text-main); border-left: 2px solid transparent; }
 .qo-item.selected { background: var(--hover-blue); border-left-color: var(--accent-blue); }
-.qo-main { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.qo-icon { display: inline-flex; align-items: center; justify-content: center; width: 20px; flex: none; font-size: 16px; }
-.qo-icon .file-icon { font-size: 18px; }
+.qo-main { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.qo-icon { display: inline-flex; align-items: center; justify-content: center; width: 18px; flex: none; font-size: 16px; }
+.qo-icon .file-icon { font-size: 16px; }
 .qo-enter { font-size: 13px; color: var(--text-muted); opacity: 0.7; margin-left: 6px; flex: none; }
 .qo-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .qo-detail { font-size: 10px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 45%; direction: rtl; text-align: right; }
@@ -4646,8 +4646,8 @@ body.compact-explorer .tree-view-item {
 .qo-tip, .qo-note { padding: 4px 14px 14px; text-align: center; font-size: 11px; color: var(--text-muted); }
 .qo-note { padding-top: 14px; font-size: 12px; }
 @media (max-width: 768px) {
-    .qo-item { min-height: 44px; }
-    .qo-hint-chip { padding: 6px 4px; }
+    .qo-item { min-height: 34px; }
+    .qo-hint-chip { padding: 3px 4px; }
 }
 
 /* ---- Name conflicts (js/core/name-conflicts.js): Replace / Skip / Rename ---- */

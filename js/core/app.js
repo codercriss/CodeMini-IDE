@@ -1431,6 +1431,34 @@ function showContextMenu(e, file) {
     let targets = isMultiSelectMode && Array.from(selectedFiles).some(f => f.id === file.id) ? Array.from(selectedFiles) : [file];
     let isMulti = targets.length > 1;
 
+    // Fly-out submenus (Create..., Copy to..., Move to...): only one is open at a time, and each is placed so it stays
+    // on screen. It normally opens to the right of its entry; near the right edge of the screen it flips to the left,
+    // and on a screen too narrow for either it drops directly under its entry. It is kept inside the screen vertically too.
+    const openSubmenus = [];
+    const closeSubmenus = (except) => openSubmenus.forEach(({ item, sub }) => { if (sub !== except) { sub.classList.remove('show-submenu'); item.classList.remove('open'); } });
+    const placeSubmenu = (item, sub) => {
+        sub.style.left = '100%'; sub.style.top = '0';
+        const ir = item.getBoundingClientRect(), sw = sub.offsetWidth, sh = sub.offsetHeight, vw = window.innerWidth, vh = window.innerHeight, edge = 5;
+        let left, top = 0;
+        if (ir.right + sw <= vw - edge) left = ir.width;
+        else if (ir.left - sw >= edge) left = -sw;
+        else { left = Math.min(0, vw - edge - sw - ir.left); left = Math.max(left, edge - ir.left); top = ir.height; }
+        if (ir.top + top + sh > vh - edge) top = Math.max(edge - ir.top, vh - edge - sh - ir.top);
+        sub.style.left = left + 'px'; sub.style.top = top + 'px';
+    };
+    const wireSubmenu = (item, sub) => {
+        sub.classList.add('adaptive-submenu');
+        item.onclick = (evt) => {
+            evt.stopPropagation();
+            const opening = !sub.classList.contains('show-submenu');
+            closeSubmenus(opening ? sub : null);
+            sub.classList.toggle('show-submenu', opening);
+            item.classList.toggle('open', opening);
+            if (opening) placeSubmenu(item, sub);
+        };
+        openSubmenus.push({ item, sub });
+    };
+
     if (window.isTreeViewMode && file.type === 'folder' && !isMulti) {
         const createItem = document.createElement('div');
         createItem.className = 'dropdown-item context-has-submenu';
@@ -1458,10 +1486,7 @@ function showContextMenu(e, file) {
         addSub('ri-folder-lock-line', 'Create Locked Folder', 'locked-folder');
         
         createItem.appendChild(subMenu);
-        createItem.onclick = (evt) => {
-            evt.stopPropagation();
-            subMenu.classList.toggle('show-submenu');
-        };
+        wireSubmenu(createItem, subMenu);
         menu.appendChild(createItem);
         
         const sep = document.createElement('div');
@@ -1634,26 +1659,12 @@ function showContextMenu(e, file) {
             ...otherProfiles.map(p => ({ icon: 'ri-window-line', name: p.name, db: p.db, rootId: 'root' })),
             ...otherWorkspaces.map(ws => ({ icon: 'ri-folder-5-line', name: ws.name, db: ws.resolvedDb, rootId: ws.id === 'root' ? 'root' : ws.id }))
         ];
-        const openSubmenus = [];
-        const closeSubmenus = (except) => openSubmenus.forEach(({ item, sub }) => { if (sub !== except) { sub.classList.remove('show-submenu'); item.classList.remove('open'); } });
-        // The flyout normally opens to the right of its entry; near the right edge of the screen it flips to the left,
-        // and on a screen too narrow for either it drops directly under the entry. It is kept inside the screen vertically too.
-        const placeSubmenu = (item, sub) => {
-            sub.style.left = '100%'; sub.style.top = '0';
-            const ir = item.getBoundingClientRect(), sw = sub.offsetWidth, sh = sub.offsetHeight, vw = window.innerWidth, vh = window.innerHeight, edge = 5;
-            let left, top = 0;
-            if (ir.right + sw <= vw - edge) left = ir.width;
-            else if (ir.left - sw >= edge) left = -sw;
-            else { left = Math.min(0, vw - edge - sw - ir.left); left = Math.max(left, edge - ir.left); top = ir.height; }
-            if (ir.top + top + sh > vh - edge) top = Math.max(edge - ir.top, vh - edge - sh - ir.top);
-            sub.style.left = left + 'px'; sub.style.top = top + 'px';
-        };
         const addTransferMenu = (icon, label, action, pastWord) => {
             const item = document.createElement('div');
             item.className = 'dropdown-item context-has-submenu';
             item.innerHTML = `<i class="${icon}"></i> <span>${CodeMiniEscape.html(label)}</span> <i class="ri-arrow-right-s-line" style="margin-left:auto;"></i>`;
             const sub = document.createElement('div');
-            sub.className = 'context-submenu transfer-submenu';
+            sub.className = 'context-submenu';
             sub.setAttribute('role', 'menu');
             destinations.forEach((d, i) => {
                 if (i > 0 && destinations[i - 1].icon !== d.icon) {
@@ -1675,15 +1686,7 @@ function showContextMenu(e, file) {
                 sub.appendChild(row);
             });
             item.appendChild(sub);
-            item.onclick = (evt) => {
-                evt.stopPropagation();
-                const opening = !sub.classList.contains('show-submenu');
-                closeSubmenus(opening ? sub : null);
-                sub.classList.toggle('show-submenu', opening);
-                item.classList.toggle('open', opening);
-                if (opening) placeSubmenu(item, sub);
-            };
-            openSubmenus.push({ item, sub });
+            wireSubmenu(item, sub);
             menu.appendChild(item);
         };
         addTransferMenu('ri-file-copy-2-line', 'Copy to\u2026', 'copy');
