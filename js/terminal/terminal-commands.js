@@ -1165,7 +1165,7 @@ window.getTerminalCommands = function(
                     if (e.ctrlKey && e.key.toLowerCase() === 's') { e.preventDefault(); await doSave(); }
                     if (e.ctrlKey && e.key.toLowerCase() === 'x') { e.preventDefault(); cleanup(); }
                     
-                    if (e.ctrlKey && e.key.toLowerCase() === 'z') {
+                    if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'z') {
                         e.preventDefault();
                         if (historyIndex > 0) { historyIndex--; textarea.value = historyStack[historyIndex]; }
                     }

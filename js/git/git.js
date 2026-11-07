@@ -2397,9 +2397,13 @@ function gitSetResult(ui, key, level, text, extra) { ui.results[key] = Object.as
 // these, and they sat there until a full page reload. gitToast already gives
 // the same confirmation as a real toast, so once that's had time to be seen
 // (matching its own 3s auto-dismiss - see showSuccessToast in app.js), clear
-// the inline copy too. Reference-compares against the object gitSetResult
+// the inline copy too. The New Repository / Fork / Issue / Pull Request results
+// are cleared the same way (they used to stay until a page reload while their
+// section was open); because they carry a link that may need tapping, they get
+// a little longer: GIT_LINK_RESULT_MS. Reference-compares against the object gitSetResult
 // just created so a newer result (another action, an error) isn't clobbered
 // if it lands before this timer fires.
+const GIT_LINK_RESULT_MS = 6000;
 function gitAutoClearResult(ui, key, delay) {
     const snapshot = ui.results[key];
     setTimeout(() => {
@@ -3200,6 +3204,7 @@ async function gitCreateRepo() {
         gitSetRemote(dbName, slim.full_name, slim.default_branch, ui);
         delete ui.drafts.gitNewRepoName; delete ui.drafts.gitNewRepoDesc;
         gitSetResult(ui, 'newRepo', 'success', `Created ${slim.full_name} and set it as this workspace's remote.`, { url: slim.html_url });
+        gitAutoClearResult(ui, 'newRepo', GIT_LINK_RESULT_MS);
         gitLog('repo-create', `Created ${slim.private ? 'private' : 'public'} repository ${slim.full_name}`, 'success', { repo: slim.full_name }, dbName);
         gitToast(`Created ${slim.full_name}`);
     } catch (e) {
@@ -3222,6 +3227,7 @@ async function gitForkRepo() {
         const state = gitGHState();
         if (state.repos.loaded) state.repos.items = [slim].concat(state.repos.items.filter(x => x.full_name !== slim.full_name));
         gitSetResult(ui, 'fork', 'success', `Forked to ${slim.full_name}. GitHub can take a few seconds to finish copying the files.`, { url: slim.html_url, useRepo: slim.full_name, useBranch: slim.default_branch });
+        gitAutoClearResult(ui, 'fork', GIT_LINK_RESULT_MS);
         gitLog('fork', `Forked ${ref.full} to ${slim.full_name}`, 'success', { source: ref.full, fork: slim.full_name }, dbName);
         gitToast(`Forked ${ref.full}`);
     } catch (e) {
@@ -3248,6 +3254,7 @@ async function gitCreateIssue() {
         const data = await gitHubRequest(`/repos/${ref.full}/issues`, { method: 'POST', body: JSON.stringify(payload) });
         delete ui.drafts.gitIssueTitle; delete ui.drafts.gitIssueBody; delete ui.drafts.gitIssueLabels;
         gitSetResult(ui, 'issue', 'success', `Created issue #${data.number} in ${ref.full}.`, { url: data.html_url, linkText: `Open #${data.number}` });
+        gitAutoClearResult(ui, 'issue', GIT_LINK_RESULT_MS);
         gitLog('issue-create', `Created issue #${data.number} "${title}" in ${ref.full}`, 'success', { repo: ref.full, number: data.number }, dbName);
         gitToast(`Issue #${data.number} created`);
     } catch (e) {
@@ -3278,6 +3285,7 @@ async function gitCreatePullRequest() {
         const data = await gitHubRequest(`/repos/${ref.full}/pulls`, { method: 'POST', body: JSON.stringify(payload) });
         delete ui.drafts.gitPrTitle; delete ui.drafts.gitPrBody;
         gitSetResult(ui, 'pr', 'success', `Created ${draft ? 'draft ' : ''}pull request #${data.number} (${head} into ${base}).`, { url: data.html_url, linkText: `Open #${data.number}` });
+        gitAutoClearResult(ui, 'pr', GIT_LINK_RESULT_MS);
         gitLog('pr-create', `Created pull request #${data.number} "${title}" in ${ref.full} (${head} -> ${base})`, 'success', { repo: ref.full, number: data.number, head, base, draft }, dbName);
         gitToast(`Pull request #${data.number} created`);
     } catch (e) {

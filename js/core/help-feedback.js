@@ -138,6 +138,9 @@
                 { term: 'Ctrl+S / Cmd+S', body: 'Save the active file (works for both regular files and notebooks).' },
                 { term: 'Alt+N', body: 'Create a new file in the current folder.' },
                 { term: 'Alt+W', body: 'Close the currently active tab.' },
+                { term: 'Ctrl+P / Cmd+P', body: 'Quick Open: jump to a file by typing part of its name. Start with > for commands, : for a line, @ for a symbol or # for a workspace.' },
+                { term: 'F1 / Ctrl+Shift+P / Cmd+Shift+P', body: 'Open Quick Open in command mode (the command palette).' },
+                { term: 'Up / Down / Enter / Alt+Enter / Esc (in Quick Open)', body: 'Move through the results, open the selected one, and close the list. Alt+Enter (or Alt+click) opens the selected file to the side.' },
                 { term: 'Ctrl+Enter / Cmd+Enter', body: 'Run the active notebook cell.' },
                 { term: 'Shift+Enter', body: 'Run the active notebook cell and advance to the next one.' },
                 { term: 'Ctrl+B', body: 'Toggle the explorer sidebar. (Yields to the document editor\'s own Bold shortcut while you\'re typing inside a Word-style document.)' },
@@ -148,7 +151,8 @@
                 { term: 'Ctrl+C (in Terminal)', body: 'Cancel the current input line.' },
                 { term: 'Up / Down (in Terminal or Console)', body: 'Step through previous commands in your history.' },
                 { term: 'Ctrl+S / Ctrl+X (in the mini editor)', body: 'The terminal\'s built-in "mini" text editor (opened with mini <filename>) saves with Ctrl+S and exits back to the terminal with Ctrl+X.' },
-                { term: 'Ctrl+Z / Ctrl+Y (in the mini editor)', body: 'Undo and redo edit history while inside the mini editor.' },
+                { term: 'Ctrl+Z / Ctrl+Y or Ctrl+Shift+Z (in the mini editor)', body: 'Undo and redo edit history while inside the mini editor. Tab inserts four spaces.' },
+                { term: 'Ctrl+Enter (in the Source Control message box)', body: 'Commit with the message you typed.' },
                 { term: 'Everything else', body: 'New folder, Save As, Save All, Close All Tabs, and Zen Mode are still toolbar/menu-driven rather than keyboard shortcuts right now - see the other sections above for where to find each one.' }
             ]
         },
