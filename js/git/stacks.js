@@ -2,6 +2,14 @@
 // stacks.js
 // ==========================================
 
+// A workspace has its own icon (the one in the Explorer's workspace drop-down), so it does not look like a folder.
+function getWorkspaceIconAndColor() {
+  return {
+    icon: 'ri-folder-5-line',
+    color: 'var(--icon-gray)'
+  };
+}
+
 // --- Helper Utility for File Icons ---
 // Centralized engine to guarantee proper developer icons and accurate system colors across all sections
 function getFileIconAndColor(name, isFolder = false) {
@@ -365,7 +373,7 @@ window.renderStacks = function() {
 
   // --- HTML RENDERERS ---
   const wsHtml = (window.workspacesList || []).map(ws => {
-    const wsMeta = getFileIconAndColor(ws.name, true);
+    const wsMeta = getWorkspaceIconAndColor();
     return `
     <div class="stack-item-row stack-filterable" data-name="${CodeMiniEscape.html(ws.name.toLowerCase())}" style="font-size: 12px; padding: 7px 10px; color: var(--text-main); display: flex; align-items: center; gap: 8px; cursor: default;">
     <i class="${wsMeta.icon}" style="color: ${wsMeta.color}; font-size: 14px; width: 16px; text-align: center;"></i>
@@ -426,7 +434,7 @@ window.renderStacks = function() {
   function renderTrashItem(t, depth) {
     const idx = window.recycleBin.indexOf(t);
     const isFolder = t.type === 'folder' || t.type === 'workspace';
-    const fileMeta = getFileIconAndColor(t.name, isFolder);
+    const fileMeta = t.type === 'workspace' ? getWorkspaceIconAndColor() : getFileIconAndColor(t.name, isFolder);
     const children = isFolder ? (window.recycleBin || []).filter(c => c.parentId === t.id) : [];
     const isExpanded = window._trashExpanded.has(t.id);
     const indent = 10 + depth * 18;

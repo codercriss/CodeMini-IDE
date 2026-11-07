@@ -375,9 +375,13 @@
                         });
                     };
 
+                    // Files the text tools (cat, grep, mini, ...) must not touch: notebooks (JSON documents with their own editor)
+                    // and every binary type the app stores as base64 (images, video, audio, archives, PDFs, fonts and
+                    // Word documents - window.BINARY_FILE_EXTS), so a document is refused exactly like a notebook is.
+                    const NOTEBOOK_EXTS = ['ipynb', 'irnb', 'sqlnb', 'jlnb'];
                     const blockBinary = (filename, cmd) => {
                         const ext = filename.split('.').pop().toLowerCase();
-                        if (['ipynb', 'irnb', 'sqlnb', 'pdf', 'png', 'zip'].includes(ext)) {
+                        if (NOTEBOOK_EXTS.includes(ext) || (window.BINARY_FILE_EXTS || []).includes(ext)) {
                             printTerm(`<span style="color: var(--term-red);">${cmd}: ${filename}: Cannot read, open, or edit this type of file inside the terminal tools.</span>`, true);
                             return true;
                         }
