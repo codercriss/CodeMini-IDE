@@ -2288,6 +2288,16 @@ body.hide-window-bar .window-bar {
     border-top: 1px dashed var(--border-color);
 }
 
+.launcher-privacy a {
+    color: var(--accent-blue);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.launcher-privacy a:hover {
+    text-decoration: underline;
+}
+
 /* --- Profile Loading Overlay --- */
 .profile-loading-overlay {
     position: fixed;
@@ -3239,11 +3249,13 @@ body.preview-docked .status-bar {
     width: calc(100% - var(--dock-width));
 }
 
-body.preview-docked #livePreviewContainer {
+/* The pane's docked size hangs on its own class (set by applyDockState in preview.js), separate from body.preview-docked above:
+   on close the app starts growing back at once while the pane keeps its docked size as it slides out. The top is measured
+   from the app body (--dock-top), so it follows the window bar being hidden. */
+#livePreviewContainer.lp-docked {
     width: var(--dock-width) !important;
-    transform: translateX(0) !important;
-    top: 78px;
-    height: calc(100vh - 78px);
+    top: var(--dock-top, 78px);
+    height: calc(100vh - var(--dock-top, 78px));
     z-index: 0;
     box-shadow: none !important;
     border-left: 1px solid var(--border-color);

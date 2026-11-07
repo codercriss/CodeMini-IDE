@@ -1060,7 +1060,7 @@ const launcherHTMLTemplate = `
             <div class="launcher-card"><i class="ri-terminal-window-line" style="color: var(--text-main);"></i><span>Terminal</span></div>
         </div>
     </div>
-    <div class="launcher-privacy">CodeMini does not collects usage data, check our privacy policy for more.</div>
+    <div class="launcher-privacy">CodeMini does not collect usage data, check our <a href="${(window.APP_INFO && window.APP_INFO.links && window.APP_INFO.links.privacy) || '#'}" target="_blank" rel="noopener noreferrer">privacy policy</a> for more.</div>
 `;
 
 // window.renderTopSearch (the title-bar search island) lives in quick-open.js.

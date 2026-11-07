@@ -26,10 +26,14 @@
             background-color: var(--bg-white); z-index: 10000;
             display: flex; flex-direction: column; border-left: 1px solid var(--border-color);
             box-shadow: -5px 0 25px rgba(0, 0, 0, 0.1); transform: translateX(105%);
-            transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), width 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), top 0.3s, height 0.3s;
+            transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), width 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), top 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), height 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
         }
         #livePreviewContainer.show { transform: translateX(0); }
         #livePreviewContainer.maximized { width: 100%; border-left: none;}
+        /* Used for a single frame while the pane opens: it takes its final (docked or full) size instantly, so only the slide animates. */
+        #livePreviewContainer.lp-snap { transition: none !important; }
+        /* Full screen has nothing to dock to; the button comes back when the pane leaves full screen. */
+        #livePreviewContainer.maximized #lpDockBtn { display: none; }
         @media (max-width: 768px) {
             #livePreviewContainer { width: 100%; border-left: none; }
             #lpMaximizeBtn, #lpWordCount, #lpDockBtn { display: none !important; }
@@ -664,13 +668,27 @@
         }
     }
 
+    // The docked pane starts right under the top bars, which are a different height with the window bar hidden, in zen mode,
+    // on tablets and so on, so its top is measured from the app body instead of being a fixed number.
+    function syncDockTop() {
+        const appBody = document.querySelector('.app-body');
+        if (!appBody) return;
+        document.documentElement.style.setProperty('--dock-top', Math.max(0, Math.round(appBody.getBoundingClientRect().top)) + 'px');
+    }
+    window.addEventListener('resize', syncDockTop);
+    new MutationObserver(syncDockTop).observe(document.body, { attributes: true, attributeFilter: ['class'] }); // hide-window-bar, zen mode...
+
+    // Two separate things happen when the pane docks: the pane takes the docked size (class lp-docked on the pane, which it keeps
+    // while it slides out so closing does not make it jump), and the app is pushed aside (body.preview-docked, only while open).
     function applyDockState(state) {
-        if (state.isDocked && !state.isMaximized) {
-            document.body.classList.add('preview-docked');
+        const docked = !!state.isDocked && !state.isMaximized && window.innerWidth > 768;
+        syncDockTop();
+        previewContainer.classList.toggle('lp-docked', docked);
+        document.body.classList.toggle('preview-docked', docked);
+        if (docked) {
             document.documentElement.style.setProperty('--dock-width', `${state.dockWidth}vw`);
             lpDockBtn.classList.replace('ri-layout-right-line', 'ri-layout-right-fill');
         } else {
-            document.body.classList.remove('preview-docked');
             lpDockBtn.classList.replace('ri-layout-right-fill', 'ri-layout-right-line');
         }
     }
@@ -691,6 +709,11 @@
             lpScrollLock.classList.replace('ri-lock-unlock-line', 'ri-lock-line');
             lpScrollLock.title = 'Auto-Scroll: OFF';
         }
+
+        // Full screen is saved per window like docking is, so it is applied here too (before, only clicking the button set it).
+        previewContainer.classList.toggle('maximized', !!state.isMaximized);
+        if (state.isMaximized) lpMaximizeBtn.classList.replace('ri-fullscreen-line', 'ri-fullscreen-exit-line');
+        else lpMaximizeBtn.classList.replace('ri-fullscreen-exit-line', 'ri-fullscreen-line');
 
         applyDockState(state);
     }
@@ -3097,7 +3120,12 @@ $_SERVER['REMOTE_ADDR'] = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
                             state.currentNavIndex = -1;
                             lpConsoleContent.innerHTML = ''; 
                             lpNetworkContent.innerHTML = '';
-                            syncPreviewUI(state); // Sync icons/layout before showing
+                            // Sync icons/layout before showing. The pane takes its final size with no transition and is
+                            // flushed, then 'show' (below) lets just the slide and the app being pushed aside animate.
+                            previewContainer.classList.add('lp-snap');
+                            syncPreviewUI(state);
+                            void previewContainer.offsetWidth;
+                            previewContainer.classList.remove('lp-snap');
                         }
                         
                         previewContainer.classList.add('show');
@@ -3338,6 +3366,7 @@ $_SERVER['REMOTE_ADDR'] = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
             previewContainer.classList.remove('maximized');
             lpMaximizeBtn.classList.replace('ri-fullscreen-exit-line', 'ri-fullscreen-line');
         }
+        applyDockState(state); // full screen un-docks the pane; leaving full screen docks it again if it was docked
         savePreviewState();
     });
 
