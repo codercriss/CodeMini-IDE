@@ -54,7 +54,7 @@ const real = (c, n, x) => { if (REAL) ok(c, n, x); else { skipped++; console.log
   const toolbar = () => ev(() => { const r = document.querySelector('.pane-active .df-root, .content-pane.active .df-root'); if (!r) return null; return { counter: r.querySelector('.df-counter').textContent, labels: [r.querySelector('.df-label-left').textContent, r.querySelector('.df-label-right').textContent], msg: r.querySelector('.df-msg').hidden ? '' : r.querySelector('.df-msg').textContent, unified: r.querySelector('.df-seg-btn[data-df="unified"]').classList.contains('active'), refreshHidden: r.querySelector('[data-df="refresh"]').hidden, splitDisabled: r.querySelector('.df-seg-btn[data-df="split"]').disabled, prevDisabled: r.querySelector('[data-df="prev"]').disabled }; });
   const click = async (k) => { await ev((k) => document.querySelector('.content-pane.active .df-root [data-df="' + k + '"]').click(), k); await sleep(350); };
   const modifiedEditor = "document.querySelector('.content-pane.active')._diff.editor.getModifiedEditor()";
-  const pos = () => ev(() => document.querySelector('.content-pane.active')._diff.editor.getModifiedEditor().getPosition().lineNumber);
+  const pos = () => ev(() => { const n = document.querySelector('.content-pane.active')._diff.editor.getModifiedEditor().getPosition().lineNumber; return typeof n === 'number' ? n : null; });
   const sbs = () => ev(() => { const d = document.querySelector('.content-pane.active .monaco-diff-editor'); return d ? d.classList.contains('side-by-side') : null; });
   const waitDiff = async (ms) => { await sleep(ms || 1800); };
 
