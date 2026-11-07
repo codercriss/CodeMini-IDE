@@ -7,7 +7,6 @@
   "js/core/settings-profile.js": 1,
   "js/git/git.js": 4,
   "js/git/stacks.js": 10,
-  "js/notebook/environments.js": 1,
   "js/notebook/notebook-kernels.js": 16,
   "js/notebook/notebook-ui.js": 14,
   "js/terminal/console.js": 54,
