@@ -4751,3 +4751,47 @@ body.compact-explorer .tree-view-item {
     .df-labels { display: none; }
     .df-msg { top: 38px; }
 }
+
+/* ==========================================
+   Installed app (html.is-pwa, set in index.html / pwa.js)
+   ==========================================
+   An installed app should feel like an app, not a web page: dragging or long-pressing on menus, tabs, buttons and labels
+   no longer starts a text selection (or, on iOS, the magnifier and copy callout). Text stays selectable wherever someone
+   may want to copy it: anything you type in, the code editors and diffs, terminal / console / network output,
+   notebook cells and their output, Word-style documents, rendered Markdown, code blocks, source control messages and
+   diffs, and the Help pages. In a normal browser tab nothing changes. Only the container is listed: what is inside it
+   inherits "text" from it, while an element that sets user-select: none itself (a notebook prompt, a page break
+   marker) keeps doing so. */
+html.is-pwa body {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+
+html.is-pwa input,
+html.is-pwa textarea,
+html.is-pwa [contenteditable]:not([contenteditable="false"]),
+html.is-pwa .monaco-editor,
+html.is-pwa .monaco-diff-editor,
+html.is-pwa .df-host,
+html.is-pwa .term-output,
+html.is-pwa .term-input,
+html.is-pwa #lpConsoleContent,
+html.is-pwa #lpNetworkContent,
+html.is-pwa .console-entry,
+html.is-pwa .cell-input,
+html.is-pwa .cell-output,
+html.is-pwa .cell-output-wrapper,
+html.is-pwa .cell-monaco-container,
+html.is-pwa .markdown-rendered,
+html.is-pwa .doc-content,
+html.is-pwa .git-diff-body,
+html.is-pwa .git-log-msg,
+html.is-pwa .git-result-text,
+html.is-pwa .help-content,
+html.is-pwa pre,
+html.is-pwa code, html.is-pwa samp {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
+}

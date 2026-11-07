@@ -21,6 +21,20 @@
         }
     </script>
 
+    <!-- Running as an installed app (not a browser tab): html.is-pwa. CSS uses it to turn off text selection across the
+         app chrome (see "Installed app" in style.css). Same test as CodeMiniPWA.isStandalone() in pwa.js, which also
+         keeps the class in step if the display mode changes. Set here so there is no flash of selectable text. -->
+    <script>
+        (function () {
+            try {
+                var mm = function (q) { return !!(window.matchMedia && window.matchMedia(q).matches); };
+                if (mm('(display-mode: standalone)') || mm('(display-mode: window-controls-overlay)') || navigator.standalone === true) {
+                    document.documentElement.classList.add('is-pwa');
+                }
+            } catch (e) { /* no matchMedia: stay a normal page */ }
+        })();
+    </script>
+
     <!-- Apply the saved theme before the first paint. The real applyTheme() (settings-profile.js) only runs at
          DOMContentLoaded, so without this every load starts on the default light theme and flashes to the
          saved one. applyTheme() stores what it applied for each window (codemini_theme_cache); this just puts

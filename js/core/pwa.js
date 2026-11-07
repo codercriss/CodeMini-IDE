@@ -44,6 +44,20 @@
         } catch (e) { return false; }
     }
 
+    // html.is-pwa is first set by a tiny inline script in index.html (before first paint); this keeps it right if the
+    // display mode changes while the page is open (for example the browser moves it into or out of an app window).
+    function syncPwaClass() {
+        document.documentElement.classList.toggle('is-pwa', isStandalone());
+    }
+    try {
+        ['(display-mode: standalone)', '(display-mode: window-controls-overlay)'].forEach((q) => {
+            const mq = window.matchMedia(q);
+            if (mq.addEventListener) mq.addEventListener('change', syncPwaClass);
+            else if (mq.addListener) mq.addListener(syncPwaClass);
+        });
+    } catch (e) { /* matchMedia unavailable */ }
+    syncPwaClass();
+
     // ------------------------------------------------------------------
     // Toast (reuses the app's existing .toast-container / .custom-toast styles)
     // ------------------------------------------------------------------
