@@ -293,6 +293,13 @@
                     <span class="explorer-sync-icon" id="explorerSyncIcon"></span>
                     <span id="explorerSyncText">Syncing locally</span>
                 </div>
+                <!-- Replaces the sync status while Multi-Select or the Download toggle is on (see
+                     refreshExplorerSelectActions in app.js; CSS shows it via .is-selecting on the bar). -->
+                <div class="explorer-select-actions" id="explorerSelectActions" role="toolbar" aria-label="Selection shortcuts">
+                    <button type="button" class="explorer-select-btn" id="selectAllToggleBtn" title="Select all" aria-label="Select all"><i class="ri-check-double-line"></i></button>
+                    <button type="button" class="explorer-select-btn" id="selectAllFoldersBtn" title="Select all folders" aria-label="Select all folders" aria-pressed="false"><i class="ri-folder-2-line"></i></button>
+                    <button type="button" class="explorer-select-btn" id="selectAllFilesBtn" title="Select all files" aria-label="Select all files" aria-pressed="false"><i class="ri-file-text-line"></i></button>
+                </div>
             </div>
         </div>
 

@@ -164,6 +164,9 @@ let isMultiSelectMode = false;
 let selectedFiles = new Set();
 let isDownloadMultiSelectMode = false;
 let downloadSelectedFiles = new Set();
+// The rows the Explorer is showing right now ({ file, el }), rebuilt on every render. The status-bar selection
+// shortcuts (Select all / folders / files) act on exactly these, i.e. on what the person can see.
+let explorerRenderedRows = [];
 
 let db;
 let creationMode = null;
@@ -469,6 +472,7 @@ function switchWindow(winId, isCreating = false) {
     if (msBtn) msBtn.style.color = 'var(--icon-gray)';
     const dlBtn = document.querySelector('.ri-download-line[title="Download"]');
     if (dlBtn) dlBtn.style.color = 'var(--icon-gray)';
+    if (window.refreshExplorerSelectActions) window.refreshExplorerSelectActions();
     
     window.recentlyClosed = window.createPersistentArray(`codemini_recently_closed_${cellActiveWindow.id}`);
     window.recycleBin = window.createPersistentArray(`codemini_recycle_bin_${cellActiveWindow.db}`);
@@ -925,6 +929,7 @@ function loadFilesFromDB() {
         if (typeof window.updateExplorerStatus === 'function') window.updateExplorerStatus(allFiles);
 
         renderFileList(allFiles);
+        if (window.refreshExplorerSelectActions) window.refreshExplorerSelectActions(); // the rows (and what is selected among them) just changed
         
         if (window.renderStacks) window.renderStacks();
         if (typeof window.updateProfileStats === 'function') window.updateProfileStats();
@@ -1906,8 +1911,92 @@ if (multiSelectBtn) {
             selectedFiles.clear();
             document.querySelectorAll('.file-item.selected-file').forEach(el => el.classList.remove('selected-file'));
         }
+        window.refreshExplorerSelectActions();
     });
 }
+
+// ===== Explorer status bar: selection shortcuts =====
+// While Multi-Select or the Download toggle is on, the right side of the status bar shows three icons instead of
+// the sync status: Select all / Unselect all, Select all folders, Select all files. They work on the rows currently
+// shown (so a search filter, the open folder and expanded tree folders all count), and, like a click on a row,
+// they fill the Download selection when that toggle is on (it wins when both are on) and the Multi-Select one otherwise.
+// A workspace counts as a folder, the same as everywhere else in the Explorer.
+const isFolderLikeRecord = (f) => f.type === 'folder' || f.type === 'workspace';
+
+function activeExplorerSelection() {
+    return isDownloadMultiSelectMode
+        ? { set: downloadSelectedFiles, cls: 'download-selected-file' }
+        : { set: selectedFiles, cls: 'selected-file' };
+}
+
+// kind: 'all' | 'folders' | 'files'. `all` is true when there is something to select and all of it already is.
+// For 'all' it is also true when nothing is shown (an empty folder) but a selection made elsewhere lingers,
+// so the button reads "Unselect all" and can clear it.
+function explorerSelectionState(kind) {
+    const { set } = activeExplorerSelection();
+    const ids = new Set(Array.from(set, f => f.id));
+    const pool = explorerRenderedRows.filter(({ file }) => kind === 'folders' ? isFolderLikeRecord(file) : kind === 'files' ? !isFolderLikeRecord(file) : true);
+    const all = pool.length > 0 ? pool.every(({ file }) => ids.has(file.id)) : (kind === 'all' && set.size > 0);
+    return { pool, ids, all };
+}
+
+window.refreshExplorerSelectActions = function () {
+    const bar = document.getElementById('explorerStatusBar');
+    if (!bar) return;
+    const selecting = isMultiSelectMode || isDownloadMultiSelectMode;
+    bar.classList.toggle('is-selecting', selecting);
+    bar.classList.toggle('is-download', isDownloadMultiSelectMode);
+    if (!selecting) return;
+
+    const { set } = activeExplorerSelection();
+    const all = explorerSelectionState('all');
+    const allBtn = document.getElementById('selectAllToggleBtn');
+    if (allBtn) {
+        const label = all.all ? 'Unselect all' : 'Select all';
+        allBtn.title = label; allBtn.setAttribute('aria-label', label);
+        allBtn.classList.toggle('is-active', all.all);
+        allBtn.disabled = all.pool.length === 0 && set.size === 0;
+        const icon = allBtn.firstElementChild;
+        if (icon) icon.className = all.all ? 'ri-close-circle-line' : 'ri-check-double-line';
+    }
+    [['selectAllFoldersBtn', 'folders', 'folders'], ['selectAllFilesBtn', 'files', 'files']].forEach(([id, kind, noun]) => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        const st = explorerSelectionState(kind);
+        const label = st.all ? `Unselect all ${noun}` : `Select all ${noun}`;
+        btn.title = label; btn.setAttribute('aria-label', label);
+        btn.classList.toggle('is-active', st.all);
+        btn.setAttribute('aria-pressed', st.all ? 'true' : 'false');
+        btn.disabled = st.pool.length === 0; // e.g. a folder with no sub-folders
+    });
+};
+
+// Each shortcut toggles: if everything of that kind is already selected it unselects it, otherwise it selects the rest.
+function applyExplorerSelectionShortcut(kind) {
+    const { set, cls } = activeExplorerSelection();
+    const { pool, ids, all } = explorerSelectionState(kind);
+    if (pool.length === 0 && !(kind === 'all' && set.size > 0)) return;
+    if (all) {
+        if (kind === 'all') {
+            set.clear(); // "Unselect all" means nothing stays selected, including items picked in another folder
+        } else {
+            const poolIds = new Set(pool.map(({ file }) => file.id));
+            Array.from(set).forEach(f => { if (poolIds.has(f.id)) set.delete(f); });
+        }
+        pool.forEach(({ el }) => el.classList.remove(cls));
+    } else {
+        pool.forEach(({ file, el }) => {
+            if (!ids.has(file.id)) set.add(file);
+            el.classList.add(cls);
+        });
+    }
+    if (isDownloadMultiSelectMode && typeof updateDownloadToolbar === 'function') updateDownloadToolbar(); // enables/disables Raw
+    window.refreshExplorerSelectActions();
+}
+
+document.getElementById('selectAllToggleBtn')?.addEventListener('click', () => applyExplorerSelectionShortcut('all'));
+document.getElementById('selectAllFoldersBtn')?.addEventListener('click', () => applyExplorerSelectionShortcut('folders'));
+document.getElementById('selectAllFilesBtn')?.addEventListener('click', () => applyExplorerSelectionShortcut('files'));
 
 if (explorerAddBtn) explorerAddBtn.addEventListener('click', (e) => { e.stopPropagation(); explorerDropdown.classList.toggle('show'); });
 
@@ -2130,6 +2219,7 @@ function renderFileList(allFiles) {
     updateBreadcrumbs(); 
     const currentFolderId = folderStack[folderStack.length - 1].id;
     fileList.innerHTML = '';
+    explorerRenderedRows = [];
     
     const sortFiles = (filesArray) => {
         return filesArray.sort((a, b) => {
@@ -2271,6 +2361,7 @@ newItem.style.setProperty('--tree-indent', `${level * indentBase}px`);
     newItem.addEventListener('contextmenu', (e) => showContextMenu(e, file));
     newItem.addEventListener('touchstart', (e) => { isLongPress = false; longPressTimer = setTimeout(() => { isLongPress = true; showContextMenu({clientX: e.touches[0].clientX, clientY: e.touches[0].clientY}, file); }, 600); }, {passive: true});
     newItem.addEventListener('touchend', () => clearTimeout(longPressTimer)); newItem.addEventListener('touchmove', () => clearTimeout(longPressTimer));
+    explorerRenderedRows.push({ file, el: newItem });
     fileList.appendChild(newItem);
 }
 
@@ -2355,6 +2446,7 @@ function handleFileClick(file, element, allFilesContext) {
                 loadFilesFromDB(); 
             }
         }
+        if (window.refreshExplorerSelectActions) window.refreshExplorerSelectActions();
         return;
     }
     if (file.isLocked) {

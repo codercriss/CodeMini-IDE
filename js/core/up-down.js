@@ -70,6 +70,8 @@ function updateDownloadToolbar() {
     if (rawBtn) {
         rawBtn.disabled = downloadSelectedFiles.size === 0;
     }
+    // Also called whenever the download toggle or its selection changes: keep the status-bar selection icons in step.
+    if (window.refreshExplorerSelectActions) window.refreshExplorerSelectActions();
 }
 
 function setupUploadAndDownload() {

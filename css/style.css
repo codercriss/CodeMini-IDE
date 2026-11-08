@@ -4613,6 +4613,29 @@ body.compact-explorer .tree-view-item {
 .explorer-sync-icon { display: inline-flex; align-items: center; font-size: 13px; line-height: 1; color: var(--accent-blue); }
 .explorer-status-right.is-offline .explorer-sync-icon { color: var(--icon-gray); }
 
+/* While Multi-Select or the Download toggle is on, the right side shows selection shortcuts instead of the
+   sync status (JS only toggles .is-selecting / .is-download on the bar). Teal matches the download highlight. */
+.explorer-select-actions { display: none; align-items: center; gap: 2px; flex-shrink: 0; }
+.explorer-status-bar.is-selecting #explorerSyncStatus { display: none; }
+.explorer-status-bar.is-selecting .explorer-select-actions { display: flex; }
+.explorer-select-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 20px; padding: 0; margin: 0;
+    border: 0; border-radius: 4px; background: transparent;
+    color: var(--icon-gray); font-size: 14px; line-height: 1; cursor: pointer;
+    transition: background-color 0.15s, color 0.15s;
+}
+.explorer-select-btn:hover:not(:disabled) { background-color: var(--hover-blue); color: var(--text-main); }
+.explorer-select-btn:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: -2px; }
+.explorer-select-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.explorer-select-btn.is-active { color: var(--accent-blue); }
+.explorer-status-bar.is-download .explorer-select-btn.is-active { color: var(--accent-new); }
+@media (pointer: coarse) {
+    /* Fingers need a bigger target than a 22px strip gives, so the bar grows while these icons are showing. */
+    .explorer-status-bar.is-selecting { height: 34px; }
+    .explorer-select-btn { width: 40px; height: 30px; font-size: 18px; }
+}
+
 /* --- Version history cards (Settings > Updates and the Version History tab) ---
    Button + animated panel, deliberately unlike the Help tab's <details> rows. No coloured edge or
    accent border: the card keeps the same neutral border open or closed. */
