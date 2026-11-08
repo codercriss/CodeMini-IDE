@@ -4837,10 +4837,10 @@ html.is-pwa code, html.is-pwa samp {
 .tl-act[data-tl-action="delete"]:hover { color: var(--color-danger); }
 @media (hover: none) { .tl-actions { display: inline-flex; } }
 @media (max-width: 768px) {
-    .tl-main { min-height: 44px; }
-    .tl-act { width: 40px; height: 44px; }
-    .tl-toggle { min-height: 44px; }
-    #statusAutoSave { min-width: 36px; justify-content: center; padding: 6px 0; margin: -6px 0; } /* icon only on a phone: a finger needs more than 14px; the margin keeps the bar's height */
+    .tl-main { min-height: 33px; }
+    .tl-act { width: 40px; height: 33px; }
+    .tl-toggle { min-height: 33px; }
+    #statusAutoSave { justify-content: center; margin: -6px 0; } /* icon only on a phone: a finger needs more than 14px; the margin keeps the bar's height */
 }
 #statusAutoSave { gap: 5px; cursor: pointer; }
 #statusAutoSave.as-off { opacity: 0.75; }
