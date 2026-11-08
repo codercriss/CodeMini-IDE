@@ -4838,7 +4838,7 @@ html.is-pwa code, html.is-pwa samp {
 @media (hover: none) { .tl-actions { display: inline-flex; } }
 @media (max-width: 768px) {
     .tl-main { min-height: 33px; }
-    .tl-act { width: 10px; height: 10px; }
+    .tl-act { width: 24px; height: 24px; }
     .tl-toggle { min-height: 33px; }
     #statusAutoSave { justify-content: center; margin: -6px 0; } /* icon only on a phone: a finger needs more than 14px; the margin keeps the bar's height */
 }
