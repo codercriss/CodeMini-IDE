@@ -43,4 +43,41 @@ t('Settings > About has no placeholder "#" links', () => {
   assert.ok(!/All rights reserved/i.test(about), 'About should state the MIT license, not "All rights reserved"');
 });
 t('Send Feedback addresses a recipient', () => assert.ok(/mailto:\$\{to\}/.test(read('js/core/help-feedback.js'))));
+// The terminal's `uname` reports the app's own version. It is read from APP_INFO when the command runs, so a release
+// only has to change app-info.js (which this test already ties to package.json and the service worker).
+console.log('terminal uname');
+const termWin = {};
+vm.runInContext(read('js/terminal/terminal-commands.js'), vm.createContext({ window: termWin, console, setTimeout, clearTimeout }));
+const noop = () => {};
+const unameOut = [];
+// One command table, built once (as when a terminal opens). APP_INFO is swapped underneath it between calls.
+const termCommands = termWin.getTerminalCommands((line) => unameOut.push(line), noop, noop, noop, noop, noop, noop, noop, noop, noop, noop,
+  { workspaceSynced: true, folderStack: [{ id: 'root' }], interrupted: false }, noop, noop, {}, {}, {}, {}, noop, noop, noop).commands;
+const uname = (args, appInfo) => {
+  termWin.APP_INFO = appInfo;
+  unameOut.length = 0;
+  termCommands.uname(args); // prints before its first await
+  return unameOut.join('\n');
+};
+t('uname -r and uname -a show the version of the running app', () => {
+  assert.strictEqual(uname(['uname', '-r'], info), pkg.version);
+  assert.strictEqual(uname(['uname', '-a'], info), `CodeMiniOS codemini ${pkg.version} WebAssembly x86_64 GNU/Linux`);
+});
+t('they follow APP_INFO when it changes under an open terminal (read when the command runs, not when it was created)', () => {
+  assert.strictEqual(uname(['uname', '-r'], { version: '9.9.9' }), '9.9.9');
+  assert.ok(uname(['uname', '-a'], { version: '10.0.0-beta.1' }).includes(' 10.0.0-beta.1 '));
+});
+t('without APP_INFO they say "unknown" instead of failing or guessing', () => {
+  assert.strictEqual(uname(['uname', '-r'], undefined), 'unknown');
+  assert.ok(uname(['uname', '-a'], undefined).startsWith('CodeMiniOS codemini unknown '));
+  assert.strictEqual(uname(['uname', '-r'], {}), 'unknown');
+});
+t('the other uname flags are unchanged', () => {
+  assert.strictEqual(uname(['uname'], info), 'CodeMiniOS');
+  assert.strictEqual(uname(['uname', '-s'], info), 'CodeMiniOS');
+  assert.strictEqual(uname(['uname', '-m'], info), 'x86_64');
+});
+t('terminal-commands.js holds no copy of the version (it would go stale at the next release)', () => {
+  assert.ok(!read('js/terminal/terminal-commands.js').includes(pkg.version), 'the version is written into terminal-commands.js: read window.APP_INFO.version instead');
+});
 console.log(`\n${n} app-info checks passed`);

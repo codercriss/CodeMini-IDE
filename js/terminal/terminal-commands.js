@@ -294,10 +294,13 @@ window.getTerminalCommands = function(
         },
 
         uname: async (args) => {
-            if (args.includes('-a')) printTerm('CodeMiniOS codemini 1.5.0 WebAssembly x86_64 GNU/Linux');
+            // The app's own version, read when the command runs. app-info.js is the one place it is written
+            // (tests/app-info.test.js ties it to package.json and the service worker), so a release cannot leave this behind.
+            const version = (window.APP_INFO && window.APP_INFO.version) || 'unknown';
+            if (args.includes('-a')) printTerm(`CodeMiniOS codemini ${version} WebAssembly x86_64 GNU/Linux`);
             else if (args.includes('-m')) printTerm('x86_64');
             else if (args.includes('-s')) printTerm('CodeMiniOS');
-            else if (args.includes('-r')) printTerm('1.5.0');
+            else if (args.includes('-r')) printTerm(version);
             else printTerm('CodeMiniOS');
         },
         ping: async (args) => {
