@@ -346,10 +346,12 @@ function showWindowActionsMenu(e, w) {
                             files.filter(f => f.type === 'workspace').forEach(ws => {
                                 if (ws.db) {
                                     try { indexedDB.deleteDatabase(ws.db); } catch(err){}
+                                    if (window.CodeMiniHistory) window.CodeMiniHistory.purgeDatabases([ws.db]);
                                 }
                             });
                             tempDb.close();
                             try { indexedDB.deleteDatabase(w.db); } catch(err) { console.warn("Teardown DB error:", err); }
+                            if (window.CodeMiniHistory) window.CodeMiniHistory.purgeDatabases([w.db]); // its Local History and hot-exit copies go with it
                         };
                     };
                     localStorage.removeItem(`codemini_recycle_bin_${w.db}`);
@@ -1112,6 +1114,8 @@ function loadFilesFromDB() {
         
         // Startup preloader: the database is open, the file list is rendered and any saved tabs are restored.
         if (window.CodeMiniPreloader) window.CodeMiniPreloader.markReady('files');
+        // Hot exit: text that was typed and not saved when the last page ended comes back in its tab (once per database per page).
+        if (window.CodeMiniHistory && db && db.name) Promise.resolve(window.CodeMiniHistory.recoverFor(db.name)).catch(e => console.warn('Hot exit recovery failed', e));
         // Window-switch overlay: this window's files are loaded and its tabs restored.
         if (typeof window.profileLoadingReady === 'function') window.profileLoadingReady(db && db.name);
         // App shortcut (/?action=...): everything it can click now exists and any saved tabs are back.
@@ -1555,6 +1559,8 @@ function showContextMenu(e, file) {
     addOption('ri-file-copy-line', 'Copy', () => { window.workspaceClipboardRegistry[activeWinId] = { action: 'copy', files: targets, sourceDb: db.name }; });
     // Compare (js/core/diff-editor.js): Select for Compare on one file, then Compare with Selected on another.
     if (!isMulti && window.CodeMiniDiff) window.CodeMiniDiff.explorerOptions(file).forEach(o => addOption(o.icon, o.text, o.handler));
+    // Local History (js/core/file-history.js): the Timeline section lists this file's saved versions.
+    if (!isMulti && window.CodeMiniHistory) window.CodeMiniHistory.explorerOptions(file).forEach(o => addOption(o.icon, o.text, o.handler));
 
     addOption('ri-file-copy-fill', 'Duplicate', async () => {
         const txRead = db.transaction('filesystem', 'readonly');

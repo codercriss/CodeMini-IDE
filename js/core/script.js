@@ -645,7 +645,7 @@ document.getElementById('workspaceMenuBtn')?.addEventListener('click', (e) => {
                                 tx.oncomplete = () => {
                                     rootDb.close();
                                     // Fix: Delete the isolated database for the workspace to prevent ghost DB leaks
-                                    try { indexedDB.deleteDatabase(wsDbName); } catch (err) {}
+                                    try { indexedDB.deleteDatabase(wsDbName); window.CodeMiniHistory?.purgeDatabases([wsDbName]); } catch (err) {}
                                     // Everything else that was keyed to that database goes too: its saved trust decision,
                                     // and anything of its in the recycle bin (which could only ever be restored into a
                                     // database that no longer exists).
@@ -1239,6 +1239,7 @@ window.performActiveSave = function() {
             if (editorContainer) {
                 const editor = window.monaco.editor.getEditors().find(e => editorContainer.contains(e.getContainerDomNode()));
                 if (editor) {
+                    if (window.CodeMiniHistory) window.CodeMiniHistory.markManual(activeTab.dataset.fileId); // Ctrl+S: a deliberate save, shown as such in Timeline
                     if (window.appSettings && window.appSettings.formatOnSave && !editor._isFormatting) {
                         editor._isFormatting = true;
                         try { editor.getAction('editor.action.formatDocument')?.run().finally(() => { editor._isFormatting = false; if(typeof window.autoSaveFile === 'function') window.autoSaveFile(activeTab.dataset.fileId, editor.getValue(), activeTab); }); } 

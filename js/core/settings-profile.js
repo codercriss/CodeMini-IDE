@@ -99,6 +99,11 @@ window.reloadSettings = function(winId = null, isProfile = false) {
     // Existing Settings
     autoSave: localStorage.getItem(getPrefixedKey('autoSave')) || 'After Delay',
     autoSaveDelay: parseInt(localStorage.getItem(getPrefixedKey('autoSaveDelay'))) || 1000,
+    // Hot exit and Local History (js/core/file-history.js). Explicit values, so adding a mode later cannot shift them.
+    hotExit: pickOption('hotExit', ['On', 'Off'], 'On'),
+    localHistory: pickOption('localHistory', ['On', 'Off'], 'On'),
+    historyMaxEntries: Math.min(500, Math.max(1, parseInt(localStorage.getItem(getPrefixedKey('historyMaxEntries'))) || 50)),
+    historyMaxDays: Math.min(365, Math.max(1, parseInt(localStorage.getItem(getPrefixedKey('historyMaxDays'))) || 14)),
     formatOnSave: localStorage.getItem(getPrefixedKey('formatOnSave')) === 'true',
     restoreSession: localStorage.getItem(getPrefixedKey('restoreSession')) !== 'false',
     enableTrashBin: localStorage.getItem(getPrefixedKey('enableTrashBin')) !== 'false',
@@ -259,6 +264,8 @@ window.saveSetting = function(key, value) {
   if (key === 'insertSpaces' || key === 'tabSize') {
       if (typeof window.updateSpacesText === 'function') window.updateSpacesText();
   }
+  // Auto Save switch, Hot Exit, Local History: keep the status item, the backups and the Timeline in step.
+  if (window.CodeMiniHistory && (key === 'autoSave' || key === 'hotExit' || key === 'localHistory' || key === 'historyMaxEntries' || key === 'historyMaxDays')) window.CodeMiniHistory.onSettingChanged(key);
 };
 
 // Application-wide Exit Hook 
@@ -508,7 +515,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     Object.assign(window.appSettings, {
       explorerDefaultView: 'List View', treeViewIndent: 15, profileAccentTint: true, syncProfileSettings: false, confirmBeforeExit: false, showBreadcrumbs: true, compactExplorer: false, performanceMode: false, clearTrashOnExit: false,
-      autoSave: 'After Delay', autoSaveDelay: 1000, formatOnSave: false, restoreSession: true, enableTrashBin: true, autoCheckUpdates: true, maxMemory: 1024, fontSize: 13, fontFamily: "'Fira Code', monospace", fontWeight: 'normal', lineHeight: 21, letterSpacing: 0.3, fontLigatures: true, tabSize: 4, insertSpaces: true, wordWrap: 'off', minimap: false, lineNumbers: 'on', renderWhitespace: 'none', bracketPairs: true, smoothScrolling: true, cursorStyle: 'line', cursorBlinking: 'blink', mouseWheelZoom: false, editorFolding: true, renderLineHighlight: 'line', matchBrackets: 'always', cursorWidth: 2, colorTheme: 'CodeMini Light', iconTheme: 'Remix Icons', accentColor: '#3794ff', sidebarPosition: 'Left', activityBar: true, showWindowBar: true, windowOpacity: 100, nbAutoInstall: true, nbClearOnRestart: false, nbConfirmDelete: true, nbPlotBackground: 'White', nbCellFontSize: 13, nbCellFontFamily: "'Fira Code', monospace", nbCellLineHeight: 21, nbCellLetterSpacing: 0.3, nbCellLineNumbers: 'off', nbCellWordWrap: 'on', nbCellFolding: false, nbCellMinimap: false, nbCellRenderWhitespace: 'none', nbCellBracketPairs: true, nbCellCursorStyle: 'line', nbCellCursorBlinking: 'expand', nbCellSmoothScrolling: true, consoleAutoClear: false, consoleShowTimestamps: false, consoleAutoInstall: true, consoleMaxHistory: 50, consoleFontSize: 14, consoleFontFamily: "var(--font-mono)", consoleLineHeight: 21, consoleWordWrap: 'on', termFontSize: 13, termFontFamily: "'Fira Code', Consolas, monospace", termTextColor: "#d4d4d4", termPromptColor: "#4caf50", termCmdColor: "#ffffff", termHistorySize: 100,
+      autoSave: 'After Delay', autoSaveDelay: 1000, hotExit: 'On', localHistory: 'On', historyMaxEntries: 50, historyMaxDays: 14, formatOnSave: false, restoreSession: true, enableTrashBin: true, autoCheckUpdates: true, maxMemory: 1024, fontSize: 13, fontFamily: "'Fira Code', monospace", fontWeight: 'normal', lineHeight: 21, letterSpacing: 0.3, fontLigatures: true, tabSize: 4, insertSpaces: true, wordWrap: 'off', minimap: false, lineNumbers: 'on', renderWhitespace: 'none', bracketPairs: true, smoothScrolling: true, cursorStyle: 'line', cursorBlinking: 'blink', mouseWheelZoom: false, editorFolding: true, renderLineHighlight: 'line', matchBrackets: 'always', cursorWidth: 2, colorTheme: 'CodeMini Light', iconTheme: 'Remix Icons', accentColor: '#3794ff', sidebarPosition: 'Left', activityBar: true, showWindowBar: true, windowOpacity: 100, nbAutoInstall: true, nbClearOnRestart: false, nbConfirmDelete: true, nbPlotBackground: 'White', nbCellFontSize: 13, nbCellFontFamily: "'Fira Code', monospace", nbCellLineHeight: 21, nbCellLetterSpacing: 0.3, nbCellLineNumbers: 'off', nbCellWordWrap: 'on', nbCellFolding: false, nbCellMinimap: false, nbCellRenderWhitespace: 'none', nbCellBracketPairs: true, nbCellCursorStyle: 'line', nbCellCursorBlinking: 'expand', nbCellSmoothScrolling: true, consoleAutoClear: false, consoleShowTimestamps: false, consoleAutoInstall: true, consoleMaxHistory: 50, consoleFontSize: 14, consoleFontFamily: "var(--font-mono)", consoleLineHeight: 21, consoleWordWrap: 'on', termFontSize: 13, termFontFamily: "'Fira Code', Consolas, monospace", termTextColor: "#d4d4d4", termPromptColor: "#4caf50", termCmdColor: "#ffffff", termHistorySize: 100,
       workspaceTrustEnabled: true, workspaceTrustUntrustedFiles: 'Prompt', workspaceTrustEmptyWindow: true, workspaceTrustStartupPrompt: 'Once', workspaceTrustBanner: 'Until Dismissed',
       isolationMode: 'Isolated', isolationPreview: 'Use global', isolationConsole: 'Use global', isolationTerminal: 'Use global', isolationNotebooks: 'Use global'
     });
@@ -1144,6 +1151,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="settings-item"><div class="settings-item-info"><strong>Auto Save Delay</strong><span>Delay in ms to trigger auto save</span></div><div class="settings-control"><input type="number" data-setting="autoSaveDelay" style="width: 80px;"></div></div>
           <div class="settings-item"><div class="settings-item-info"><strong>Format On Save</strong><span>Format a file on save</span></div><div class="settings-control"><input type="checkbox" data-setting="formatOnSave"></div></div>
           <div class="settings-item"><div class="settings-item-info"><strong>Restore Session</strong><span>Reopen tabs from previous session</span></div><div class="settings-control"><input type="checkbox" data-setting="restoreSession"></div></div>
+          <div class="settings-item"><div class="settings-item-info"><strong>Hot Exit</strong><span>Keep text you have typed but not saved, and bring it back after a reload or crash</span></div><div class="settings-control"><select data-setting="hotExit"><option value="On">On</option><option value="Off">Off</option></select></div></div>
           <div class="settings-item"><div class="settings-item-info"><strong>Enable Trash Bin</strong><span>Move deleted items to recycle bin</span></div><div class="settings-control"><input type="checkbox" data-setting="enableTrashBin"></div></div>
 
           <h3 class="settings-category-title">System</h3>
@@ -1284,6 +1292,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
           <h3 class="settings-category-title">Data Privacy</h3>
           <div class="settings-item"><div class="settings-item-info"><strong>Clear Trash on Exit</strong><span>Automatically empty the recycle bin when closing the app</span></div><div class="settings-control"><input type="checkbox" data-setting="clearTrashOnExit"></div></div>
+
+          <h3 class="settings-category-title">Local History</h3>
+          <div class="settings-item"><div class="settings-item-info"><strong>Local History</strong><span>Keep earlier versions of a code file each time it is saved (Explorer &gt; Timeline). Locked files are never kept.</span></div><div class="settings-control"><select data-setting="localHistory"><option value="On">On</option><option value="Off">Off</option></select></div></div>
+          <div class="settings-item"><div class="settings-item-info"><strong>Versions per file</strong><span>Older versions beyond this are removed</span></div><div class="settings-control"><input type="number" data-setting="historyMaxEntries" min="1" max="500" style="width: 80px;"></div></div>
+          <div class="settings-item"><div class="settings-item-info"><strong>Keep for (days)</strong><span>Versions older than this are removed</span></div><div class="settings-control"><input type="number" data-setting="historyMaxDays" min="1" max="365" style="width: 80px;"></div></div>
+          <div class="settings-item"><div class="settings-item-info"><strong>Clear Local History</strong><span>Delete every kept version of every file, in all windows.</span></div><div class="settings-control"><button class="settings-danger-btn" id="btnClearLocalHistory">Clear History</button></div></div>
 
           <h3 class="settings-category-title">Cache Management</h3>
           <div class="settings-item"><div class="settings-item-info"><strong>Clear UI State Cache</strong><span>Resets layout, sidebar, and tab states for the active window/profile.</span></div><div class="settings-control"><button class="settings-danger-btn" id="btnClearUIState" style="color: var(--text-main); background: var(--bg-panel); border-color: var(--border-color);">Clear Cache</button></div></div>
@@ -1671,6 +1685,18 @@ document.addEventListener('DOMContentLoaded', () => {
           }
 
           // Clear UI Caches Logic
+          const btnClearHistory = document.getElementById('btnClearLocalHistory');
+          if (btnClearHistory) {
+            btnClearHistory.addEventListener('click', () => {
+              if (!window.CodeMiniHistory || !window.showCustomModal) return;
+              window.showCustomModal({ title: 'Clear Local History', text: 'Every kept version of every file will be deleted, in all windows. The files themselves are not changed.', submitText: 'Clear History' }, async () => {
+                await window.CodeMiniHistory.clearAllHistory();
+                closeGenModal();
+                if (window.showSuccessToast) window.showSuccessToast('Local History cleared.');
+              });
+            });
+          }
+
           const btnClearUI = document.getElementById('btnClearUIState');
           if (btnClearUI) {
             btnClearUI.addEventListener('click', () => {
@@ -1756,6 +1782,8 @@ document.addEventListener('DOMContentLoaded', () => {
                   const wipeDatabaseDeep = (dbName) => {
                     return new Promise((resolve) => {
                       const finish = async (workspaceDbs) => {
+                        // Local History and hot-exit copies of these databases' files live in a shared store: they go first.
+                        if (window.CodeMiniHistory) await window.CodeMiniHistory.purgeDatabases([...workspaceDbs, dbName]);
                         await Promise.all([...workspaceDbs, dbName].map(deleteDbAndWait));
                         resolve();
                       };

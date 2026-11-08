@@ -181,7 +181,7 @@ const ws1 = { id: 'ws1', name: 'Workspace 1', isWorkspaceRoot: true, parentDb: '
     assert(!/initDatabase\(cellActiveWindow\.db, \(\) => loadFilesFromDB\(\)\)/.test(src), 'a path still renders the saved location unchecked');
   });
   await t('Delete Workspace removes the record from the root database and always refreshes', () => {
-    const i = scriptSrc.indexOf("title: 'Delete Workspace'"); const block = scriptSrc.slice(i, i + 2500);
+    const i = scriptSrc.indexOf("title: 'Delete Workspace'"); const block = scriptSrc.slice(i, i + 3000); // wide enough for the Local History purge that now sits in this block
     assert(/indexedDB\.open\(cellActiveWindow\.db/.test(block), 'must open the root database');
     assert(!/db\.transaction\('filesystem', 'readwrite'\)/.test(block), 'must not delete through whichever db is open');
     assert(/loadFilesFromDB\(\)/.test(block));

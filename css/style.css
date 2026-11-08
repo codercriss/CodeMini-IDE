@@ -4795,3 +4795,54 @@ html.is-pwa code, html.is-pwa samp {
     user-select: text;
     -webkit-touch-callout: default;
 }
+
+/* ---------------------------------------------------------------------------------------------
+   Local History: Explorer > Timeline, and the Auto Save switch in the status bar (js/core/file-history.js).
+   Flat list in the app's own language: a section header over full-bleed rows with a dashed divider. No cards.
+   --------------------------------------------------------------------------------------------- */
+.tl-section { flex-shrink: 0; display: flex; flex-direction: column; min-height: 0; border-top: 1px solid var(--border-color); background: var(--bg-white); }
+.tl-header { display: flex; align-items: center; padding: 0 6px 0 0; }
+.tl-toggle { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 8px 10px 8px 6px; border: 0; background: none; color: var(--text-muted); font: inherit; font-size: 11px; font-weight: 700; letter-spacing: 0.4px; cursor: pointer; text-align: left; }
+.tl-toggle:hover { background: var(--bg-panel); }
+.tl-toggle:focus-visible, .tl-clear:focus-visible, .tl-act:focus-visible, .tl-main:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: -2px; }
+.tl-chevron { font-size: 16px; transition: transform 0.15s; flex-shrink: 0; }
+.tl-section.tl-open .tl-chevron { transform: rotate(90deg); }
+.tl-title { flex-shrink: 0; }
+.tl-file { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; letter-spacing: 0; color: var(--text-main); opacity: 0.75; }
+.tl-count { flex-shrink: 0; margin-left: auto; font-size: 10px; font-weight: 700; color: var(--text-muted); }
+.tl-count:empty { display: none; }
+.tl-clear { flex-shrink: 0; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 3px; background: none; color: var(--text-muted); font-size: 14px; cursor: pointer; opacity: 0.7; }
+.tl-clear[hidden] { display: none; }
+.tl-clear:hover { background: var(--bg-panel); opacity: 1; }
+.tl-clear.tl-armed { color: var(--color-danger); opacity: 1; }
+.tl-body { max-height: 38vh; min-height: 56px; overflow-y: auto; padding-bottom: 4px; }
+.tl-body[hidden] { display: none; }
+.tl-empty { padding: 10px 15px 12px; font-size: 11px; color: var(--text-muted); }
+.tl-row { position: relative; display: flex; align-items: stretch; border-bottom: 1px dashed var(--border-color); }
+.tl-row:hover, .tl-row:focus-within { background: var(--bg-panel); }
+.tl-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px; padding: 6px 4px 6px 15px; border: 0; background: none; color: var(--text-main); font: inherit; text-align: left; cursor: pointer; }
+.tl-dot { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; box-sizing: border-box; border: 1.5px solid var(--accent-blue); }
+.tl-dot.tl-manual { background: var(--accent-blue); }
+.tl-dot.tl-auto { background: transparent; }
+.tl-dot.tl-closed { background: transparent; border-color: var(--icon-yellow); border-style: dashed; }
+.tl-text { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.tl-time { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-meta { font-size: 10px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.tl-add { color: var(--accent-new); font-weight: 600; }
+.tl-rem { color: var(--color-danger); font-weight: 600; }
+.tl-actions { flex-shrink: 0; display: none; align-items: center; gap: 2px; padding-right: 8px; }
+.tl-row:hover .tl-actions, .tl-row:focus-within .tl-actions { display: inline-flex; }
+.tl-act { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 3px; background: none; color: var(--text-muted); font-size: 14px; cursor: pointer; }
+.tl-act:hover { background: var(--hover-blue); color: var(--accent-blue); }
+.tl-act[data-tl-action="delete"]:hover { color: var(--color-danger); }
+@media (hover: none) { .tl-actions { display: inline-flex; } }
+@media (max-width: 768px) {
+    .tl-main { min-height: 44px; }
+    .tl-act { width: 40px; height: 44px; }
+    .tl-toggle { min-height: 44px; }
+    #statusAutoSave { min-width: 36px; justify-content: center; padding: 6px 0; margin: -6px 0; } /* icon only on a phone: a finger needs more than 14px; the margin keeps the bar's height */
+}
+#statusAutoSave { gap: 5px; cursor: pointer; }
+#statusAutoSave.as-off { opacity: 0.75; }
+#statusAutoSave.as-off i { color: var(--icon-yellow); }
+#statusAutoSave:focus-visible { outline: 1px solid var(--accent-blue); outline-offset: -1px; }

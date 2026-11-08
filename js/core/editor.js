@@ -1159,6 +1159,8 @@ window.autoSaveFile = function(fileId, newContent, tabEl, encoding, explicitDbNa
                         tabEl.classList.add('saved-pulse'); 
                         setTimeout(() => tabEl.classList.remove('saved-pulse'), 1000);
                     }
+                    // Local history + hot exit (js/core/file-history.js): this text is now what the file holds.
+                    try { if (window.CodeMiniHistory) window.CodeMiniHistory.noteSaved({ tabEl, dbName: targetDbName, file, content: newContent }); } catch (e) { /* history must never break saving */ }
                     isolatedDb.close();
                 };
             } else {
@@ -1314,6 +1316,7 @@ function switchTab(targetId) {
     if (typeof pushNavState === 'function') setTimeout(pushNavState, 50);
 
     if(window.updateDebugPanel) window.updateDebugPanel();
+    try { if (window.CodeMiniHistory) window.CodeMiniHistory.noteActiveChanged(); } catch (e) { /* Timeline follows the active file */ }
 }
 
 function updateOpenedTabsRegistry() {
@@ -1341,6 +1344,8 @@ function updateOpenedTabsRegistry() {
 // closeTab (single tab) AND window.teardownAllOpenPanes (bulk, see below) so
 // the two paths can never drift out of sync with each other.
 function teardownPaneResources(tabElement, paneElement) {
+    // Keeps typed-but-unsaved text in Local History and drops its hot-exit copy (closing on purpose is not a crash).
+    try { if (window.CodeMiniHistory) window.CodeMiniHistory.tabClosing(tabElement); } catch (e) { /* never block closing */ }
     // Monaco's own delayed-autosave timer (see editor.onDidChangeModelContent
     // above) - cancel it here rather than letting it fire later, whether
     // this tab is closing outright or just getting swept up in a window
@@ -1451,6 +1456,7 @@ function closeTab(tabElement, paneElement, group) {
         if (window.saveCurrentUIState) window.saveCurrentUIState();
     }
     updateOpenedTabsRegistry(); window.updatePlayIconVisibility();
+    try { if (window.CodeMiniHistory) window.CodeMiniHistory.noteActiveChanged(); } catch (e) { /* Timeline follows the active file */ }
 }
 
 // --- FILE BREADCRUMB DYNAMIC INJECTION ---
@@ -1678,9 +1684,11 @@ window.createNewTab = function(title, iconClass, isUnsaved = false, contentHTML 
                     guides: { bracketPairs: window.appSettings ? window.appSettings.bracketPairs : true }
                 });
 
+                try { if (tabType === 'monaco' && window.CodeMiniHistory) window.CodeMiniHistory.noteOpened(tab, String(contentHTML || ''), editor); } catch (e) { /* history must never break opening */ }
                 let saveTimeout;
                 editor.onDidChangeModelContent(() => {
                     tab.classList.add('unsaved-blink');
+                    try { if (tabType === 'monaco' && window.CodeMiniHistory) window.CodeMiniHistory.noteEdit(tab); } catch (e) { /* hot exit must never break typing */ }
                     
                     if (window.appSettings && window.appSettings.autoSave === 'After Delay') {
                         clearTimeout(saveTimeout);

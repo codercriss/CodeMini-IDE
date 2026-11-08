@@ -337,6 +337,7 @@
         closeMenu();
         const items = [];
         if (tab.dataset.type === 'monaco' && tab.dataset.fileId) items.push({ icon: 'ri-arrow-left-right-line', text: 'Compare with Saved', run: () => compareWithSaved(tab) });
+        if (tab.dataset.type === 'monaco' && tab.dataset.fileId && W.CodeMiniHistory) items.push({ icon: 'ri-history-line', text: 'Local History...', run: () => W.CodeMiniHistory.showForTab(tab) });
         items.push({ icon: 'ri-close-line', text: 'Close', run: () => { const b = tab.querySelector('.tab-close'); if (b) b.click(); } });
         items.push({ icon: 'ri-close-circle-line', text: 'Close Others', run: () => {
             const group = tab.closest('.editor-group');

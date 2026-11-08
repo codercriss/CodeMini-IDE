@@ -140,7 +140,7 @@ const real = (c, n, x) => { if (REAL) ok(c, n, x); else { skipped++; console.log
   await ev(() => { const ed = getActiveMonacoEditor(); ed.executeEdits('t', [{ range: { startLineNumber: 2, startColumn: 1, endLineNumber: 2, endColumn: 4 }, text: 'EDITED' }]); });
   await page.locator('.tab', { hasText: 'a.js' }).first().click({ button: 'right' }); await sleep(300);
   const items = await ev(() => Array.from(document.querySelectorAll('.df-menu-item')).map(i => i.textContent));
-  ok(items.join() === 'Compare with Saved,Close,Close Others', 'right-clicking a file tab offers Compare with Saved, Close and Close Others', items);
+  ok(items.join() === 'Compare with Saved,Local History...,Close,Close Others', 'right-clicking a file tab offers Compare with Saved, Local History..., Close and Close Others', items);
   await page.keyboard.press('Escape'); await sleep(200);
   ok(!(await ev(() => !!document.querySelector('.df-menu'))), 'Esc closes the menu');
   await page.locator('.tab', { hasText: 'a.js' }).first().click({ button: 'right' }); await sleep(300);

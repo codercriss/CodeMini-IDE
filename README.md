@@ -70,6 +70,7 @@ It is built to be usable on a phone as well as a laptop.
 
 - **Multiple windows and profiles**, each with its own isolated file storage and UI state
 - **Git and GitHub integration** (clone/import, pull, push) using your own token. Push works like `git push`: your commits arrive as real commits and the branch moves once
+- **Local History and hot exit.** Earlier versions of a code file are kept each time it is saved (Explorer > Timeline: compare, restore), and text you typed but did not save comes back after a reload or crash. A switch in the status bar turns Auto Save on and off
 - **Built-in viewers** for PDF, Word documents, images, audio, video and archives
 - **Themes**, light and dark
 
@@ -226,6 +227,7 @@ MONACO_DIR=/tmp/node_modules/monaco-editor/min npm run test:e2e -- diff-editor
 | `app-info.test.js` | Keeps version, links and About page consistent with the repo |
 | `release-history.test.js` | Keeps the in-app version history in step with `CHANGELOG.md` and the app version |
 | `bin-restore-confirm.test.js` | Stacks > Recycle Bin: Restore and Restore All ask first |
+| `file-history.test.js` | Local History and hot exit rules: fingerprints, line counts, what may be copied (never a locked file), merging, pruning, the global sweep, recovery planning (live windows, deleted and changed files), and the wiring into the editor, the delete paths and Settings |
 | `diff-editor.test.js` | The diff editor's helpers: where each change is, stepping with wrap-around, the counter text, language from the file name, tab titles |
 | `name-conflicts.test.js` | The Replace / Skip / Rename planner: what is asked and when, apply-to-all, Stop, and what can never be replaced (locked items, anything holding the source, a name taken inside the same batch) |
 | `quick-open.test.js` | Quick Open's fuzzy matching (letter positions, word starts, camelCase), ranking, `> : @ #` and `name:line` parsing, the recent list, and speed on 5,000 files |
@@ -245,6 +247,7 @@ MONACO_DIR=/tmp/node_modules/monaco-editor/min npm run test:e2e -- diff-editor
 | --- | --- |
 | `workspace-trust.e2e.js` | Trust prompt, Restricted Mode, banner, settings and persistence |
 | `terminal-trust.e2e.js` | Terminal refuses to run files in a restricted workspace |
+| `file-history.e2e.js` | Auto Save switch, Timeline (open, compare, Restore with undo, delete, clear), saves leaving versions on the real IndexedDB, locked files never copied, and the whole hot-exit cycle: type, reload, recovered tab, notification and Review, a changed or deleted file, a second window. Needs `MONACO_DIR` for the editor checks (about 170 s) |
 | `diff-editor.e2e.js` | The diff tab with a real Monaco diff editor: Select for Compare / Compare with Selected, stepping through changes, Unified/Split, Ignore whitespace, Refresh, identical / binary / locked files, the tab's right-click menu and Compare with Saved, Source Control's popup, Open in tab and double-click, the Quick Open compare commands, no restore after a reload, phone layout. Needs `MONACO_DIR` (below); without it the editor checks are reported as SKIP |
 | `quick-open-monaco.e2e.js` | Quick Open's go-to-line (`:42`, `:100:4`, `file.txt:77`) against a real Monaco: cursor, scroll and focus. Needs `MONACO_DIR`; without it, SKIP |
 | `name-conflicts.e2e.js` | The clash dialog in the real app: Copy/Cut + Paste through the Explorer's right-click menus, multi-select with apply-to-all and Stop, drag-and-drop, imports of files, folders and JSON exports, a workspace in another database, the Recycle Bin, locked files, open tabs, phone size |

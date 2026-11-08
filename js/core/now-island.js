@@ -793,6 +793,8 @@
         'open-source-control': { label: 'Open Source Control', primary: true, show: () => true, run: () => openSidebarVia('menuSource', 'sourceControlSidebar') },
         'open-keys': { label: 'Open My Keys', primary: true, show: () => true, run: () => openSidebarVia('menuKeys', 'keysSidebar') },
         'open-security': { label: 'Open Security settings', primary: false, show: () => true, run: () => openSettingsPage('security') },
+        // Hot exit (file-history.js): compare each recovered file with its saved version. Hidden once those tabs are gone.
+        'review-recovered': { label: 'Review', primary: true, show: () => !!(window.CodeMiniHistory && window.CodeMiniHistory.hasReview()), run: () => { if (window.CodeMiniHistory) window.CodeMiniHistory.reviewRecovered(); } },
         // Needs a click (a user gesture): the browser may ask permission. app-alerts.js owns the logic.
         'protect-storage': {
             label: 'Protect my files', primary: true,

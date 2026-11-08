@@ -238,6 +238,11 @@
                 const tab = W.CodeMiniDiff && W.CodeMiniDiff.activeFileTab();
                 if (!tab) { if (W.showSuccessToast) W.showSuccessToast('Open a code file first.'); return; }
                 W.CodeMiniDiff.compareWithSaved(tab);
+            } },
+            { name: 'Show Local History for Active File', icon: 'ri-history-line', run: () => {
+                const tab = W.CodeMiniDiff && W.CodeMiniDiff.activeFileTab();
+                if (!tab || !W.CodeMiniHistory) { if (W.showSuccessToast) W.showSuccessToast('Open a code file first.'); return; }
+                W.CodeMiniHistory.showForTab(tab);
             } }
         ];
     }

@@ -47,6 +47,7 @@ const STATIC_ASSETS = [
     '/js/viewers/pdf-viewer.js',
     '/js/core/quick-open.js',
     '/js/core/diff-editor.js',
+    '/js/core/file-history.js',
     '/js/core/script.js',
     '/js/core/workspace-trust.js',
     '/js/core/help-feedback.js',

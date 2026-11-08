@@ -15,7 +15,8 @@ function makeEnv({ controlled, updateImpl }) {
     return e;
   };
   const doc = { body: el('body'), readyState: 'complete', getElementById: () => null, createElement: el, createTextNode: (s) => s,
-    addEventListener() {}, visibilityState: 'visible' };
+    addEventListener() {}, visibilityState: 'visible',
+    documentElement: { classList: { toggle() {}, add() {}, remove() {} } } };
   const registration = { installing: null, waiting: null, update: () => updateImpl(registration) };
   const sw = { controller: controlled ? {} : null,
     addEventListener: (ev, fn) => { swListeners[ev] = fn; },
