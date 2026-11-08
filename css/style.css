@@ -4800,7 +4800,7 @@ html.is-pwa code, html.is-pwa samp {
    Local History: Explorer > Timeline, and the Auto Save switch in the status bar (js/core/file-history.js).
    Flat list in the app's own language: a section header over full-bleed rows with a dashed divider. No cards.
    --------------------------------------------------------------------------------------------- */
-.tl-section { flex-shrink: 0; display: flex; flex-direction: column; min-height: 0; border-top: 1px solid var(--border-color); background: var(--bg-white); }
+.tl-section { position: relative; flex-shrink: 0; display: flex; flex-direction: column; min-height: 0; border-top: 1px solid var(--border-color); background: var(--bg-white); }
 .tl-header { display: flex; align-items: center; padding: 0 6px 0 0; }
 .tl-toggle { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 8px 10px 8px 6px; border: 0; background: none; color: var(--text-muted); font: inherit; font-size: 11px; font-weight: 700; letter-spacing: 0.4px; cursor: pointer; text-align: left; }
 .tl-toggle:hover { background: var(--bg-panel); }
@@ -4817,6 +4817,10 @@ html.is-pwa code, html.is-pwa samp {
 .tl-clear.tl-armed { color: var(--color-danger); opacity: 1; }
 .tl-body { max-height: 38vh; min-height: 56px; overflow-y: auto; padding-bottom: 4px; }
 .tl-body[hidden] { display: none; }
+.tl-body.tl-sized { box-sizing: border-box; max-height: none; }
+.tl-resizer { position: absolute; top: -3px; left: 0; right: 0; height: 6px; cursor: ns-resize; background: transparent; z-index: 5; transition: background 0.2s; touch-action: none; }
+.tl-resizer:hover, .tl-resizer.dragging, .tl-resizer:focus-visible { background: var(--accent-blue); outline: none; }
+.tl-section:not(.tl-open) .tl-resizer { display: none; }
 .tl-empty { padding: 10px 15px 12px; font-size: 11px; color: var(--text-muted); }
 .tl-row { position: relative; display: flex; align-items: stretch; border-bottom: 1px dashed var(--border-color); }
 .tl-row:hover, .tl-row:focus-within { background: var(--bg-panel); }

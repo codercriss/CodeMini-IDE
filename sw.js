@@ -1,6 +1,6 @@
 // Static app-shell cache. Matches the app version (package.json / Settings > About); bump it on every release
 // that changes a precached file so installed copies refresh (old caches are deleted on activate).
-const CACHE_NAME = 'codemini-static-v1.4.0';
+const CACHE_NAME = 'codemini-static-v1.5.0';
 // Deliberately NOT bumped with CACHE_NAME: everything already in here is a valid
 // (non-opaque) CDN response, and bumping would force every user to re-download
 // Pyodide/Monaco for no reason.

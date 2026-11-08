@@ -247,6 +247,94 @@ const BOOT = REAL ? 6500 : 5200;
     ok(!(await tl()).open && await ev(() => localStorage.getItem('codemini_timeline_open')) === '0', 'its open/closed state is remembered');
 
     // ------------------------------------------------------------------------------------------------
+    console.log('\n[Timeline: resizing]');
+    await seed(); await open('fa');
+    await ev(async ([n]) => { const H = CodeMiniHistory; for (let i = 1; i <= 5; i++) await H.history.record({ dbName: n, fileId: 'fa', name: 'a.js', content: 'v' + i + '\n', kind: 'manual', now: Date.now() - (6 - i) * 3600000 }); }, [dbName]);
+    const ACTIVE = await ev(() => localStorage.getItem('codemini_active_window'));
+    const setActive = (v) => ev((v) => { if (v === null) localStorage.removeItem('codemini_active_window'); else localStorage.setItem('codemini_active_window', v); window.dispatchEvent(new Event('resize')); }, v);
+    const WINK = await ev(() => 'codemini_timeline_height_' + (localStorage.getItem('codemini_active_window') || 'win_default'));
+    await ev((k) => localStorage.removeItem(k), WINK);
+    if (await ev(() => document.getElementById('explorerTimeline').classList.contains('tl-open'))) { await cur.click('#explorerTimeline .tl-toggle'); await sleep(200); }
+    const rz = () => ev(() => { const r = document.querySelector('#explorerTimeline .tl-resizer'); const cs = getComputedStyle(r); return { role: r.getAttribute('role'), orient: r.getAttribute('aria-orientation'), display: cs.display, h: r.getBoundingClientRect().height, cursor: cs.cursor, tab: r.tabIndex }; });
+    const bodyInfo = () => ev(() => { const b = document.getElementById('explorerTimelineBody'); return { h: b.offsetHeight, sized: b.classList.contains('tl-sized'), styleH: b.style.height, list: document.getElementById('fileList').offsetHeight, now: document.querySelector('#explorerTimeline .tl-resizer').getAttribute('aria-valuenow') }; });
+    const savedH = () => ev((k) => localStorage.getItem(k), WINK);
+    const near = (a, b, tol) => Math.abs(a - b) <= (tol || 2);
+    let r = await rz();
+    ok(r.display === 'none', 'while the Timeline is closed there is no handle', r);
+    await cur.click('#explorerTimeline .tl-toggle'); await sleep(500);
+    r = await rz();
+    ok(r.display !== 'none' && r.h === 6 && r.cursor === 'ns-resize', 'opened, the top edge has a 6px ns-resize handle (like the bottom panel\u2019s)', r);
+    ok(r.role === 'separator' && r.orient === 'horizontal' && r.tab === 0, 'it is a focusable separator for keyboard and screen-reader users', r);
+    let b0 = await bodyInfo();
+    ok(!b0.sized && b0.styleH === '' && await savedH() === null, 'until you resize it, the height is the default and nothing is saved', b0);
+
+    const drag = async (dy) => { const box = await cur.locator('#explorerTimeline .tl-resizer').boundingBox(); const x = box.x + box.width / 2, y = box.y + box.height / 2; await cur.mouse.move(x, y); await cur.mouse.down(); await cur.mouse.move(x, y + dy / 2, { steps: 4 }); await cur.mouse.move(x, y + dy, { steps: 4 }); await cur.mouse.up(); await sleep(200); };
+    await drag(-80);
+    let b1 = await bodyInfo();
+    ok(near(b1.h, b0.h + 80, 3) && b1.sized, 'dragging the edge up 80px makes the Timeline 80px taller', [b0.h, b1.h]);
+    ok(near(b1.list, b0.list - 80, 3), 'and the file list gives up exactly that much', [b0.list, b1.list]);
+    ok(near(parseInt(await savedH(), 10), b1.h, 1), 'the height is saved for this window', [await savedH(), b1.h]);
+    await drag(+1000);
+    let b2 = await bodyInfo();
+    ok(b2.h === 56, 'dragging far down stops at the 56px minimum', b2);
+    await drag(-1500);
+    let b3 = await bodyInfo();
+    ok(b3.list >= 118 && b3.list <= 124 && b3.h > b1.h, 'dragging far up stops while the file list still has about 120px', b3);
+    ok(await cur.locator('#explorerTimeline .tl-row').count() === 5, 'the rows are all still there and scroll inside', await cur.locator('#explorerTimeline .tl-row').count());
+
+    await cur.focus('#explorerTimeline .tl-resizer');
+    await cur.keyboard.press('ArrowDown'); await sleep(100);
+    let k1 = await bodyInfo();
+    ok(near(k1.h, b3.h - 16, 1), 'Down arrow on the handle: 16px shorter', [b3.h, k1.h]);
+    await cur.keyboard.press('Shift+ArrowDown'); await sleep(100);
+    let k2 = await bodyInfo();
+    ok(near(k2.h, k1.h - 64, 1), 'Shift+Down: 64px shorter', [k1.h, k2.h]);
+    await cur.keyboard.press('ArrowUp'); await sleep(100);
+    let k3 = await bodyInfo();
+    ok(near(k3.h, k2.h + 16, 1) && near(parseInt(await savedH(), 10), k3.h, 1) && near(parseInt(k3.now, 10), k3.h, 1), 'Up arrow: 16px taller, saved, and announced through aria-valuenow', k3);
+
+    await cur.dblclick('#explorerTimeline .tl-resizer'); await sleep(200);
+    let d1 = await bodyInfo();
+    ok(!d1.sized && d1.styleH === '' && await savedH() === null, 'double-clicking the handle puts the default back and forgets the saved height', d1);
+    await cur.focus('#explorerTimeline .tl-resizer'); await cur.keyboard.press('ArrowUp'); await sleep(100);
+    await cur.keyboard.press('Home'); await sleep(100);
+    ok(!(await bodyInfo()).sized && await savedH() === null, 'Home on the handle does the same');
+
+    const touchDrag = (dy) => ev((dy) => { const el = document.querySelector('#explorerTimeline .tl-resizer'); const r = el.getBoundingClientRect(); const x = r.left + r.width / 2, y = r.top + r.height / 2; const mk = (type, yy) => { const t = new Touch({ identifier: 1, target: el, clientX: x, clientY: yy }); return new TouchEvent(type, { touches: type === 'touchend' ? [] : [t], changedTouches: [t], bubbles: true, cancelable: true }); }; el.dispatchEvent(mk('touchstart', y)); document.dispatchEvent(mk('touchmove', y + dy / 2)); document.dispatchEvent(mk('touchmove', y + dy)); document.dispatchEvent(mk('touchend', y + dy)); }, dy);
+    const t0 = (await bodyInfo()).h;
+    await touchDrag(-60); await sleep(200);
+    const t1 = await bodyInfo();
+    ok(near(t1.h, t0 + 60, 3) && t1.sized && near(parseInt(await savedH(), 10), t1.h, 1), 'a finger drags it too (touch events), and it is saved', [t0, t1.h]);
+
+    await cur.click('#explorerTimeline .tl-toggle'); await sleep(200);
+    ok((await bodyInfo()).sized && near(parseInt(await savedH(), 10), t1.h, 1), 'closing and reopening keeps the size', await bodyInfo());
+    await cur.click('#explorerTimeline .tl-toggle'); await sleep(500);
+    ok(near((await bodyInfo()).h, t1.h, 1), 'reopened at the same height', [(await bodyInfo()).h, t1.h]);
+
+    const reach = async (target) => { const cur0 = (await bodyInfo()).h; await drag(cur0 - target); return (await bodyInfo()).h; };
+    const want = await reach(300);
+    ok(near(want, 300, 3) && near(parseInt(await savedH(), 10), want, 1), 'a 300px Timeline is chosen and saved', want);
+    await cur.setViewportSize({ width: 1280, height: 520 }); await sleep(600);
+    const small = await bodyInfo();
+    ok(small.h < want && small.list >= 112 && small.list <= 128, 'in a short window it shrinks so the file list keeps about 120px', small);
+    ok(parseInt(await savedH(), 10) === want, 'without forgetting the height you chose', await savedH());
+    await cur.setViewportSize({ width: 1280, height: 800 }); await sleep(600);
+    ok(near((await bodyInfo()).h, want, 1), 'and goes back to it when the window is tall again', [(await bodyInfo()).h, want]);
+
+    await ev(([k, v]) => localStorage.setItem(k, String(v)), [WINK, 230]);
+    await reload();
+    await ensureExplorer();
+    const rl = await bodyInfo();
+    ok(await ev(() => document.getElementById('explorerTimeline').classList.contains('tl-open')) && near(rl.h, 230, 1) && rl.sized, 'after a reload the Timeline comes back at its saved height', rl);
+    await setActive('win_other'); await sleep(400);
+    const other = await bodyInfo();
+    ok(!other.sized, 'a window with no saved height of its own shows the default (heights are per window)', other);
+    await setActive(ACTIVE); await sleep(400);
+    ok(near((await bodyInfo()).h, 230, 1), 'and switching back brings this window\u2019s own height back', (await bodyInfo()).h);
+    await ev((k) => localStorage.removeItem(k), WINK);
+    await cur.dblclick('#explorerTimeline .tl-resizer'); await sleep(150);
+    await cur.click('#explorerTimeline .tl-toggle'); await sleep(200);
+
     console.log('\n[Hot exit: type, reload, get it back]');
     await seed(); await open('fa');
     ok((await backups()).length === 0, 'nothing is backed up before anything is typed');

@@ -897,6 +897,20 @@ document.addEventListener('DOMContentLoaded', () => {
   // Text is trusted, static markup (it carries <strong> and entities), so it is not escaped.
   const _RELEASES = [
     {
+      version: '1.5.0', icon: 'ri-history-line', date: '8 Nov 2026',
+      summary: 'Quick Open, a diff editor, Local History with a resizable Timeline, hot exit, and git in the terminal.',
+      features: [
+        '<strong>Quick Open:</strong> <strong>Ctrl+P</strong> finds files by a few letters of their name, <strong>F1</strong> or Ctrl+Shift+P runs commands, and recent files come first. It works from the keyboard alone, and on a phone it opens under the top bar.',
+        '<strong>Diff editor:</strong> compare two files, a file with its saved version, or a Git change in an editor tab, with the diff view the app already loads, so it works offline.',
+        '<strong>Local History:</strong> every save of a code file keeps a version. Explorer &rsaquo; <strong>Timeline</strong> lists them, compares them with the file, restores them, and can be dragged to any height. Up to 50 versions per file for 14 days; locked files are never copied.',
+        '<strong>Hot exit:</strong> text you typed but did not save comes back after a reload or crash, still unsaved, with a Review button that compares it with the saved file. Closing a tab no longer loses its text silently: it stays in the Timeline as &ldquo;Closed unsaved&rdquo;.',
+        '<strong>Auto Save switch</strong> in the status bar turns Auto Save off, and back to the mode you had, in one click.',
+        '<strong>A name already in use now asks</strong> (Replace, Skip or Rename) instead of renaming, for copy, paste, drag and drop, moves, imports and Recycle Bin restores.',
+        '<strong>git in the terminal:</strong> the integrated terminal has a <strong>git</strong> command that works on the same repository as Source Control.',
+        '<strong>Recycle Bin restore asks first,</strong> so a mis-tap on a phone cannot put files back by accident.'
+      ]
+    },
+    {
       version: '1.4.0', icon: 'ri-shield-check-line', date: '31 Oct 2026',
       summary: 'Code you run is isolated from your files, token and keys. Push is now a real push.',
       features: [

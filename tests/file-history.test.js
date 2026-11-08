@@ -3,7 +3,7 @@
 // tests/e2e/file-history.e2e.js.
 const assert = require('assert');
 const H = require('../js/core/file-history.js');
-const { LIMITS, fnv1a, fileKey, lineDelta, formatSize, relativeTime, canKeep, shouldMerge, planPrune, planSweep, planRecovery, memoryStore, createHistory } = H;
+const { LIMITS, clampHeight, fnv1a, fileKey, lineDelta, formatSize, relativeTime, canKeep, shouldMerge, planPrune, planSweep, planRecovery, memoryStore, createHistory } = H;
 let n = 0;
 const t = async (name, fn) => { await fn(); n++; console.log('  ok', name); };
 const MIN = 60000, DAY = 86400000;
@@ -49,6 +49,25 @@ const MIN = 60000, DAY = 86400000;
     assert.strictEqual(canKeep({ type: 'file' }, 'x'.repeat(LIMITS.maxSnapshotChars)), true);
     assert.strictEqual(canKeep({ type: 'file' }, 'x'.repeat(LIMITS.maxSnapshotChars + 1)), false);
     assert.strictEqual(canKeep({ type: 'file' }, 'x'.repeat(LIMITS.maxBackupChars), LIMITS.maxBackupChars), true);
+  });
+
+  console.log('resizing the Timeline');
+  await t('a Timeline height is kept between the minimum and what leaves the file list its own minimum', () => {
+    // body 200 + list 400: the pair is 600 while dragging, and the list must keep 120, so the body can reach 480.
+    assert.strictEqual(clampHeight(300, 200, 400, 56, 120), 300);
+    assert.strictEqual(clampHeight(480, 200, 400, 56, 120), 480);
+    assert.strictEqual(clampHeight(481, 200, 400, 56, 120), 480, 'one pixel more would take the list under 120');
+    assert.strictEqual(clampHeight(9999, 200, 400, 56, 120), 480);
+    assert.strictEqual(clampHeight(56, 200, 400, 56, 120), 56);
+    assert.strictEqual(clampHeight(10, 200, 400, 56, 120), 56, 'never smaller than the minimum');
+    assert.strictEqual(clampHeight(-50, 200, 400, 56, 120), 56);
+  });
+  await t('in a window too small for both minimums the minimum wins, and junk input is the minimum', () => {
+    assert.strictEqual(clampHeight(300, 60, 40, 56, 120), 56, 'there is no room to grow: stay at the minimum');
+    assert.strictEqual(clampHeight(NaN, 200, 400, 56, 120), 56);
+    assert.strictEqual(clampHeight(undefined, 200, 400, 56, 120), 56);
+    assert.strictEqual(clampHeight('250', 200, 400, 56, 120), 250, 'a stored string is a number');
+    assert.strictEqual(clampHeight(250.6, 200, 400, 56, 120), 251, 'whole pixels');
   });
 
   console.log('merging, pruning, sweeping');
@@ -234,6 +253,15 @@ const MIN = 60000, DAY = 86400000;
     assert(/Local History\.\.\./.test(read('js/core/diff-editor.js')));
     assert(/Show Local History for Active File/.test(read('js/core/quick-open.js')));
     assert(/'review-recovered'/.test(read('js/core/now-island.js')));
+  });
+  await t('the Timeline handle uses the app\'s own makeResizable and a per-window saved height', () => {
+    const fh = read('js/core/file-history.js');
+    assert(/W\.makeResizable\(resizerEl, \{/.test(fh), 'one handle helper for the whole app: mouse and touch');
+    assert(/'codemini_timeline_height_' \+ winKey\(\)/.test(fh), 'saved per window, like codemini_sidebar_width_ and codemini_bottom_panel_height_');
+    assert(/role', 'separator'/.test(fh) && /aria-orientation', 'horizontal'/.test(fh), 'keyboard and screen-reader users get a separator too');
+    const css = read('css/style.css');
+    assert(/\.tl-resizer \{[^}]*height: 6px;[^}]*cursor: ns-resize;/.test(css), 'the same 6px ns-resize strip as .panel-resizer-horizontal');
+    assert(/\.tl-body\.tl-sized \{[^}]*box-sizing: border-box;/.test(css), 'border-box, or each repaint would add the padding again');
   });
   await t('recovery runs after saved tabs are restored', () => {
     const app = read('js/core/app.js');

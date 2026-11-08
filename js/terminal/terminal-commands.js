@@ -294,10 +294,10 @@ window.getTerminalCommands = function(
         },
 
         uname: async (args) => {
-            if (args.includes('-a')) printTerm('CodeMiniOS codemini 1.4.0 WebAssembly x86_64 GNU/Linux');
+            if (args.includes('-a')) printTerm('CodeMiniOS codemini 1.5.0 WebAssembly x86_64 GNU/Linux');
             else if (args.includes('-m')) printTerm('x86_64');
             else if (args.includes('-s')) printTerm('CodeMiniOS');
-            else if (args.includes('-r')) printTerm('1.4.0');
+            else if (args.includes('-r')) printTerm('1.5.0');
             else printTerm('CodeMiniOS');
         },
         ping: async (args) => {

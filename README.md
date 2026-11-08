@@ -8,7 +8,7 @@
 No backend. No account. No build step.
 
 [![Live app](https://img.shields.io/badge/live-codemini--ide.vercel.app-3b82f6)](https://codemini-ide.vercel.app/)
-[![Version](https://img.shields.io/badge/version-1.4.0-informational)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.5.0-informational)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![PWA](https://img.shields.io/badge/PWA-installable-5a0fc8)](https://codemini-ide.vercel.app/)
 
@@ -247,7 +247,7 @@ MONACO_DIR=/tmp/node_modules/monaco-editor/min npm run test:e2e -- diff-editor
 | --- | --- |
 | `workspace-trust.e2e.js` | Trust prompt, Restricted Mode, banner, settings and persistence |
 | `terminal-trust.e2e.js` | Terminal refuses to run files in a restricted workspace |
-| `file-history.e2e.js` | Auto Save switch, Timeline (open, compare, Restore with undo, delete, clear), saves leaving versions on the real IndexedDB, locked files never copied, and the whole hot-exit cycle: type, reload, recovered tab, notification and Review, a changed or deleted file, a second window. Needs `MONACO_DIR` for the editor checks (about 170 s) |
+| `file-history.e2e.js` | Auto Save switch, Timeline (open, compare, Restore with undo, delete, clear), saves leaving versions on the real IndexedDB, locked files never copied, and the whole hot-exit cycle: type, reload, recovered tab, notification and Review, a changed or deleted file, a second window. Also the Timeline’s resizing (mouse, keyboard, touch, saved per window, short windows). Needs `MONACO_DIR` for the editor checks (about 200 s) |
 | `diff-editor.e2e.js` | The diff tab with a real Monaco diff editor: Select for Compare / Compare with Selected, stepping through changes, Unified/Split, Ignore whitespace, Refresh, identical / binary / locked files, the tab's right-click menu and Compare with Saved, Source Control's popup, Open in tab and double-click, the Quick Open compare commands, no restore after a reload, phone layout. Needs `MONACO_DIR` (below); without it the editor checks are reported as SKIP |
 | `quick-open-monaco.e2e.js` | Quick Open's go-to-line (`:42`, `:100:4`, `file.txt:77`) against a real Monaco: cursor, scroll and focus. Needs `MONACO_DIR`; without it, SKIP |
 | `name-conflicts.e2e.js` | The clash dialog in the real app: Copy/Cut + Paste through the Explorer's right-click menus, multi-select with apply-to-all and Stop, drag-and-drop, imports of files, folders and JSON exports, a workspace in another database, the Recycle Bin, locked files, open tabs, phone size |

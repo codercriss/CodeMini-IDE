@@ -84,6 +84,13 @@
         return text.length <= (limit || LIMITS.maxSnapshotChars);
     }
 
+    // The Timeline's height may not drop below `min`, and may not squeeze the file list above it under `minRoom`.
+    // While the handle is dragged, current + room stays constant (the list gives up exactly what the Timeline takes).
+    function clampHeight(h, current, room, min, minRoom) {
+        const max = Math.max(min, current + room - minRoom);
+        return Math.round(Math.min(max, Math.max(min, Number(h) || 0)));
+    }
+
     // Two auto saves a few seconds apart are one change as far as a reader cares: the newer replaces the older.
     function shouldMerge(prev, kind, now, mergeMs) {
         return !!prev && prev.kind === 'auto' && kind === 'auto' && (now - prev.time) <= (mergeMs == null ? LIMITS.mergeMs : mergeMs);
@@ -215,7 +222,7 @@
         };
     }
 
-    const api = { LIMITS, fnv1a, fileKey, lineDelta, formatSize, relativeTime, canKeep, shouldMerge, planPrune, planSweep, planRecovery, memoryStore, createHistory };
+    const api = { LIMITS, clampHeight, fnv1a, fileKey, lineDelta, formatSize, relativeTime, canKeep, shouldMerge, planPrune, planSweep, planRecovery, memoryStore, createHistory };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (typeof document === 'undefined') return; // Node: logic only
 
@@ -549,6 +556,42 @@
     const OPEN_KEY = 'codemini_timeline_open';
     let sec = null, bodyEl = null, fileEl = null, countEl = null, clearBtn = null, toggleBtn = null;
     let tlOpen = false, pinned = null, tlRows = [], tlToken = 0, clearArmed = null;
+    // Resizing: drag the top edge (or Up / Down on it, Home to reset). The size is remembered per window, like the
+    // sidebar width and the bottom panel height. What the user chose (preferredH) is kept even when a small window
+    // forces a smaller one for now.
+    const TL_MIN = 56, TL_MIN_LIST = 120, TL_STEP = 16;
+    let resizerEl = null, preferredH = null, heightWin = null, fitTimer = null;
+    const winKey = () => { try { return localStorage.getItem('codemini_active_window') || 'win_default'; } catch (e) { return 'win_default'; } };
+    const heightKey = () => 'codemini_timeline_height_' + winKey();
+    const listRoom = () => { const l = document.getElementById('fileList'); return l ? l.offsetHeight : 0; };
+    function paintHeight(h) { // shows a height without remembering it
+        const l = document.getElementById('fileList');
+        const set = (v) => { bodyEl.style.height = v + 'px'; bodyEl.classList.add('tl-sized'); };
+        set(clampHeight(h, bodyEl.offsetHeight, listRoom(), TL_MIN, TL_MIN_LIST));
+        // When the list is squeezed to nothing, the rows above it (the breadcrumb) shrink as well, which hides part of
+        // the shortage from the first clamp. So look at what the list really got, and take the rest off.
+        for (let i = 0; i < 4 && l && l.offsetHeight < TL_MIN_LIST && bodyEl.offsetHeight > TL_MIN; i++) set(Math.max(TL_MIN, bodyEl.offsetHeight - (TL_MIN_LIST - l.offsetHeight)));
+        const v = bodyEl.offsetHeight;
+        resizerEl.setAttribute('aria-valuenow', String(v));
+        return v;
+    }
+    function rememberHeight(v) { preferredH = v; try { localStorage.setItem(heightKey(), String(v)); } catch (e) { /* private mode */ } }
+    function resetHeight() {
+        preferredH = null;
+        try { localStorage.removeItem(heightKey()); } catch (e) { /* private mode */ }
+        bodyEl.style.height = ''; bodyEl.classList.remove('tl-sized'); resizerEl.removeAttribute('aria-valuenow');
+    }
+    function loadHeight() { // this window's own size (a window switch changes it)
+        heightWin = winKey();
+        let v = 0; try { v = parseInt(localStorage.getItem(heightKey()), 10) || 0; } catch (e) { /* private mode */ }
+        preferredH = v >= TL_MIN ? v : null;
+    }
+    function fitHeight() {
+        // Not on screen (no layout box), or the user is dragging: leave it. A list squeezed to 0px is NOT "not on screen": that is when it must shrink.
+        if (!tlOpen || !bodyEl || !sec.getClientRects().length || resizerEl.classList.contains('dragging')) return;
+        if (heightWin !== winKey()) loadHeight();
+        if (preferredH) paintHeight(preferredH); else { bodyEl.style.height = ''; bodyEl.classList.remove('tl-sized'); }
+    }
 
     function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
     function icon(name) { const i = document.createElement('i'); i.className = name; return i; }
@@ -667,6 +710,7 @@
         sec.classList.toggle('tl-open', tlOpen);
         toggleBtn.setAttribute('aria-expanded', tlOpen ? 'true' : 'false');
         bodyEl.hidden = !tlOpen;
+        if (tlOpen) requestAnimationFrame(fitHeight);
         refreshTimeline();
     }
 
@@ -707,9 +751,32 @@
         clearBtn.appendChild(icon('ri-delete-bin-line')); clearBtn.hidden = true;
         head.append(toggleBtn, clearBtn);
         bodyEl = el('div', 'tl-body'); bodyEl.id = 'explorerTimelineBody'; bodyEl.hidden = true;
-        sec.append(head, bodyEl);
+        resizerEl = el('div', 'tl-resizer'); resizerEl.setAttribute('role', 'separator'); resizerEl.setAttribute('aria-orientation', 'horizontal');
+        resizerEl.setAttribute('aria-label', 'Resize Timeline'); resizerEl.setAttribute('aria-controls', 'explorerTimelineBody');
+        resizerEl.setAttribute('aria-valuemin', String(TL_MIN)); resizerEl.tabIndex = 0;
+        resizerEl.title = 'Drag to resize. Double-click to reset.';
+        sec.append(resizerEl, head, bodyEl);
         bar.parentNode.insertBefore(sec, bar);
 
+        let startH = 0, startRoom = 0;
+        if (typeof W.makeResizable === 'function') W.makeResizable(resizerEl, { // the app's own handle helper: mouse and touch
+            cursor: 'ns-resize',
+            onStart: () => { if (!tlOpen) return false; startH = bodyEl.offsetHeight; startRoom = listRoom(); },
+            onMove: (dx, dy) => {
+                const v = clampHeight(startH - dy, startH, startRoom, TL_MIN, TL_MIN_LIST);
+                bodyEl.style.height = v + 'px'; bodyEl.classList.add('tl-sized'); resizerEl.setAttribute('aria-valuenow', String(v));
+            },
+            onEnd: () => rememberHeight(bodyEl.offsetHeight)
+        });
+        resizerEl.addEventListener('dblclick', resetHeight);
+        resizerEl.addEventListener('keydown', (e) => {
+            const step = e.shiftKey ? TL_STEP * 4 : TL_STEP;
+            if (e.key === 'Home') { e.preventDefault(); resetHeight(); return; }
+            if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+            e.preventDefault();
+            rememberHeight(paintHeight(bodyEl.offsetHeight + (e.key === 'ArrowUp' ? step : -step)));
+        });
+        W.addEventListener('resize', () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitHeight, 120); });
         toggleBtn.addEventListener('click', () => { if (tlOpen) pinned = null; setOpen(!tlOpen); });
         clearBtn.addEventListener('click', armClear);
         bodyEl.addEventListener('click', (e) => {
@@ -719,6 +786,7 @@
             if (a === 'diff') diffWithCurrent(m); else if (a === 'compare-prev') diffWithPrevious(m);
             else if (a === 'restore') restore(m); else if (a === 'delete') removeEntry(m);
         });
+        loadHeight();
         let saved = '0'; try { saved = localStorage.getItem(OPEN_KEY) || '0'; } catch (e) { /* private mode */ }
         setOpen(saved === '1');
     }
