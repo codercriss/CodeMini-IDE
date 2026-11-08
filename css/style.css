@@ -4620,7 +4620,7 @@ body.compact-explorer .tree-view-item {
 .explorer-status-bar.is-selecting .explorer-select-actions { display: flex; }
 .explorer-select-btn {
     display: inline-flex; align-items: center; justify-content: center;
-    width: 24px; height: 20px; padding: 0; margin: 0;
+    width: 26px; height: 20px; padding: 0; margin: 0;
     border: 0; border-radius: 4px; background: transparent;
     color: var(--icon-gray); font-size: 14px; line-height: 1; cursor: pointer;
     transition: background-color 0.15s, color 0.15s;
@@ -4633,7 +4633,7 @@ body.compact-explorer .tree-view-item {
 @media (pointer: coarse) {
     /* Fingers need a bigger target than a 22px strip gives, so the bar grows while these icons are showing. */
     .explorer-status-bar.is-selecting { height: 34px; }
-    .explorer-select-btn { width: 40px; height: 30px; font-size: 18px; }
+    .explorer-select-btn { font-size: 14px; width: 26px; heigt: 20px;}
 }
 
 /* --- Version history cards (Settings > Updates and the Version History tab) ---
