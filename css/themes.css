@@ -1027,7 +1027,7 @@
 
 /* Status Bar Dark Theme */
 [data-theme="dark"] .status-bar {
-  background-color: var(--bg-panel);
+  background-color: var(--status-bar-bg, var(--bg-panel));
   border-top: 1px solid var(--border-color);
 }
 

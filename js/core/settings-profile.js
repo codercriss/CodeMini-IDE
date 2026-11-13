@@ -45,6 +45,51 @@ window.isThemePackActive = function() {
   return !!(pack && pack !== 'None' && window.THEME_PACK_REGISTRY[pack]);
 };
 
+// ---- Status bar colors (begin) ----------------------------------------------------------------------------------
+// Settings > Theme > Status Bar lets the user choose a background and a text-and-icons color for the bottom status bar.
+// '' means "not chosen": the bar looks exactly as the theme draws it. A chosen color reaches the page as a CSS variable on
+// <html> (--status-bar-bg, --status-bar-fg), which css/style.css and css/themes.css read with the theme's own color as the
+// fallback - so with no variable set (nothing chosen, or a Theme Pack active) the stylesheet is what it was before this setting.
+// Only #rgb / #rrggbb counts. A typo in settings.json or a hand-edited stored value is treated as "not chosen", so nothing
+// but a plain hex color can ever reach the stylesheet.
+window.normalizeStatusBarColor = function(v) {
+  const m = typeof v === 'string' ? /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(v.trim()) : null;
+  if (!m) return '';
+  const hex = m[1].length === 3 ? m[1].replace(/./g, '$&$&') : m[1];
+  return '#' + hex.toLowerCase();
+};
+// Dark or white, whichever has the higher WCAG contrast against `bg`. Used for the text and icons when only a background
+// was chosen, so picking a dark background cannot leave dark text on it (nor a light one, light text).
+window.readableTextOn = function(bg) {
+  const luminance = (hex) => {
+    const lin = (i) => { const c = parseInt(hex.slice(i, i + 2), 16) / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    return 0.2126 * lin(1) + 0.7152 * lin(3) + 0.0722 * lin(5);
+  };
+  const contrast = (a, b) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  const hex = window.normalizeStatusBarColor(bg);
+  if (!hex) return '';
+  const DARK = '#000000', L = luminance(hex);
+  return contrast(L, 1) >= contrast(L, luminance(DARK)) ? '#ffffff' : DARK;
+};
+// What to apply right now: the chosen colors on the four Color Themes (Light, Light +, Dark, Dark +), and nothing at all while
+// a Theme Pack is active, because a pack owns the status bar. The choice is kept while a pack is on and returns when it is turned off.
+window.getStatusBarColors = function() {
+  if (window.isThemePackActive()) return { background: '', foreground: '' };
+  const s = window.appSettings || {};
+  const background = window.normalizeStatusBarColor(s.statusBarBackground);
+  const foreground = window.normalizeStatusBarColor(s.statusBarForeground) || window.readableTextOn(background);
+  return { background, foreground };
+};
+// Sets the two variables on `root` (<html>), or removes them: removing is what lets a Theme Pack, or Reset, fall back to the stylesheet's own colors.
+window.applyStatusBarColors = function(root) {
+  const c = window.getStatusBarColors();
+  [['--status-bar-bg', c.background], ['--status-bar-fg', c.foreground]].forEach(([name, value]) => {
+    if (value) root.style.setProperty(name, value); else root.style.removeProperty(name);
+  });
+  return c;
+};
+// ---- Status bar colors (end) ------------------------------------------------------------------------------------
+
 // The storage key for a per-window / per-profile setting: the one rule reloadSettings and saveSetting apply, for modules
 // that keep their own data (keybindings, snippets). With no window given it is the active one.
 window.getPrefixedKey = function(baseKey, winId = null, isProfile = null) {
@@ -65,7 +110,7 @@ window.getPrefixedKey = function(baseKey, winId = null, isProfile = null) {
 window.getDefaultSettings = function() {
   return {
       explorerDefaultView: 'List View', treeViewIndent: 15, profileAccentTint: true, syncProfileSettings: false, confirmBeforeExit: false, showBreadcrumbs: true, compactExplorer: false, performanceMode: false, clearTrashOnExit: false,
-      autoSave: 'After Delay', autoSaveDelay: 1000, hotExit: 'On', localHistory: 'On', historyMaxEntries: 50, historyMaxDays: 14, formatOnSave: false, restoreSession: true, enableTrashBin: true, autoCheckUpdates: true, maxMemory: 1024, fontSize: 13, fontFamily: "'Fira Code', monospace", fontWeight: 'normal', lineHeight: 21, letterSpacing: 0.3, fontLigatures: true, tabSize: 4, insertSpaces: true, wordWrap: 'off', minimap: false, lineNumbers: 'on', renderWhitespace: 'none', bracketPairs: true, smoothScrolling: true, cursorStyle: 'line', cursorBlinking: 'blink', mouseWheelZoom: false, editorFolding: true, renderLineHighlight: 'line', matchBrackets: 'always', cursorWidth: 2, colorTheme: 'CodeMini Light', iconTheme: 'Remix Icons', accentColor: '#3794ff', sidebarPosition: 'Left', activityBar: true, showWindowBar: true, windowOpacity: 100, nbAutoInstall: true, nbClearOnRestart: false, nbConfirmDelete: true, nbPlotBackground: 'White', nbCellFontSize: 13, nbCellFontFamily: "'Fira Code', monospace", nbCellLineHeight: 21, nbCellLetterSpacing: 0.3, nbCellLineNumbers: 'off', nbCellWordWrap: 'on', nbCellFolding: false, nbCellMinimap: false, nbCellRenderWhitespace: 'none', nbCellBracketPairs: true, nbCellCursorStyle: 'line', nbCellCursorBlinking: 'expand', nbCellSmoothScrolling: true, consoleAutoClear: false, consoleShowTimestamps: false, consoleAutoInstall: true, consoleMaxHistory: 50, consoleFontSize: 14, consoleFontFamily: "var(--font-mono)", consoleLineHeight: 21, consoleWordWrap: 'on', termFontSize: 13, termFontFamily: "'Fira Code', Consolas, monospace", termTextColor: "#d4d4d4", termPromptColor: "#4caf50", termCmdColor: "#ffffff", termHistorySize: 100,
+      autoSave: 'After Delay', autoSaveDelay: 1000, hotExit: 'On', localHistory: 'On', historyMaxEntries: 50, historyMaxDays: 14, formatOnSave: false, restoreSession: true, enableTrashBin: true, autoCheckUpdates: true, maxMemory: 1024, fontSize: 13, fontFamily: "'Fira Code', monospace", fontWeight: 'normal', lineHeight: 21, letterSpacing: 0.3, fontLigatures: true, tabSize: 4, insertSpaces: true, wordWrap: 'off', minimap: false, lineNumbers: 'on', renderWhitespace: 'none', bracketPairs: true, smoothScrolling: true, cursorStyle: 'line', cursorBlinking: 'blink', mouseWheelZoom: false, editorFolding: true, renderLineHighlight: 'line', matchBrackets: 'always', cursorWidth: 2, colorTheme: 'CodeMini Light', iconTheme: 'Remix Icons', accentColor: '#3794ff', statusBarBackground: '', statusBarForeground: '', sidebarPosition: 'Left', activityBar: true, showWindowBar: true, windowOpacity: 100, nbAutoInstall: true, nbClearOnRestart: false, nbConfirmDelete: true, nbPlotBackground: 'White', nbCellFontSize: 13, nbCellFontFamily: "'Fira Code', monospace", nbCellLineHeight: 21, nbCellLetterSpacing: 0.3, nbCellLineNumbers: 'off', nbCellWordWrap: 'on', nbCellFolding: false, nbCellMinimap: false, nbCellRenderWhitespace: 'none', nbCellBracketPairs: true, nbCellCursorStyle: 'line', nbCellCursorBlinking: 'expand', nbCellSmoothScrolling: true, consoleAutoClear: false, consoleShowTimestamps: false, consoleAutoInstall: true, consoleMaxHistory: 50, consoleFontSize: 14, consoleFontFamily: "var(--font-mono)", consoleLineHeight: 21, consoleWordWrap: 'on', termFontSize: 13, termFontFamily: "'Fira Code', Consolas, monospace", termTextColor: "#d4d4d4", termPromptColor: "#4caf50", termCmdColor: "#ffffff", termHistorySize: 100,
       workspaceTrustEnabled: true, workspaceTrustUntrustedFiles: 'Prompt', workspaceTrustEmptyWindow: true, workspaceTrustStartupPrompt: 'Once', workspaceTrustBanner: 'Until Dismissed',
       isolationMode: 'Isolated', isolationPreview: 'Use global', isolationConsole: 'Use global', isolationTerminal: 'Use global', isolationNotebooks: 'Use global'
     };
@@ -167,6 +212,8 @@ window.reloadSettings = function(winId = null, isProfile = false) {
     themePack: localStorage.getItem(getPrefixedKey('themePack')) || 'None',
     iconTheme: localStorage.getItem(getPrefixedKey('iconTheme')) || 'Remix Icons',
     accentColor: localStorage.getItem(getPrefixedKey('accentColor')) || '#3794ff',
+    statusBarBackground: window.normalizeStatusBarColor(localStorage.getItem(getPrefixedKey('statusBarBackground'))),
+    statusBarForeground: window.normalizeStatusBarColor(localStorage.getItem(getPrefixedKey('statusBarForeground'))),
 
     sidebarPosition: localStorage.getItem(getPrefixedKey('sidebarPosition')) || 'Left',
     activityBar: localStorage.getItem(getPrefixedKey('activityBar')) !== 'false',
@@ -240,6 +287,8 @@ window.getIsolationSettings = function() {
 };
 
 window.saveSetting = function(key, value) {
+  // Status bar colors are stored as '' (not chosen) or a plain #rrggbb, whoever asks (the Settings screen, settings.json).
+  if (key === 'statusBarBackground' || key === 'statusBarForeground') value = window.normalizeStatusBarColor(value);
   window.appSettings[key] = value;
   const winId = typeof cellActiveWinId !== 'undefined' ? cellActiveWinId : (localStorage.getItem('codemini_active_window') || 'win_default');
   const activeWin = (typeof cellWindows !== 'undefined' ? cellWindows : JSON.parse(localStorage.getItem('codemini_windows'))).find(w => w.id === winId) || { profile: false };
@@ -254,7 +303,7 @@ window.saveSetting = function(key, value) {
 
   localStorage.setItem(prefixedKey, value);
 
-  if (['colorTheme', 'themePack', 'accentColor', 'windowOpacity', 'sidebarPosition', 'activityBar', 'showWindowBar', 'profileAccentTint', 'performanceMode', 'showBreadcrumbs', 'compactExplorer'].includes(key)) {
+  if (['colorTheme', 'themePack', 'accentColor', 'statusBarBackground', 'statusBarForeground', 'windowOpacity', 'sidebarPosition', 'activityBar', 'showWindowBar', 'profileAccentTint', 'performanceMode', 'showBreadcrumbs', 'compactExplorer'].includes(key)) {
       if (typeof window.applyTheme === 'function') window.applyTheme();
       // applyTheme() just recalculated whether a Theme Pack is active - the
       // Color Theme / Accent Color lock state in the Settings panel needs to
@@ -335,6 +384,8 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       document.documentElement.style.setProperty('--accent-blue', window.appSettings.accentColor);
     }
+    // Status bar colors: set only on the four Color Themes, removed while a Theme Pack is active (see getStatusBarColors).
+    window.applyStatusBarColors(document.documentElement);
     document.body.style.opacity = window.appSettings.windowOpacity / 100;
 
     const isProfile = typeof cellActiveWindow !== 'undefined' && cellActiveWindow.profile;
@@ -375,7 +426,7 @@ document.addEventListener('DOMContentLoaded', () => {
       try { themeCache = JSON.parse(localStorage.getItem('codemini_theme_cache')); } catch (e) { /* start fresh */ }
       if (!themeCache || typeof themeCache !== 'object' || Array.isArray(themeCache)) themeCache = {};
       const vars = {};
-      ['--accent-blue', '--bg-tabs-bar', '--bg-tab-inactive'].forEach(name => {
+      ['--accent-blue', '--bg-tabs-bar', '--bg-tab-inactive', '--status-bar-bg', '--status-bar-fg'].forEach(name => {
         const v = root.style.getPropertyValue(name);
         if (v) vars[name] = v;
       });
@@ -603,6 +654,38 @@ document.addEventListener('DOMContentLoaded', () => {
         accentColorHint.textContent = packActive
           ? `Controlled by the "${window.appSettings.themePack}" theme pack`
           : 'Controls primary highlight color';
+      }
+    }
+
+    // Status bar colors. "Not chosen" is '' and a color input cannot show that (it would show black), so an unchosen swatch
+    // shows the color the bar has right now, read back from the page: it follows the Color Theme, and it is what you would be
+    // changing. Under a Theme Pack the pack owns the bar, so both swatches (and Reset) are locked, like Accent Color.
+    const sbBgInput = container.querySelector('#statusBarBackgroundInput');
+    const sbFgInput = container.querySelector('#statusBarForegroundInput');
+    if (sbBgInput && sbFgInput) {
+      const bar = document.querySelector('.status-bar');
+      const cs = bar ? getComputedStyle(bar) : null;
+      const toHex = (css) => {
+        const m = /^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/.exec(css || '');
+        return m ? '#' + [m[1], m[2], m[3]].map(n => Number(n).toString(16).padStart(2, '0')).join('') : '';
+      };
+      const chosenBg = window.normalizeStatusBarColor(window.appSettings.statusBarBackground);
+      const chosenFg = window.normalizeStatusBarColor(window.appSettings.statusBarForeground);
+      sbBgInput.value = (!packActive && chosenBg) || toHex(cs && cs.backgroundColor) || '#000000';
+      sbFgInput.value = (!packActive && chosenFg) || toHex(cs && cs.color) || '#000000';
+      [sbBgInput, sbFgInput].forEach(input => {
+        input.disabled = packActive;
+        input.style.opacity = packActive ? '0.5' : '';
+        input.style.cursor = packActive ? 'not-allowed' : '';
+      });
+      const sbReset = container.querySelector('#btnResetStatusBarColors');
+      if (sbReset) sbReset.disabled = packActive || (!chosenBg && !chosenFg);
+      const sbHint = container.querySelector('#statusBarColorsHint');
+      if (sbHint) {
+        if (sbHint.dataset.baseText === undefined) sbHint.dataset.baseText = sbHint.textContent;
+        sbHint.textContent = packActive
+          ? `Controlled by the "${window.appSettings.themePack}" theme pack - set Theme Pack to None to use your own colors`
+          : sbHint.dataset.baseText;
       }
     }
   }
@@ -1284,6 +1367,9 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="settings-item"><div class="settings-item-info"><strong>Icon Theme</strong><span>Specifies the file icon theme</span></div><div class="settings-control"><select data-setting="iconTheme"><option>Remix Icons</option><option>Material</option><option>Font Awesome</option></select></div></div>
           <div class="settings-item"><div class="settings-item-info"><strong>Accent Color</strong><span id="accentColorHint">Controls primary highlight color</span></div><div class="settings-control"><input type="color" id="accentColorInput" data-setting="accentColor"></div></div>
 
+          <h3 class="settings-category-title">Status Bar</h3>
+          <div class="settings-item"><div class="settings-item-info"><strong>Status Bar Colors</strong><span id="statusBarColorsHint">Background, and the color of its text and icons. Applies to Light, Light +, Dark and Dark +; a theme pack keeps its own. Choose only a background and the text picks black or white to stay readable.</span></div><div class="settings-control sb-colors"><label class="sb-color"><span>Background</span><input type="color" id="statusBarBackgroundInput" data-setting="statusBarBackground" aria-label="Status bar background color"></label><label class="sb-color"><span>Text &amp; icons</span><input type="color" id="statusBarForegroundInput" data-setting="statusBarForeground" aria-label="Status bar text and icon color"></label><button type="button" class="sb-reset-btn" id="btnResetStatusBarColors">Reset</button></div></div>
+
           <h3 class="settings-category-title">UI Elements</h3>
           <div class="settings-item"><div class="settings-item-info"><strong>Sidebar Position</strong><span>Controls the location of the sidebar</span></div><div class="settings-control"><select data-setting="sidebarPosition"><option>Left</option><option>Right</option></select></div></div>
           <div class="settings-item"><div class="settings-item-info"><strong>Activity Bar</strong><span>Show the side activity bar</span></div><div class="settings-control"><input type="checkbox" data-setting="activityBar"></div></div>
@@ -1733,6 +1819,15 @@ document.addEventListener('DOMContentLoaded', () => {
             input.addEventListener('change', updateHandler);
             if (['range', 'color', 'text', 'number'].includes(input.type)) input.addEventListener('input', updateHandler);
           });
+
+          // Status Bar > Reset: back to the status bar exactly as the theme draws it.
+          const btnResetStatusBar = settingsContainer.querySelector('#btnResetStatusBarColors');
+          if (btnResetStatusBar) {
+            btnResetStatusBar.addEventListener('click', () => {
+              window.saveSetting('statusBarBackground', '');
+              window.saveSetting('statusBarForeground', '');
+            });
+          }
           
           // Check runner: asks the deployed runner which version it is (js/viewers/runner-client.js) and says so, in words, without running anything.
           const btnCheckRunner = document.getElementById('btnCheckRunner');

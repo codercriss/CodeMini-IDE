@@ -1320,15 +1320,18 @@ body {
 }
 
 /* --- Status Bar --- */
+/* --status-bar-bg / --status-bar-fg are set on <html> only while the user has chosen colors (Settings > Theme > Status Bar)
+   and no Theme Pack is active (applyStatusBarColors in settings-profile.js). With them unset, each var() falls back to the
+   color this rule always used, so the bar is unchanged. The dark rule in themes.css reads the background the same way. */
 .status-bar {
     height: 26px;
-    background-color: var(--bg-panel);
+    background-color: var(--status-bar-bg, var(--bg-panel));
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 0 14px;
     font-size: 12px;
-    color: var(--text-main);
+    color: var(--status-bar-fg, var(--text-main));
     white-space: nowrap;
     position: relative;
     z-index: 10;
@@ -1353,7 +1356,7 @@ body {
 
 .status-item i {
     font-size: 14px;
-    color: var(--icon-gray);
+    color: var(--status-bar-fg, var(--icon-gray));
 }
 
 /* --- Modals --- */
@@ -2246,6 +2249,55 @@ body.hide-window-bar .window-bar {
 
 .settings-danger-btn:hover {
     background: #ffcdd2;
+}
+
+/* Settings > Theme > Status Bar: the background swatch, the text-and-icons swatch and Reset share one row. */
+.settings-control.sb-colors {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.sb-color {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.sb-color:has(input:disabled) {
+    cursor: not-allowed;
+}
+
+.sb-reset-btn {
+    padding: 7px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-panel);
+    color: var(--text-main);
+    font-family: var(--font-main);
+    font-size: 13px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.sb-reset-btn:hover:not(:disabled) {
+    border-color: var(--accent-blue);
+}
+
+.sb-reset-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+    .settings-control.sb-colors {
+        justify-content: flex-start;
+    }
 }
 
 /* --- Quick Start Additions --- */
