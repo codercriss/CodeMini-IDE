@@ -52,7 +52,33 @@
         return { title: name + ' (' + left + ' \u2194 ' + right + ')', left, right };
     }
 
-    const api = { changeTargets, nextIndex, counterLabel, languageForName, labelFor, describeSides };
+    // True when two texts differ only in whitespace (indentation, spacing inside a line, blank lines, line endings).
+    function whitespaceOnly(a, b) {
+        const strip = (t) => String(t || '').replace(/\s+/g, '');
+        return strip(a) === strip(b);
+    }
+    // The editor options a diff tab takes from the app's settings, so it looks like the main editor
+    // (line numbers on / off / relative / interval, font, whitespace marks, word wrap ...).
+    function optionsFromSettings(s) {
+        s = s || {};
+        const o = {
+            fontSize: s.fontSize || 13,
+            fontFamily: s.fontFamily || "'Fira Code', 'JetBrains Mono', monospace",
+            fontWeight: s.fontWeight || 'normal',
+            lineHeight: s.lineHeight || 21,
+            letterSpacing: typeof s.letterSpacing === 'number' ? s.letterSpacing : 0.3,
+            fontLigatures: s.fontLigatures !== false,
+            tabSize: s.tabSize || 4,
+            wordWrap: s.wordWrap || 'off',
+            lineNumbers: s.lineNumbers || 'on',
+            renderWhitespace: s.renderWhitespace || 'none',
+            smoothScrolling: s.smoothScrolling !== false,
+            bracketPairColorization: { enabled: s.bracketPairs !== false }
+        };
+        return o;
+    }
+
+    const api = { changeTargets, nextIndex, counterLabel, languageForName, labelFor, describeSides, whitespaceOnly, optionsFromSettings };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (typeof document === 'undefined') return; // Node: logic only
 
@@ -142,7 +168,7 @@
             rootEl.querySelectorAll('[data-df="prev"], [data-df="next"]').forEach((b) => { b.disabled = none; });
             if (none && rec.data && !rec.data.binary) {
                 const same = rec.data.original.text === rec.data.modified.text;
-                message(same ? 'No differences' : 'No differences except whitespace', 'ri-check-double-line');
+                message(same ? 'No differences' : (rec.ignoreWs || whitespaceOnly(rec.data.original.text, rec.data.modified.text) ? 'No differences except whitespace' : 'No differences'), 'ri-check-double-line');
             } else if (rec.data && !rec.data.binary) clearMessage();
         };
         const go = (dir) => {
@@ -167,12 +193,11 @@
                     rec.original = m.editor.createModel(data.original.text, language);
                     rec.modified = m.editor.createModel(data.modified.text, language);
                     const theme = (W.appSettings && typeof W.isThemeDark === 'function' && W.isThemeDark()) ? 'vs-dark' : 'vs-light';
-                    rec.editor = m.editor.createDiffEditor(q('.df-host'), {
+                    rec.editor = m.editor.createDiffEditor(q('.df-host'), Object.assign({
                         theme, automaticLayout: true, readOnly: true, originalEditable: false, renderSideBySide: effectiveView() === 'split',
                         ignoreTrimWhitespace: rec.ignoreWs, enableSplitViewResizing: true, renderOverviewRuler: true, scrollBeyondLastLine: false,
-                        fontSize: s.fontSize || 13, fontFamily: s.fontFamily || "'Fira Code', 'JetBrains Mono', monospace", lineHeight: s.lineHeight || 21,
-                        minimap: { enabled: false }, wordWrap: s.wordWrap || 'off', renderWhitespace: s.renderWhitespace || 'none'
-                    });
+                        minimap: { enabled: false }
+                    }, optionsFromSettings(s)));
                     rec.editor.setModel({ original: rec.original, modified: rec.modified });
                     rec.editor.onDidUpdateDiff(updateCounter);
                 } else {
@@ -224,6 +249,16 @@
         }
         load();
     }
+
+    // Called by the Settings screen whenever an editor setting changes: every open diff tab follows it.
+    W.updateDiffEditorSettings = function () {
+        const s = W.appSettings || {};
+        const theme = (typeof W.isThemeDark === 'function' && W.isThemeDark()) ? 'vs-dark' : 'vs-light';
+        document.querySelectorAll('.df-root').forEach((rootEl) => {
+            const pane = rootEl.closest('.content-pane'); const rec = pane && pane._diff;
+            if (rec && rec.editor && !rec.disposed) { try { rec.editor.updateOptions(optionsFromSettings(s)); if (W.monaco) W.monaco.editor.setTheme(theme); } catch (e) { /* a disposed editor */ } }
+        });
+    };
 
     W.teardownDiffEditor = function (paneId) {
         const pane = document.getElementById(paneId); const rec = pane && pane._diff; if (!rec) return;

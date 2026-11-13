@@ -59,4 +59,20 @@ t('tab titles for each kind of comparison', () => {
   assert.strictEqual(describeSides('git', 'app.js', 'HEAD', 'Working tree').title, 'app.js (HEAD \u2194 Working tree)');
 });
 
+t('a diff tab takes line numbers and the other editor settings from the app settings', () => {
+  const { optionsFromSettings } = require('../js/core/diff-editor.js');
+  for (const v of ['on', 'off', 'relative', 'interval']) assert.strictEqual(optionsFromSettings({ lineNumbers: v }).lineNumbers, v);
+  assert.strictEqual(optionsFromSettings({}).lineNumbers, 'on');
+  const o = optionsFromSettings({ fontSize: 16, wordWrap: 'on', renderWhitespace: 'all', tabSize: 2, fontLigatures: false, bracketPairs: false });
+  assert.strictEqual(o.fontSize, 16); assert.strictEqual(o.wordWrap, 'on'); assert.strictEqual(o.renderWhitespace, 'all');
+  assert.strictEqual(o.tabSize, 2); assert.strictEqual(o.fontLigatures, false); assert.strictEqual(o.bracketPairColorization.enabled, false);
+});
+t('whitespaceOnly: indentation, spacing inside a line, blank lines and line endings', () => {
+  const { whitespaceOnly } = require('../js/core/diff-editor.js');
+  assert.ok(whitespaceOnly('a\n b\n', 'a\nb\n')); assert.ok(whitespaceOnly('f(a,  b)', 'f(a, b)'));
+  assert.ok(whitespaceOnly('a\n\n\nb', 'a\nb')); assert.ok(whitespaceOnly('a\r\nb', 'a\nb'));
+  assert.ok(!whitespaceOnly('ab', 'a b') === false); assert.ok(!whitespaceOnly('x', 'y'));
+});
+
+
 console.log(`\n${n} diff-editor checks passed`);

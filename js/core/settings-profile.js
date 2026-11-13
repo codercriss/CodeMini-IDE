@@ -483,10 +483,13 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     window.monaco.editor.getEditors().forEach(editor => {
+      // A diff tab's two sides are owned by its diff editor: it is updated as a whole just below.
+      if (editor.getContainerDomNode().closest && editor.getContainerDomNode().closest('.df-root')) return;
       if (!Object.values(window.cellMonacoEditors || {}).includes(editor)) {
         editor.updateOptions(editorOptions);
       }
     });
+    if (typeof window.updateDiffEditorSettings === 'function') window.updateDiffEditorSettings();
   }
 
   window.updateNotebookMonacoSettings = function() {
