@@ -135,6 +135,7 @@
             icon: 'ri-keyboard-line',
             open: false,
             items: [
+                { term: 'Change them', body: 'Settings > Keybindings lists every shortcut you can change: click the pencil beside one, press the new keys, then Enter (Esc cancels). Settings > Snippets keeps your own snippets, and the { } button in Settings opens every setting as JSON. The keys below are the defaults.' },
                 { term: 'Ctrl+S / Cmd+S', body: 'Save the active file (works for both regular files and notebooks).' },
                 { term: 'Alt+N', body: 'Create a new file in the current folder.' },
                 { term: 'Alt+W', body: 'Close the currently active tab.' },

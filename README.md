@@ -70,6 +70,7 @@ It is built to be usable on a phone as well as a laptop.
 
 - **Multiple windows and profiles**, each with its own isolated file storage and UI state
 - **Git and GitHub integration** (clone/import, pull, push) using your own token. Push works like `git push`: your commits arrive as real commits and the branch moves once
+- **Shortcuts, snippets and settings.json.** Change any shortcut in Settings > Keybindings, keep your own snippets per language in Settings > Snippets (offered in autocomplete), and edit every setting as JSON with checks as you type
 - **Local History and hot exit.** Earlier versions of a code file are kept each time it is saved (Explorer > Timeline: compare, restore), and text you typed but did not save comes back after a reload or crash. A switch in the status bar turns Auto Save on and off
 - **Built-in viewers** for PDF, Word documents, images, audio, video and archives
 - **Themes**, light and dark
@@ -227,6 +228,9 @@ MONACO_DIR=/tmp/node_modules/monaco-editor/min npm run test:e2e -- diff-editor
 | `app-info.test.js` | Keeps version, links and About page consistent with the repo |
 | `release-history.test.js` | Keeps the in-app version history in step with `CHANGELOG.md` and the app version |
 | `bin-restore-confirm.test.js` | Stacks > Recycle Bin: Restore and Restore All ask first |
+| `keybindings.test.js` | Shortcut rules: key names and combos (Cmd as Ctrl, AltGr, Mac dead keys), what may be bound, the catalog, the registry with the user's changes, conflicts, the dispatcher (a key you set beats a default, conditions, recording), and the wiring that replaced the old handlers |
+| `snippets.test.js` | The snippet file format and its checks, the New Snippet form, autocomplete items, prefix matching, the per-language store (including a language or snippet named `__proto__`), and the wiring |
+| `settings-json.test.js` | What goes in settings.json (and what never does), the schema, the checks before anything is applied, only-what-you-changed, the shared JSON-schema registrar, and the wiring; run against the real default settings |
 | `file-history.test.js` | Local History and hot exit rules: fingerprints, line counts, what may be copied (never a locked file), merging, pruning, the global sweep, recovery planning (live windows, deleted and changed files), and the wiring into the editor, the delete paths and Settings |
 | `diff-editor.test.js` | The diff editor's helpers: where each change is, stepping with wrap-around, the counter text, language from the file name, tab titles |
 | `name-conflicts.test.js` | The Replace / Skip / Rename planner: what is asked and when, apply-to-all, Stop, and what can never be replaced (locked items, anything holding the source, a name taken inside the same batch) |
@@ -247,6 +251,9 @@ MONACO_DIR=/tmp/node_modules/monaco-editor/min npm run test:e2e -- diff-editor
 | --- | --- |
 | `workspace-trust.e2e.js` | Trust prompt, Restricted Mode, banner, settings and persistence |
 | `terminal-trust.e2e.js` | Terminal refuses to run files in a restricted workspace |
+| `keybindings.e2e.js` | The defaults still do what they did, and Settings > Keybindings: recording a key, refusing a bare letter, the browser-reserved, AltGr and conflict warnings, Remove, Reset, Reset all, the palette showing the live key, a reload, and a closed Settings tab never leaving shortcuts off |
+| `snippets.e2e.js` | Settings > Snippets and its form, the schema checks, one language's snippets not appearing in another, saving, and real autocomplete in a file (needs `MONACO_DIR`) |
+| `settings-json.e2e.js` | The { } button, the settings.json tab, schema squiggles, applying on save only and only when valid, security settings left out, only your changes applied, and coming back after a reload (needs `MONACO_DIR`) |
 | `file-history.e2e.js` | Auto Save switch, Timeline (open, compare, Restore with undo, delete, clear), saves leaving versions on the real IndexedDB, locked files never copied, and the whole hot-exit cycle: type, reload, recovered tab, notification and Review, a changed or deleted file, a second window. Also the Timeline’s resizing (mouse, keyboard, touch, saved per window, short windows). Needs `MONACO_DIR` for the editor checks (about 200 s) |
 | `diff-editor.e2e.js` | The diff tab with a real Monaco diff editor: Select for Compare / Compare with Selected, stepping through changes, Unified/Split, Ignore whitespace, Refresh, identical / binary / locked files, the tab's right-click menu and Compare with Saved, Source Control's popup, Open in tab and double-click, the Quick Open compare commands, no restore after a reload, phone layout. Needs `MONACO_DIR` (below); without it the editor checks are reported as SKIP |
 | `quick-open-monaco.e2e.js` | Quick Open's go-to-line (`:42`, `:100:4`, `file.txt:77`) against a real Monaco: cursor, scroll and focus. Needs `MONACO_DIR`; without it, SKIP |

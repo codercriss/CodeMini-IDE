@@ -1976,21 +1976,16 @@ except Exception:
 document.addEventListener('keydown', (e) => {
     const pane = document.querySelector('.editor-group.active-group .content-pane.active'); if (!pane) return;
     const activeCell = pane.querySelector('.cell.active');
-    
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); if (activeCell) runCell(activeCell, pane); }
-    if (e.shiftKey && e.key === 'Enter') {
+    // Run Cell / Run Cell and Move On: the keys are the user's (Settings > Keybindings). Save is the registry's too (file.save).
+    const kb = window.CodeMiniKeybindings;
+    const runKey = kb ? kb.matches(e, 'notebook.runCell') : ((e.ctrlKey || e.metaKey) && e.key === 'Enter');
+    const advanceKey = kb ? kb.matches(e, 'notebook.runAdvance') : (e.shiftKey && e.key === 'Enter');
+    if (runKey) { e.preventDefault(); if (activeCell) runCell(activeCell, pane); }
+    if (advanceKey) {
         e.preventDefault();
         if (activeCell) {
             runCell(activeCell, pane); const nextCell = activeCell.nextElementSibling;
             if (nextCell && nextCell.classList.contains('cell')) { pane.querySelectorAll('.cell').forEach(c => c.classList.remove('active')); nextCell.classList.add('active'); }
-        }
-    }
-    if ((e.ctrlKey || e.metaKey) && e.key === 's') { 
-        e.preventDefault(); 
-        if (typeof window.performActiveSave === 'function') {
-            window.performActiveSave();
-        } else {
-            triggerNotebookSave(pane);
         }
     }
 });

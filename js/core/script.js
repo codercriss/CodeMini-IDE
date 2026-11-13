@@ -1234,6 +1234,8 @@ window.performActiveSave = function() {
     const activePane = activeGroup ? activeGroup.querySelector('.content-pane.active') : document.querySelector('.content-pane.active');
     if (activePane) {
         const activeTab = activeGroup.querySelector(`.tab.active`) || document.querySelector(`.tab[data-target="${activePane.id}"]`);
+        // settings.json has no file behind it: saving it applies the settings (js/core/settings-json.js).
+        if (activeTab && window.CodeMiniSettingsJson && window.CodeMiniSettingsJson.isVirtual(activeTab)) { window.CodeMiniSettingsJson.save(activeTab); return true; }
         if (activeTab && activeTab.dataset.type === 'monaco' && window.monaco) {
             const editorContainer = activePane.querySelector('[id^="editor-container-"]');
             if (editorContainer) {
@@ -1261,84 +1263,10 @@ window.performActiveSave = function() {
     return false;
 };
 
-// Global app-chrome shortcuts. Previously "New file, close tab, toggle
-// sidebar, open terminal, search, and formatting" were toolbar/menu-driven
-// only (per the Settings/Help Keybindings docs) - this fills that gap.
-// Deliberately NOT included: Ctrl+F for find-in-file. The existing
-// "mobile" search bar (search.js) only ever searches Monaco content, which
-// is exactly the case Monaco's own built-in Ctrl+F find widget already
-// covers - adding a second, competing global handler for the same keystroke
-// risks fighting Monaco's native one rather than filling a real gap.
-document.addEventListener('keydown', (e) => {
-    // Toggle Sidebar - skipped specifically while typing inside the Word-style
-    // document editor's contenteditable region (docs.js), where Ctrl+B
-    // already has a native meaning (the browser's own Bold toggle) that
-    // would otherwise get silently overridden. Monaco and plain inputs have
-    // no such conflict for Ctrl+B, so this excludes only that one context.
-    if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b') {
-        if (e.target && e.target.closest && e.target.closest('.doc-content')) return;
-        e.preventDefault();
-        const folderIconItem = document.getElementById('folderIconItem');
-        if (folderIconItem) folderIconItem.click();
-        return;
-    }
-
-    // Open Terminal - matches VS Code's own Ctrl+` convention.
-    if (e.ctrlKey && e.key === '`') {
-        e.preventDefault();
-        const terminalIconItem = document.getElementById('terminalIconItem');
-        if (terminalIconItem) terminalIconItem.click();
-        return;
-    }
-
-    // Search across files (sidebar) - matches VS Code's Ctrl+Shift+F.
-    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'f') {
-        e.preventDefault();
-        const searchIconItem = document.getElementById('searchIconItem');
-        if (searchIconItem) searchIconItem.click();
-        return;
-    }
-
-    // Format Document - matches VS Code's Shift+Alt+F. Monaco files use
-    // Monaco's own formatter action directly (getActiveMonacoEditor,
-    // exposed by search.js, already implements "focused editor, else the
-    // active pane's" correctly); notebooks reuse the same toolbar-click
-    // delegation the existing "Format Code" command-palette entry uses.
-    if (e.shiftKey && e.altKey && e.key.toLowerCase() === 'f') {
-        e.preventDefault();
-        const fmtGroup = document.getElementById(typeof activeGroupId !== 'undefined' && activeGroupId ? activeGroupId : 'editorGroup1');
-        const fmtTab = fmtGroup ? fmtGroup.querySelector('.tab.active') : document.querySelector('.tab.active');
-        if (fmtTab && (fmtTab.dataset.type === 'notebook' || fmtTab.dataset.type === 'java-notebook')) {
-            document.querySelector('.tb-format')?.click();
-            document.querySelector('.jtb-format')?.click();
-        } else if (window.getActiveMonacoEditor) {
-            const editor = window.getActiveMonacoEditor();
-            if (editor) editor.getAction('editor.action.formatDocument')?.run();
-        }
-        return;
-    }
-
-    // New File - !ctrlKey guards against AltGr (commonly reported by the
-    // browser as ctrlKey+altKey together) misfiring this on international
-    // keyboard layouts that use AltGr+N to type a special character.
-    if (e.altKey && !e.ctrlKey && !e.metaKey && e.key.toLowerCase() === 'n') {
-        e.preventDefault();
-        const menuNewFile = document.getElementById('menuNewFile');
-        if (menuNewFile) menuNewFile.click();
-        return;
-    }
-
-    // Close the active tab (same AltGr guard as New File above).
-    if (e.altKey && !e.ctrlKey && !e.metaKey && e.key.toLowerCase() === 'w') {
-        e.preventDefault();
-        const closeGroup = document.getElementById(typeof activeGroupId !== 'undefined' && activeGroupId ? activeGroupId : 'editorGroup1');
-        const closeTabEl = closeGroup ? closeGroup.querySelector('.tab.active') : document.querySelector('.tab.active');
-        if (closeTabEl) {
-            const closeBtn = closeTabEl.querySelector('.tab-close');
-            if (closeBtn) closeBtn.click();
-        }
-    }
-});
+// Global app-chrome shortcuts (New file, Close tab, Toggle sidebar, Open terminal, Search, Format, Save, Quick Open)
+// are commands in js/core/keybindings.js now, so they can be listed and changed in Settings > Keybindings.
+// Deliberately NOT a command: Ctrl+F for find-in-file. Monaco's own find widget already owns that keystroke, and a
+// second global handler would only fight it.
 
 document.getElementById('menuSave')?.addEventListener('click', () => {
     window.performActiveSave();

@@ -989,6 +989,8 @@ function loadFilesFromDB() {
                                     }
                                 }
                             }
+                        } else if (t.virtual === 'settings-json') {
+                            if (window.CodeMiniSettingsJson) window.CodeMiniSettingsJson.open();
                         } else if (t.type === 'workspace') {
                             if (targetGroup && !targetGroup.querySelector('.tab[data-type="workspace"]')) {
                                 window.createNewTab('Workspace', 'ri-apps-2-line', false, typeof launcherHTMLTemplate !== 'undefined' ? launcherHTMLTemplate : '', 'workspace');

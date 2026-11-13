@@ -1329,6 +1329,7 @@ function updateOpenedTabsRegistry() {
             iconStyle: iEl ? (iEl.getAttribute('style') || '') : '',
             type: t.dataset.type,
             fileId: t.dataset.fileId,
+            virtual: t.dataset.virtual, // a tab with no file behind it (settings.json): restore regenerates it
             groupId: t.closest('.editor-group') ? t.closest('.editor-group').id : 'editorGroup1'
         };
     });
@@ -1346,6 +1347,8 @@ function updateOpenedTabsRegistry() {
 function teardownPaneResources(tabElement, paneElement) {
     // Keeps typed-but-unsaved text in Local History and drops its hot-exit copy (closing on purpose is not a crash).
     try { if (window.CodeMiniHistory) window.CodeMiniHistory.tabClosing(tabElement); } catch (e) { /* never block closing */ }
+    // A feature that put its own editor or models in this pane (Snippets, settings.json) sets pane._cmDispose to free them.
+    try { if (paneElement && typeof paneElement._cmDispose === 'function') paneElement._cmDispose(); } catch (e) { /* never block closing */ }
     // Monaco's own delayed-autosave timer (see editor.onDidChangeModelContent
     // above) - cancel it here rather than letting it fire later, whether
     // this tab is closing outright or just getting swept up in a window

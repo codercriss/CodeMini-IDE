@@ -201,23 +201,25 @@
 
     // ---- the commands (each one drives a control the app already has) ----
     const click = (id) => () => { const n = document.getElementById(id); if (n) n.click(); };
+    // The key a command is bound to right now ("Alt+N"), so the palette never shows a stale one after a rebind.
+    const keyOf = (id) => (W.CodeMiniKeybindings ? W.CodeMiniKeybindings.label(id) : '');
     function activeMonaco() { return typeof W.getActiveMonacoEditor === 'function' ? W.getActiveMonacoEditor() : null; }
     function commandList() {
         return [
-            { name: 'New File', icon: 'ri-file-add-line', keys: 'Alt+N', run: click('menuNewFile') },
+            { name: 'New File', icon: 'ri-file-add-line', keys: keyOf('file.new'), run: click('menuNewFile') },
             { name: 'New Folder', icon: 'ri-folder-add-line', run: click('addFolderBtn') },
-            { name: 'Open Terminal', icon: 'ri-terminal-window-line', keys: 'Ctrl+`', run: click('terminalIconItem') },
-            { name: 'Toggle Sidebar', icon: 'ri-layout-left-line', keys: 'Ctrl+B', run: click('folderIconItem') },
-            { name: 'Search Across Files', icon: 'ri-search-line', keys: 'Ctrl+Shift+F', run: click('searchIconItem') },
+            { name: 'Open Terminal', icon: 'ri-terminal-window-line', keys: keyOf('view.toggleTerminal'), run: click('terminalIconItem') },
+            { name: 'Toggle Sidebar', icon: 'ri-layout-left-line', keys: keyOf('view.toggleSidebar'), run: click('folderIconItem') },
+            { name: 'Search Across Files', icon: 'ri-search-line', keys: keyOf('view.searchFiles'), run: click('searchIconItem') },
             { name: 'Settings', icon: 'ri-settings-6-line', run: click('settingsIconItem') },
             { name: 'Profile', icon: 'ri-user-4-line', run: click('profileIconItem') },
-            { name: 'Format Code', icon: 'ri-format-clear', keys: 'Shift+Alt+F', run: () => {
+            { name: 'Format Code', icon: 'ri-format-clear', keys: keyOf('editor.format'), run: () => {
                 const ed = activeMonaco();
                 if (ed) { const a = ed.getAction('editor.action.formatDocument'); if (a) { a.run(); return; } }
                 document.querySelector('.tb-format')?.click(); document.querySelector('.jtb-format')?.click();
             } },
             { name: 'Split Editor', icon: 'ri-layout-column-line', run: click('splitLayoutBtn') },
-            { name: 'Close Active Tab', icon: 'ri-close-line', keys: 'Alt+W', run: () => {
+            { name: 'Close Active Tab', icon: 'ri-close-line', keys: keyOf('tab.close'), run: () => {
                 const g = document.getElementById(W.activeGroupId || 'editorGroup1');
                 const t = g ? g.querySelector('.tab.active .tab-close') : null; if (t) t.click();
             } },
@@ -239,6 +241,9 @@
                 if (!tab) { if (W.showSuccessToast) W.showSuccessToast('Open a code file first.'); return; }
                 W.CodeMiniDiff.compareWithSaved(tab);
             } },
+            { name: 'Open Keyboard Shortcuts', icon: 'ri-keyboard-line', run: () => { if (typeof W.openSettingsTab === 'function') W.openSettingsTab('keybinds'); } },
+            { name: 'Configure Snippets', icon: 'ri-braces-line', run: () => { if (W.CodeMiniSnippets) W.CodeMiniSnippets.open(); } },
+            { name: 'Open Settings (JSON)', icon: 'ri-file-settings-line', run: () => { if (W.CodeMiniSettingsJson) W.CodeMiniSettingsJson.open(); } },
             { name: 'Show Local History for Active File', icon: 'ri-history-line', run: () => {
                 const tab = W.CodeMiniDiff && W.CodeMiniDiff.activeFileTab();
                 if (!tab || !W.CodeMiniHistory) { if (W.showSuccessToast) W.showSuccessToast('Open a code file first.'); return; }
@@ -525,14 +530,8 @@
         box.addEventListener('touchmove', () => { if (document.activeElement === inp) inp.blur(); }, { passive: true });
     }
 
-    // Ctrl+P / Cmd+P, F1 and Ctrl+Shift+P. Captured so neither Monaco nor the browser's Print dialog gets them first.
-    document.addEventListener('keydown', (e) => {
-        const mod = e.ctrlKey || e.metaKey;
-        const key = (e.key || '').toLowerCase();
-        if (mod && !e.shiftKey && !e.altKey && key === 'p') { e.preventDefault(); e.stopPropagation(); W.openQuickOpen(); }
-        else if (e.key === 'F1' && !mod && !e.altKey && !e.shiftKey) { e.preventDefault(); e.stopPropagation(); W.openQuickOpen('>'); }
-        else if (mod && e.shiftKey && !e.altKey && key === 'p') { e.preventDefault(); e.stopPropagation(); W.openQuickOpen('>'); }
-    }, true);
+    // Ctrl+P / Cmd+P, F1 and Ctrl+Shift+P are commands in js/core/keybindings.js (quickOpen.files, quickOpen.commands), captured there
+    // so neither Monaco nor the browser's Print dialog gets them first, and changeable in Settings > Keybindings.
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })(typeof window !== 'undefined' ? window : globalThis);

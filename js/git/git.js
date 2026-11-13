@@ -4780,7 +4780,7 @@ window.renderGitPanel = async function() {
     if (newContent) newContent.scrollTop = scrollPos;
 
     const msgEl = document.getElementById('gitCommitMsg');
-    if (msgEl) msgEl.addEventListener('keydown', (e) => { if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); gitDoCommit(); } });
+    if (msgEl) msgEl.addEventListener('keydown', (e) => { const kb = window.CodeMiniKeybindings; if (kb ? kb.matches(e, 'scm.commit') : (e.ctrlKey && e.key === 'Enter')) { e.preventDefault(); gitDoCommit(); } });
 
     injectGitStyles();
 };

@@ -45,6 +45,32 @@ window.isThemePackActive = function() {
   return !!(pack && pack !== 'None' && window.THEME_PACK_REGISTRY[pack]);
 };
 
+// The storage key for a per-window / per-profile setting: the one rule reloadSettings and saveSetting apply, for modules
+// that keep their own data (keybindings, snippets). With no window given it is the active one.
+window.getPrefixedKey = function(baseKey, winId = null, isProfile = null) {
+  if (baseKey === 'syncProfileSettings') return 'codemini_syncProfileSettings';
+  if (!winId) {
+    winId = localStorage.getItem('codemini_active_window') || 'win_default';
+    let wins = null; try { wins = JSON.parse(localStorage.getItem('codemini_windows')); } catch (e) { wins = null; }
+    wins = Array.isArray(wins) && wins.length ? wins : [{ id: 'win_default', profile: false }];
+    const w = wins.find(x => x.id === winId) || wins[0];
+    isProfile = !!w.profile;
+  }
+  const sync = localStorage.getItem('codemini_syncProfileSettings') === 'true';
+  return (isProfile && !sync) ? `codemini_${winId}_${baseKey}` : `codemini_${baseKey}`;
+};
+
+// Every setting with the value it has when nothing has been changed. Reset uses it, and so does the Settings JSON view
+// (js/core/settings-json.js), so there is one list of what a setting is called and what its default is.
+window.getDefaultSettings = function() {
+  return {
+      explorerDefaultView: 'List View', treeViewIndent: 15, profileAccentTint: true, syncProfileSettings: false, confirmBeforeExit: false, showBreadcrumbs: true, compactExplorer: false, performanceMode: false, clearTrashOnExit: false,
+      autoSave: 'After Delay', autoSaveDelay: 1000, hotExit: 'On', localHistory: 'On', historyMaxEntries: 50, historyMaxDays: 14, formatOnSave: false, restoreSession: true, enableTrashBin: true, autoCheckUpdates: true, maxMemory: 1024, fontSize: 13, fontFamily: "'Fira Code', monospace", fontWeight: 'normal', lineHeight: 21, letterSpacing: 0.3, fontLigatures: true, tabSize: 4, insertSpaces: true, wordWrap: 'off', minimap: false, lineNumbers: 'on', renderWhitespace: 'none', bracketPairs: true, smoothScrolling: true, cursorStyle: 'line', cursorBlinking: 'blink', mouseWheelZoom: false, editorFolding: true, renderLineHighlight: 'line', matchBrackets: 'always', cursorWidth: 2, colorTheme: 'CodeMini Light', iconTheme: 'Remix Icons', accentColor: '#3794ff', sidebarPosition: 'Left', activityBar: true, showWindowBar: true, windowOpacity: 100, nbAutoInstall: true, nbClearOnRestart: false, nbConfirmDelete: true, nbPlotBackground: 'White', nbCellFontSize: 13, nbCellFontFamily: "'Fira Code', monospace", nbCellLineHeight: 21, nbCellLetterSpacing: 0.3, nbCellLineNumbers: 'off', nbCellWordWrap: 'on', nbCellFolding: false, nbCellMinimap: false, nbCellRenderWhitespace: 'none', nbCellBracketPairs: true, nbCellCursorStyle: 'line', nbCellCursorBlinking: 'expand', nbCellSmoothScrolling: true, consoleAutoClear: false, consoleShowTimestamps: false, consoleAutoInstall: true, consoleMaxHistory: 50, consoleFontSize: 14, consoleFontFamily: "var(--font-mono)", consoleLineHeight: 21, consoleWordWrap: 'on', termFontSize: 13, termFontFamily: "'Fira Code', Consolas, monospace", termTextColor: "#d4d4d4", termPromptColor: "#4caf50", termCmdColor: "#ffffff", termHistorySize: 100,
+      workspaceTrustEnabled: true, workspaceTrustUntrustedFiles: 'Prompt', workspaceTrustEmptyWindow: true, workspaceTrustStartupPrompt: 'Once', workspaceTrustBanner: 'Until Dismissed',
+      isolationMode: 'Isolated', isolationPreview: 'Use global', isolationConsole: 'Use global', isolationTerminal: 'Use global', isolationNotebooks: 'Use global'
+    };
+};
+
 window.reloadSettings = function(winId = null, isProfile = false) {
   if (!winId) {
     winId = localStorage.getItem('codemini_active_window') || 'win_default';
@@ -184,6 +210,9 @@ window.reloadSettings = function(winId = null, isProfile = false) {
 
   if (typeof applyTheme === 'function') applyTheme();
   if (typeof syncUI === 'function') syncUI();
+  // Shortcuts and snippets are per window / profile too: a window switch reloads them with the settings.
+  if (window.CodeMiniKeybindings) window.CodeMiniKeybindings.reloadFor(winId, isProfile);
+  if (window.CodeMiniSnippets) window.CodeMiniSnippets.reloadFor(winId, isProfile);
 };
 
 window.reloadSettings();
@@ -513,12 +542,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     keysToRemove.forEach(key => localStorage.removeItem(key));
 
-    Object.assign(window.appSettings, {
-      explorerDefaultView: 'List View', treeViewIndent: 15, profileAccentTint: true, syncProfileSettings: false, confirmBeforeExit: false, showBreadcrumbs: true, compactExplorer: false, performanceMode: false, clearTrashOnExit: false,
-      autoSave: 'After Delay', autoSaveDelay: 1000, hotExit: 'On', localHistory: 'On', historyMaxEntries: 50, historyMaxDays: 14, formatOnSave: false, restoreSession: true, enableTrashBin: true, autoCheckUpdates: true, maxMemory: 1024, fontSize: 13, fontFamily: "'Fira Code', monospace", fontWeight: 'normal', lineHeight: 21, letterSpacing: 0.3, fontLigatures: true, tabSize: 4, insertSpaces: true, wordWrap: 'off', minimap: false, lineNumbers: 'on', renderWhitespace: 'none', bracketPairs: true, smoothScrolling: true, cursorStyle: 'line', cursorBlinking: 'blink', mouseWheelZoom: false, editorFolding: true, renderLineHighlight: 'line', matchBrackets: 'always', cursorWidth: 2, colorTheme: 'CodeMini Light', iconTheme: 'Remix Icons', accentColor: '#3794ff', sidebarPosition: 'Left', activityBar: true, showWindowBar: true, windowOpacity: 100, nbAutoInstall: true, nbClearOnRestart: false, nbConfirmDelete: true, nbPlotBackground: 'White', nbCellFontSize: 13, nbCellFontFamily: "'Fira Code', monospace", nbCellLineHeight: 21, nbCellLetterSpacing: 0.3, nbCellLineNumbers: 'off', nbCellWordWrap: 'on', nbCellFolding: false, nbCellMinimap: false, nbCellRenderWhitespace: 'none', nbCellBracketPairs: true, nbCellCursorStyle: 'line', nbCellCursorBlinking: 'expand', nbCellSmoothScrolling: true, consoleAutoClear: false, consoleShowTimestamps: false, consoleAutoInstall: true, consoleMaxHistory: 50, consoleFontSize: 14, consoleFontFamily: "var(--font-mono)", consoleLineHeight: 21, consoleWordWrap: 'on', termFontSize: 13, termFontFamily: "'Fira Code', Consolas, monospace", termTextColor: "#d4d4d4", termPromptColor: "#4caf50", termCmdColor: "#ffffff", termHistorySize: 100,
-      workspaceTrustEnabled: true, workspaceTrustUntrustedFiles: 'Prompt', workspaceTrustEmptyWindow: true, workspaceTrustStartupPrompt: 'Once', workspaceTrustBanner: 'Until Dismissed',
-      isolationMode: 'Isolated', isolationPreview: 'Use global', isolationConsole: 'Use global', isolationTerminal: 'Use global', isolationNotebooks: 'Use global'
-    });
+    Object.assign(window.appSettings, window.getDefaultSettings());
 
     Object.keys(window.appSettings).forEach(key => {
       localStorage.setItem(`${prefix}${key}`, window.appSettings[key]);
@@ -1119,6 +1143,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <div class="settings-fixed-header">
       <i class="ri-settings-6-line"></i>
       <span>Settings</span>
+      <button class="sj-open" id="openSettingsJson" type="button" title="Open Settings (JSON)" aria-label="Open Settings (JSON)"><i class="ri-braces-line"></i></button>
     </div>
 
     <div class="settings-search-bar">
@@ -1135,6 +1160,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="settings-sidebar-item" data-tab="console"><i class="ri-terminal-box-line"></i> Console</div>
         <div class="settings-sidebar-item" data-tab="terminal"><i class="ri-terminal-window-line"></i> Terminal</div>
         <div class="settings-sidebar-item" data-tab="editor"><i class="ri-code-box-line"></i> Editor</div>
+        <div class="settings-sidebar-item" data-tab="snippets"><i class="ri-braces-line"></i> Snippets</div>
         <div class="settings-sidebar-item" data-tab="theme"><i class="ri-paint-brush-line"></i> Theme</div>
         <div class="settings-sidebar-item" data-tab="keybinds"><i class="ri-keyboard-line"></i> Keybindings</div>
         <div class="settings-sidebar-item" data-tab="application"><i class="ri-window-fill"></i> Application</div>
@@ -1262,24 +1288,27 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="settings-item"><div class="settings-item-info"><strong>Window Opacity</strong><span>UI background transparency</span></div><div class="settings-control"><input type="range" min="50" max="100" data-setting="windowOpacity"></div></div>
         </div>
 
+        <div class="settings-content-section" id="set-snippets" data-section-label="Snippets">
+          <h3 class="settings-category-title">Snippets</h3>
+          <div class="settings-item"><div class="settings-item-info"><strong>Language</strong><span>Snippets belong to a language. Type a snippet&rsquo;s prefix in a file of that language and pick it from autocomplete.</span></div><div class="settings-control"><select id="snLang"></select></div></div>
+
+          <h3 class="settings-category-title">New Snippet</h3>
+          <div class="settings-item"><div class="settings-item-info"><strong>Name</strong><span>How it is listed</span></div><div class="settings-control"><input type="text" id="snName" class="sn-input" placeholder="Log to console" autocomplete="off"></div></div>
+          <div class="settings-item"><div class="settings-item-info"><strong>Prefix</strong><span>What you type to get it. Separate several with a comma.</span></div><div class="settings-control"><input type="text" id="snPrefix" class="sn-input" placeholder="log" autocomplete="off" autocapitalize="off" spellcheck="false"></div></div>
+          <div class="settings-item"><div class="settings-item-info"><strong>Description</strong><span>Optional. Shown beside it in autocomplete.</span></div><div class="settings-control"><input type="text" id="snDesc" class="sn-input" placeholder="Print a value" autocomplete="off"></div></div>
+          <div class="settings-item"><div class="settings-item-info"><strong>Body</strong><span>What it inserts. Use $1, $2 for tab stops and $&#123;1:name&#125; for a stop with text.</span></div><div class="settings-control"><textarea id="snBody" class="sn-body" rows="4" spellcheck="false" autocapitalize="off" placeholder="console.log($1);"></textarea></div></div>
+          <div class="settings-item"><div class="settings-item-info"><span id="snFormError" class="sn-form-error" hidden></span></div><div class="settings-control"><button class="update-btn primary" id="snAdd" type="button">Add Snippet</button></div></div>
+
+          <h3 class="settings-category-title">Snippets File</h3>
+          <div class="sn-editor-wrap"><div id="snEditor" class="sn-editor"></div><div id="snStatus" class="sn-status"></div></div>
+        </div>
+
         <div class="settings-content-section" id="set-keybinds" data-section-label="Keybindings">
-          <h3 class="settings-category-title">File Management</h3>
-          <div class="settings-item"><div class="settings-item-info"><strong>Save File</strong><span>Save the currently active file or notebook</span></div><div class="settings-control"><span class="kbd-badge">Ctrl + S</span></div></div>
-          <div class="settings-item"><div class="settings-item-info"><strong>New File</strong><span>Create a new file in the current folder</span></div><div class="settings-control"><span class="kbd-badge">Alt + N</span></div></div>
-          <div class="settings-item"><div class="settings-item-info"><strong>Close Tab</strong><span>Close the currently active tab</span></div><div class="settings-control"><span class="kbd-badge">Alt + W</span></div></div>
+          <div class="settings-item"><div class="settings-item-info"><strong>Customize shortcuts</strong><span>Click the pencil beside a command, press the keys you want, then Enter (Esc cancels). A shortcut needs Ctrl or Alt, or is a function key.</span></div><div class="settings-control"><button class="settings-danger-btn" id="kbResetAll">Reset all</button></div></div>
+          <div id="kbRows"></div>
 
-          <h3 class="settings-category-title">Execution (Notebooks)</h3>
-          <div class="settings-item"><div class="settings-item-info"><strong>Run Cell</strong><span>Run active notebook cell</span></div><div class="settings-control"><span class="kbd-badge">Ctrl + Enter</span></div></div>
-          <div class="settings-item"><div class="settings-item-info"><strong>Run & Advance</strong><span>Run cell and select next</span></div><div class="settings-control"><span class="kbd-badge">Shift + Enter</span></div></div>
-
-          <h3 class="settings-category-title">Navigation & Formatting</h3>
-          <div class="settings-item"><div class="settings-item-info"><strong>Quick Open</strong><span>Jump to a file by typing part of its name (type &gt; for commands, : for a line, @ for a symbol, # for a workspace)</span></div><div class="settings-control"><span class="kbd-badge">Ctrl + P</span></div></div>
-          <div class="settings-item"><div class="settings-item-info"><strong>Command Palette</strong><span>Open Quick Open in command mode</span></div><div class="settings-control"><span class="kbd-badge">F1 / Ctrl + Shift + P</span></div></div>
+          <h3 class="settings-category-title">Fixed shortcuts</h3>
           <div class="settings-item"><div class="settings-item-info"><strong>Open to the Side</strong><span>In Quick Open, open the selected file beside the current editor (Alt + click works too)</span></div><div class="settings-control"><span class="kbd-badge">Alt + Enter</span></div></div>
-          <div class="settings-item"><div class="settings-item-info"><strong>Toggle Sidebar</strong><span>Show or hide the explorer sidebar</span></div><div class="settings-control"><span class="kbd-badge">Ctrl + B</span></div></div>
-          <div class="settings-item"><div class="settings-item-info"><strong>Open Terminal</strong><span>Open (or focus) a terminal tab</span></div><div class="settings-control"><span class="kbd-badge">Ctrl + &#96;</span></div></div>
-          <div class="settings-item"><div class="settings-item-info"><strong>Search Across Files</strong><span>Open the sidebar's project-wide search</span></div><div class="settings-control"><span class="kbd-badge">Ctrl + Shift + F</span></div></div>
-          <div class="settings-item"><div class="settings-item-info"><strong>Format Document</strong><span>Format the active file (or notebook cell toolbar's format action)</span></div><div class="settings-control"><span class="kbd-badge">Shift + Alt + F</span></div></div>
 
           <h3 class="settings-category-title">Terminal & Console</h3>
           <div class="settings-item"><div class="settings-item-info"><strong>Autocomplete</strong><span>Complete the current command or filename in the terminal</span></div><div class="settings-control"><span class="kbd-badge">Tab</span></div></div>
@@ -1292,9 +1321,6 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="settings-item"><div class="settings-item-info"><strong>Undo</strong><span>Step back through edit history in the mini editor</span></div><div class="settings-control"><span class="kbd-badge">Ctrl + Z</span></div></div>
           <div class="settings-item"><div class="settings-item-info"><strong>Redo</strong><span>Step forward through edit history in the mini editor</span></div><div class="settings-control"><span class="kbd-badge">Ctrl + Y / Ctrl + Shift + Z</span></div></div>
           <div class="settings-item"><div class="settings-item-info"><strong>Indent</strong><span>Insert four spaces in the mini editor</span></div><div class="settings-control"><span class="kbd-badge">Tab</span></div></div>
-
-          <h3 class="settings-category-title">Source Control</h3>
-          <div class="settings-item"><div class="settings-item-info"><strong>Commit</strong><span>Commit with the message typed in the Source Control message box</span></div><div class="settings-control"><span class="kbd-badge">Ctrl + Enter</span></div></div>
 
           <h3 class="settings-category-title">Everything Else</h3>
           <div class="settings-item"><div class="settings-item-info"><strong>Other actions</strong><span>New Folder, Save As, Save All, Close All Tabs, and Zen Mode are still toolbar/menu-driven rather than keyboard shortcuts.</span></div></div>
@@ -1408,6 +1434,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="settings-tab" data-tab="console"><i class="ri-terminal-box-line"></i> Console</div>
       <div class="settings-tab" data-tab="terminal"><i class="ri-terminal-window-line"></i> Terminal</div>
       <div class="settings-tab" data-tab="editor"><i class="ri-code-box-line"></i> Editor</div>
+      <div class="settings-tab" data-tab="snippets"><i class="ri-braces-line"></i> Snippets</div>
       <div class="settings-tab" data-tab="theme"><i class="ri-paint-brush-line"></i> Theme</div>
       <div class="settings-tab" data-tab="keybinds"><i class="ri-keyboard-line"></i> Keybindings</div>
       <div class="settings-tab" data-tab="application"><i class="ri-window-fill"></i> Application</div>
@@ -1418,6 +1445,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
   </div>
   `;
+
+  // What each setting is, read from the Settings screen's own controls (its type, allowed options, number range and label).
+  // The Settings JSON view builds its schema from this, so the checks can never disagree with the screen.
+  window.getSettingsDescriptors = function() {
+    const doc = new DOMParser().parseFromString(settingsHTML, 'text/html');
+    const out = [];
+    doc.querySelectorAll('[data-setting]').forEach(el => {
+      const key = el.dataset.setting;
+      if (out.some(d => d.key === key)) return;
+      const d = { key, kind: 'text' };
+      if (el.tagName === 'SELECT') { d.kind = 'select'; d.options = Array.from(el.options).map(o => o.hasAttribute('value') ? o.getAttribute('value') : o.textContent.trim()); }
+      else if (el.type === 'checkbox') d.kind = 'checkbox';
+      else if (el.type === 'number' || el.type === 'range') { d.kind = 'number'; if (el.getAttribute('min') !== null) d.min = Number(el.getAttribute('min')); if (el.getAttribute('max') !== null) d.max = Number(el.getAttribute('max')); }
+      const item = el.closest('.settings-item');
+      if (item) { const st = item.querySelector('strong'), sp = item.querySelector('.settings-item-info span'); d.title = st ? st.textContent.trim() : ''; d.description = sp ? sp.textContent.trim() : ''; }
+      out.push(d);
+    });
+    return out;
+  };
 
   // ==========================================
   // UPDATES PANE (Settings > Updates)
@@ -1542,6 +1588,10 @@ document.addEventListener('DOMContentLoaded', () => {
           if (!settingsContainer) return;
 
           window.syncUI();
+          if (window.CodeMiniKeybindings) window.CodeMiniKeybindings.renderSettings(settingsContainer);
+          if (window.CodeMiniSnippets) window.CodeMiniSnippets.renderSettings(settingsContainer);
+          const jsonBtn = settingsContainer.querySelector('#openSettingsJson');
+          if (jsonBtn) jsonBtn.addEventListener('click', () => { if (window.CodeMiniSettingsJson) window.CodeMiniSettingsJson.open(); });
           renderUpdatesPanel(settingsContainer);
 
           function switchSettingsTab(tabId) {

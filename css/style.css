@@ -4873,3 +4873,70 @@ html.is-pwa code, html.is-pwa samp {
 #statusAutoSave.as-off { opacity: 0.75; }
 #statusAutoSave.as-off i { color: var(--icon-yellow); }
 #statusAutoSave:focus-visible { outline: 1px solid var(--accent-blue); outline-offset: -1px; }
+
+/* ---------------------------------------------------------------------------------------------
+   Settings > Keybindings (js/core/keybindings.js). Rows are the Settings screen's own .settings-item: the command, what it
+   does, when it applies and where its key came from on the left, the keys and icon buttons on the right.
+   --------------------------------------------------------------------------------------------- */
+.kb-row { flex-wrap: wrap; gap: 0 16px; }
+.kb-control { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+.kb-keys { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.kb-or { font-size: 11px; color: var(--text-muted); }
+.kb-none { font-size: 12px; color: var(--text-muted); font-style: italic; }
+.kb-meta { margin-top: 3px; font-size: 11px; color: var(--text-muted); }
+.kb-source { font-weight: 600; }
+.kb-source.kb-user { color: var(--accent-blue); }
+.kb-actions { display: flex; align-items: center; gap: 2px; }
+.kb-btn { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 3px; background: none; color: var(--text-muted); font-size: 15px; cursor: pointer; opacity: 0; }
+.kb-row:hover .kb-btn, .kb-row:focus-within .kb-btn, .kb-btn:focus-visible { opacity: 1; }
+.kb-btn:hover { background: var(--hover-blue); color: var(--accent-blue); }
+.kb-btn[data-kb-act="clear"]:hover { color: var(--color-danger); }
+.kb-btn[data-kb-act="confirm"] { color: var(--accent-new); }
+.kb-btn:disabled { opacity: 0.35 !important; cursor: default; background: none; }
+.kb-btn:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: -2px; }
+@media (hover: none) { .kb-btn { opacity: 1; } }
+.kb-recorder { display: flex; align-items: center; min-width: 220px; padding: 5px 10px; border: 1px solid var(--accent-blue); border-radius: 4px; background: var(--bg-white); outline: none; }
+.kb-rec-text { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--text-main); }
+.kb-rec-text.kb-rec-empty { font-family: var(--font-main); font-weight: 400; color: var(--text-muted); }
+.kb-note { flex-basis: 100%; margin-top: 8px; padding: 3px 8px; border-left: 3px solid var(--icon-yellow); background: var(--bg-panel); font-size: 11px; color: var(--text-main); }
+.kb-note[hidden] { display: none; }
+.kb-note.kb-note-error { border-left-color: var(--color-danger); }
+@media (max-width: 768px) {
+    .kb-control { justify-content: flex-start; }
+    .kb-keys { justify-content: flex-start; }
+    .kb-recorder { min-width: 0; flex: 1; }
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Settings > Snippets (js/core/snippets.js) and the settings.json tab (js/core/settings-json.js).
+   The form rows are the Settings screen's own .settings-item; the controls take the same padding, radius and focus ring.
+   --------------------------------------------------------------------------------------------- */
+.sj-open { margin-left: auto; width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 3px; background: none; cursor: pointer; }
+.sj-open:hover { background: var(--hover-blue); }
+.sj-open:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: -2px; }
+.sn-input { width: 260px; max-width: 100%; box-sizing: border-box; cursor: text !important; }
+.sn-body { width: 260px; max-width: 100%; min-height: 84px; box-sizing: border-box; resize: vertical; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-white); color: var(--text-main); font-family: var(--font-mono); font-size: 12px; line-height: 1.5; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
+.sn-body:focus { border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(55, 148, 255, 0.15); }
+.settings-item-info .sn-form-error { font-size: 12px; font-weight: 600; color: var(--color-danger); }
+/* The Settings text-input rule has no :focus on its middle selector, so every text input looks focused. Not changed here (it is the Settings screen's own rule); the form's inputs show the ring only while focused. */
+.settings-control input.sn-input:not(:focus) { border-color: var(--border-color); box-shadow: none; }
+.sn-form-error[hidden] { display: none; }
+.sn-editor-wrap { padding-top: 6px; }
+.sn-editor { height: clamp(240px, 45vh, 420px); border: 1px solid var(--border-color); border-radius: 6px; overflow: hidden; }
+.sn-status { margin-top: 8px; padding: 3px 8px; border-left: 3px solid var(--border-color); font-size: 12px; color: var(--text-muted); }
+.sn-status.sn-ok { border-left-color: var(--accent-new); }
+.sn-status.sn-warn { border-left-color: var(--icon-yellow); color: var(--text-main); }
+.sn-status.sn-error { border-left-color: var(--color-danger); color: var(--text-main); }
+.sj-banner { flex-shrink: 0; background: var(--bg-panel); border-bottom: 1px solid var(--border-color); font-size: 12px; color: var(--text-muted); }
+.sj-head { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; padding: 6px 12px; }
+.sj-head i { font-size: 14px; color: var(--accent-blue); flex-shrink: 0; }
+.sj-state { margin-left: auto; font-weight: 600; }
+.sj-state.sj-ok { color: var(--accent-new); }
+.sj-state.sj-error { color: var(--color-danger); }
+.sj-problems { padding: 0 12px 6px 34px; }
+.sj-problems[hidden] { display: none; }
+.sj-problem { padding: 1px 8px; border-left: 3px solid var(--color-danger); margin-top: 3px; color: var(--text-main); }
+@media (max-width: 768px) {
+    .sn-input, .sn-body { width: 100%; }
+    .sj-state { margin-left: 0; }
+}
