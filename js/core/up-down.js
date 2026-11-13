@@ -584,24 +584,84 @@ async function handleDownloadJson() {
     toggleDownloadMode();
 }
 
+// Tree view: ticking a folder also ticks everything inside it, and the ZIP builder walks into every selected
+// folder itself. Zipping all of those items would add the contents a second time at the top level of the archive,
+// so only the items whose parent chain holds no selected item are kept (the folder brings its contents along).
+// Pure: takes the selected records and every record of the database.
+function selectionRoots(selected, allFiles) {
+    const items = [], seen = new Set();
+    Array.from(selected).forEach(f => { if (f && !seen.has(f.id)) { seen.add(f.id); items.push(f); } });
+    const byId = new Map((allFiles || []).map(f => [f.id, f]));
+    return items.filter(f => {
+        let parent = byId.get(f.parentId); const guard = new Set();
+        while (parent && !guard.has(parent.id)) {
+            if (parent.id !== f.id && seen.has(parent.id)) return false; // an item is never its own ancestor (a corrupt loop must not drop it)
+            guard.add(parent.id);
+            parent = byId.get(parent.parentId);
+        }
+        return true;
+    });
+}
+
+// JSZip, loaded the first time it is needed. A plain <script> tag does NOT work here: Monaco's AMD loader (in the
+// page head) defines window.define with define.amd, so JSZip's UMD wrapper registers itself as an anonymous AMD
+// module and never creates the global `JSZip` - the script loads without error and `new JSZip()` then throws. Hiding
+// window.define while the file downloads would also hide it from Monaco's own modules loading at that moment, so the
+// file is fetched as text (the service worker caches it, so it works offline after the first time) and run with
+// `define`, `exports` and `module` shadowed: the wrapper then takes its plain-global branch and nothing global is touched.
+const JSZIP_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+let jsZipLoading = null;
+function loadJSZip() {
+    if (typeof window.JSZip === 'function') return Promise.resolve(window.JSZip);
+    if (jsZipLoading) return jsZipLoading; // two clicks while it loads share one download
+    jsZipLoading = fetch(JSZIP_URL, { mode: 'cors', credentials: 'omit' })
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .then(code => {
+            // An inline <script> with the library wrapped in a function whose `define`, `exports` and `module` are
+            // its own (undefined) parameters. It runs on insertion, before the next line.
+            const el = document.createElement('script');
+            el.textContent = '(function (define, exports, module) {\n' + code + '\n}).call(window);';
+            document.head.appendChild(el);
+            el.remove();
+            if (typeof window.JSZip !== 'function') throw new Error('JSZip did not start');
+            return window.JSZip;
+        })
+        .catch(e => { jsZipLoading = null; throw e; }); // a failed load can be retried
+    return jsZipLoading;
+}
+
+// Hands a blob to the browser as a download. The link is in the page while it is clicked (Firefox needs that) and the
+// blob URL lives on for a few seconds: revoking it straight after click() cancels the download in some browsers.
+function triggerBlobDownload(blob, name) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name; a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 4000);
+}
+
+function notifyZipFailed(text) {
+    if (window.showCustomModal) {
+        window.showCustomModal({ title: 'ZIP download failed', text, submitText: 'OK' }, () => { if (typeof closeGenModal === 'function') closeGenModal(); });
+    } else console.error(text);
+}
+
 async function handleDownloadZip() {
     if (downloadSelectedFiles.size === 0) return;
 
-    // Captured before the JSZip CDN load below, which only happens once per
+    // Captured before the JSZip load below, which only happens once per
     // session but can take a moment - if the user switches windows while it's
     // loading, `db` would otherwise point at the new window by the time the
     // folder-children lookup below runs, silently zipping up empty folders
     // instead of the ones actually selected.
     const targetDb = db;
 
-    if (typeof JSZip === 'undefined') {
-        await new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
-            script.onload = resolve;
-            script.onerror = reject;
-            document.head.appendChild(script);
-        });
+    let JSZipLib;
+    try { JSZipLib = await loadJSZip(); }
+    catch (e) {
+        notifyZipFailed('The ZIP library could not be loaded. It needs a connection the first time (after that it works offline). ' + (e && e.message ? '(' + e.message + ')' : ''));
+        return;
     }
 
     const tx = targetDb.transaction('filesystem', 'readonly');
@@ -609,7 +669,7 @@ async function handleDownloadZip() {
         tx.objectStore('filesystem').getAll().onsuccess = e => res(e.target.result);
     });
 
-    const zip = new JSZip();
+    const zip = new JSZipLib();
 
     let lockedSkipped = 0;
     const buildZip = (fileObj, currentFolder) => {
@@ -626,16 +686,14 @@ async function handleDownloadZip() {
         }
     };
 
-    Array.from(downloadSelectedFiles).forEach(f => buildZip(f, zip));
+    selectionRoots(downloadSelectedFiles, allFiles).forEach(f => buildZip(f, zip));
 
-    zip.generateAsync({ type: 'blob' }).then(content => {
-        const url = URL.createObjectURL(content);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `codemini_archive_${Date.now()}.zip`;
-        a.click();
-        URL.revokeObjectURL(url);
+    try {
+        const content = await zip.generateAsync({ type: 'blob' });
+        triggerBlobDownload(content, `codemini_archive_${Date.now()}.zip`);
         toggleDownloadMode();
         notifyLockedSkipped(lockedSkipped);
-    });
+    } catch (e) {
+        notifyZipFailed('The ZIP could not be built: ' + (e && e.message ? e.message : e));
+    }
 }
