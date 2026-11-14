@@ -955,7 +955,7 @@ async function _nbHostPip(winId, pkgs) {
     }
 }
 
-async function runCell(cell, pane) {
+async function _runCellCore(cell, pane) {
     // Workspace Trust: executing a code cell runs workspace content, which Restricted Mode turns off.
     // (Markdown/raw cells only render, and their output is sanitized below, so they stay usable.)
     if ((cell.dataset.cellType || 'code') === 'code' && window.WorkspaceTrust && !window.WorkspaceTrust.guard('Running notebook cells')) return;
@@ -1559,6 +1559,63 @@ _res
         }
         
         setTimeout(() => window.generateTOC(pane), 200);
+    }
+}
+
+// ---- Now Island: a notebook run is a background task (RUNNING, Peek, Stop, the status-bar spinner) ----
+// One task per notebook. Run All owns it (nbBgBegin / nbBgEnd, called by the Run All handlers) and each cell it runs only updates its title;
+// a cell run on its own (Run, Shift+Enter) makes its own task for the length of that cell. A run that ends within a second is never shown.
+// notify:false: finished long runs already have their own notification (notifyNotebookRunDone, above).
+function _nbBgStart(pane, label) {
+    const bg = window.CodeMiniBackground;
+    if (!bg || !pane || !pane.id) return null;
+    const winId = _getWinId();
+    const tab = () => document.querySelector('.tab[data-target="' + pane.id + '"]');
+    const id = 'nb:' + pane.id;
+    const had = bg.get(id);
+    const owned = !(had && had.state === 'running');
+    const task = bg.start({
+        id, kind: 'notebook', title: 'Notebook: ' + _nbTitleOf(pane) + (label || ''), source: 'Notebooks', notify: false, winId,
+        isHidden: () => { const t = tab(); return !t || !t.classList.contains('active'); },
+        onGoto: () => {
+            const go = () => { const t = tab(); if (t) t.click(); };
+            if (_getWinId() !== winId && typeof switchWindow === 'function') { switchWindow(winId); setTimeout(go, 300); } else go();
+        },
+        onStop: () => { const b = pane.querySelector('.tb-interrupt'); if (b) b.click(); } // the same path as the toolbar's Interrupt Kernel
+    });
+    if (!owned && label) task.update({ title: 'Notebook: ' + _nbTitleOf(pane) + label });
+    return { task, owned };
+}
+// A cell clears kernelInterrupted itself when it ends, so a Stop during the LAST cell of a Run All would look like a normal finish to the loop:
+// the cell wrapper notes it here, per task id, and nbBgEnd reads it.
+window._nbBgStopped = {};
+window.nbBgBegin = function (pane) { const b = _nbBgStart(pane, ''); if (b && b.owned) { delete window._nbBgStopped[b.task.id]; return b.task; } return null; };
+window.nbBgEnd = function (task, stopped) {
+    if (!task) return;
+    const was = stopped || !!window._nbBgStopped[task.id];
+    delete window._nbBgStopped[task.id];
+    task.finish(was ? 'stopped' : 'success', was ? 'Stopped' : '');
+};
+
+async function runCell(cell, pane) {
+    // Reporting a task must never be able to stop a cell from running (a stub cell, a pane that is gone): any failure here means no task.
+    let b = null;
+    try { b = _nbBgStart(pane, ', cell [' + getNextExecutionCount(cell) + ']'); } catch (e) { b = null; }
+    try { return await _runCellCore(cell, pane); }
+    finally {
+        if (b && !b.owned) {
+            const o = cell.querySelector('.cell-output');
+            if (o && /^\[Execution Interrupted\]/.test(o.textContent.trim())) window._nbBgStopped[b.task.id] = true;
+        }
+        if (b && b.owned) {
+            // The cell shows how it ended: "[3]:" for a run that completed, otherwise its output says Interrupted or Error.
+            const prompt = cell.querySelector('.cell-prompt'), out = cell.querySelector('.cell-output');
+            const outText = out ? out.textContent.trim() : '';
+            if (prompt && /^\[\d+\]:/.test(prompt.textContent.trim())) b.task.finish('success');
+            else if (/^\[Execution Interrupted\]/.test(outText)) b.task.finish('stopped', 'Stopped');
+            else if (/^Error:/.test(outText)) b.task.fail(outText.split('\n')[0].slice(0, 200));
+            else b.task.finish('success');
+        }
     }
 }
 

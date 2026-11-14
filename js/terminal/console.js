@@ -59,8 +59,14 @@
         const ask = (text) => (window.inlineInputPrompt ? window.inlineInputPrompt(text) : Promise.resolve(window.prompt(text) || ''));
         let res;
         try {
-            res = await window.CodeMiniExec.run(a.activeWinId, { lang, code, opts: { trusted: a.isTrusted, autoInstall: a.autoInstall, sep: '\t' } }, (e) => events.push(e), ask);
+            res = await window.CodeMiniExec.run(a.activeWinId, { lang, code, opts: { trusted: a.isTrusted, autoInstall: a.autoInstall, sep: '\t' } }, (e) => {
+                events.push(e);
+                // Peek in Now Island shows the output as it arrives (text only; rich html output is not shown there).
+                if (a.task && e.kind !== 'html') a.task.log(String(e.text), (e.kind === 'stderr' || e.kind === 'error') ? 'err' : 'out');
+            }, ask);
+            if (a.signal && res && res.error) a.signal.errorText = String(res.error.message || res.error.text || 'The code ended with an error');
         } catch (e) {
+            if (a.signal) a.signal.errorText = e.message;
             // Stop shut the host down on purpose (see the Stop button): that is not a failure, and it must never fall back to the in-app engine.
             if (a.signal && a.signal.interrupted) return red("[Execution Interrupted] Stopped: this window's isolated host was shut down, so its variables were reset.");
             return red(`[${lang === 'javascript' ? 'JS' : a.language} System Error] ${e.message}`);
@@ -716,8 +722,18 @@
                 }
                 if (viaRunner) {
                     inFlightRun = { interrupted: false };
-                    try { mockResponse = await runConsoleViaRunner({ language, command, activeWinId, isTrusted, autoInstall, startTime, signal: inFlightRun }); }
-                    finally { inFlightRun = null; }
+                    // Now Island: a command that takes a while is listed under RUNNING (with Peek and Stop). One that ends at once never is.
+                    const run = inFlightRun;
+                    const snip = command.trim().split('\n')[0].slice(0, 40);
+                    const bgTask = window.CodeMiniBackground ? window.CodeMiniBackground.start({
+                        kind: 'console', title: `Console ${language}: ${snip}`, winId: activeWinId, source: 'Console',
+                        onStop: () => { run.interrupted = true; if (window.CodeMiniExec) window.CodeMiniExec.kill(activeWinId); }
+                    }) : null;
+                    try { mockResponse = await runConsoleViaRunner({ language, command, activeWinId, isTrusted, autoInstall, startTime, signal: run, task: bgTask }); }
+                    finally {
+                        inFlightRun = null;
+                        if (bgTask) { if (run.interrupted) bgTask.finish('stopped', 'Stopped'); else if (run.errorText) bgTask.fail(run.errorText); else bgTask.finish('success'); }
+                    }
                 } else if (language.toLowerCase() === 'php') {
                     try {
                         if (!window.phpWebInstances[activeWinId]) {

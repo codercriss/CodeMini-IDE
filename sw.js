@@ -38,6 +38,7 @@ const STATIC_ASSETS = [
     '/js/git/stacks.js',
     '/js/git/git.js',
     '/js/terminal/terminal-git.js',
+    '/js/core/background-tasks.js',
     '/js/core/now-island.js',
     '/js/core/app-alerts.js',
     '/js/notebook/notebook-kernels.js',

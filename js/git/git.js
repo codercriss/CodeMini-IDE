@@ -3300,11 +3300,44 @@ async function gitCreatePullRequest() {
 // list reload, a repo list finishing - can't leave the status pointing at a dead node.
 function gitSetRemoteProgress(ui, text) {
     gitSetResult(ui, 'remote', 'info', text);
+    gitBgProgress(ui, text);
     // Only a "working" box is updated in place. Without one on screen (or with an old success/error box still
     // showing) there is nothing live to update, and the text must not be written into a box that looks finished.
     const box = document.getElementById('gitRemoteStatus');
     const el = box && box.classList.contains('git-result-info') ? box.querySelector('.git-result-text') : null;
     if (el) el.textContent = text;
+}
+// Now Island: a push, pull or fetch is a background task, so it stays visible (RUNNING, Peek, the status-bar spinner) when
+// Source Control is closed or the person is in another window. The step text that already goes to the status line also goes to the task.
+// notify:false because Git has its own notices for a failure (gitNotify) and its own toast for a success.
+function gitBgStart(ui, verb, ref, branch) {
+    gitBgFinish(ui); // never leave an earlier one dangling
+    if (!window.CodeMiniBackground) return;
+    const sidebar = () => document.getElementById('sourceControlSidebar');
+    ui.bgTask = window.CodeMiniBackground.start({
+        id: 'git-remote',
+        kind: 'git',
+        title: `Git: ${verb} ${ref.full}@${branch}`,
+        source: 'Source Control',
+        notify: false,
+        isHidden: () => { const sb = sidebar(); return !sb || !sb.classList.contains('open'); },
+        onGoto: () => { const sb = sidebar(); if (!sb || !sb.classList.contains('open')) document.getElementById('menuSource')?.click(); }
+    });
+}
+function gitBgProgress(ui, text) {
+    if (!ui || !ui.bgTask) return;
+    const m = /(\d+)\/(\d+)/.exec(text);
+    ui.bgTask.update({ detail: text, progress: m && Number(m[2]) > 0 ? Number(m[1]) / Number(m[2]) : null });
+    ui.bgTask.log(text);
+}
+// Ends the task from whatever the operation left in ui.results.remote (success or error), so there is one place that decides.
+function gitBgFinish(ui) {
+    const t = ui && ui.bgTask;
+    if (!t) return;
+    ui.bgTask = null;
+    const r = ui.results && ui.results.remote;
+    if (r && r.level === 'error') t.fail(r.text);
+    else t.finish('success', r && r.level === 'success' ? r.text : '');
 }
 // Begins a long-running remote operation's status line. Call it right after ui.busy.sync = true. It stores the
 // first text AND redraws the panel, so the working box (and the dimmed Push/Pull/Fetch buttons) are on screen
@@ -3313,6 +3346,7 @@ function gitSetRemoteProgress(ui, text) {
 // tabs, closing and reopening it) re-rendered the panel. Fetch always did this correctly.
 function gitStartRemoteProgress(ui, text) {
     gitSetResult(ui, 'remote', 'info', text);
+    gitBgProgress(ui, text);
     window.renderGitPanel();
 }
 function gitReadRemoteFields(ui) {
@@ -3607,6 +3641,7 @@ async function gitPushToGitHub() {
     const headTree = gitComputeHeadTree(repo, headSha);
 
     ui.busy.sync = true;
+    gitBgStart(ui, 'push', ref, branch);
     gitStartRemoteProgress(ui, `Checking ${ref.full}@${branch}...`);
     const progress = { bootstrapped: false, text: (t) => gitSetRemoteProgress(ui, t) };
     const track = (rec) => { try { gitSaveRemoteTracking(dbName, branch, rec); } catch (e) {} }; // bookkeeping only: never the reason a finished push reads as failed
@@ -3656,7 +3691,7 @@ async function gitPushToGitHub() {
         if (!(e.status === 401 && !e.noToken)) {
             gitNotify({ id: 'git-push-failed', title: 'Push to GitHub failed', text: `${ref.full}@${branch}: ${text}` });
         }
-    } finally { ui.busy.sync = false; window.renderGitPanel(); }
+    } finally { ui.busy.sync = false; gitBgFinish(ui); window.renderGitPanel(); }
 }
 // User-facing "Fetch": checks the remote branch's current state and updates
 // the local remote-tracking record, without touching any working files or
@@ -3669,6 +3704,7 @@ async function gitFetchOnly() {
     const fields = gitReadRemoteFields(ui); if (!fields) return;
     const { ref, branch } = fields;
     const dbName = db.name;
+    gitBgStart(ui, 'fetch', ref, branch);
     ui.busy.sync = true;
     gitSetResult(ui, 'remote', 'info', `Checking ${ref.full}@${branch}...`);
     window.renderGitPanel();
@@ -3684,7 +3720,7 @@ async function gitFetchOnly() {
     } catch (e) {
         gitSetResult(ui, 'remote', 'error', gitFriendlyError(e));
         gitLog('fetch', `Fetch from ${ref.full}@${branch} failed: ${e.message}`, 'error', { repo: ref.full, branch }, dbName);
-    } finally { ui.busy.sync = false; window.renderGitPanel(); }
+    } finally { ui.busy.sync = false; gitBgFinish(ui); window.renderGitPanel(); }
 }
 async function gitPullFromGitHub() {
     const ui = gitUi();
@@ -3700,6 +3736,7 @@ async function gitPullFromGitHub() {
     const doPull = async () => {
         if (ui.busy.sync) return;
         ui.busy.sync = true;
+        gitBgStart(ui, 'pull', ref, branch);
         try {
             gitStartRemoteProgress(ui, 'Fetching repository tree...');
             const refData = await gitHubRequest(`/repos/${ref.full}/git/refs/heads/${branchPath}`);
@@ -3758,7 +3795,7 @@ async function gitPullFromGitHub() {
             if (!(e.status === 401 && !e.noToken)) {
                 gitNotify({ id: 'git-pull-failed', title: 'Pull from GitHub failed', text: `${ref.full}@${branch}: ${gitFriendlyError(e)}` });
             }
-        } finally { ui.busy.sync = false; window.renderGitPanel(); }
+        } finally { ui.busy.sync = false; gitBgFinish(ui); window.renderGitPanel(); }
     };
 
     const doCheckAndPull = async () => {

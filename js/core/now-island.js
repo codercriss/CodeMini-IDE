@@ -11,7 +11,10 @@
             bottom: 30px; /* Above PC status bar (26px) + margin */
             right: 15px;
             width: 370px;
-            height: 290px;
+            /* Grows with its content (a running task, a long list) but never past 72vh; 290px when there is little to show. */
+            height: auto;
+            min-height: 290px;
+            max-height: 72vh;
             background-color: var(--bg-white);
             border: 1px solid var(--border-color);
             border-radius: 4px;
@@ -87,18 +90,28 @@
             flex: 1;
             min-height: 0;
             position: relative;
+            display: flex;
+            flex-direction: column;
             background-color: var(--bg-white);
             border-radius: 0 0 6px 6px;
         }
 
+        /* A pane is a flex column so that it fills a panel that is at its minimum height (the empty states centre in it),
+           and scrolls inside the body once the panel has reached max-height. */
         .ni-pane {
             display: none;
-            height: 100%;
+            flex: 1 1 auto;
+            min-height: 0;
             overflow-y: auto;
         }
 
         .ni-pane.active {
-            display: block;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .ni-pane.active > *:not(.ni-empty) {
+            flex: none;
         }
 
         .ni-badge {
@@ -137,9 +150,16 @@
             align-items: center;
             justify-content: center;
             gap: 6px;
-            height: 100%;
+            flex: 1 0 auto;
+            min-height: 120px;
             color: var(--text-muted);
             font-size: 12px;
+        }
+
+        .ni-empty[hidden],
+        .ni-sec[hidden],
+        #niPeekDock[hidden] {
+            display: none;
         }
 
         .ni-empty i {
@@ -444,6 +464,375 @@
             to { opacity: 0; transform: translateY(12px); }
         }
 
+
+        /* ---- Background tasks: RUNNING and RECENTLY FINISHED in the Now pane (flat rows, no cards) ---- */
+        .ni-sec-running > .sb-section-header {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background-color: var(--bg-white);
+        }
+
+        .ni-task-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .ni-task {
+            position: relative;
+            background-color: var(--bg-white);
+            border-bottom: 1px dashed var(--border-color);
+            padding: 10px 15px;
+        }
+
+        .ni-task:hover {
+            background-color: var(--bg-panel);
+        }
+
+        /* While it runs, the 2px progress line replaces the dashed border. */
+        .ni-task[data-state="running"] {
+            border-bottom-color: transparent;
+        }
+
+        .ni-task-top {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .ni-task-icon {
+            flex: none;
+            font-size: 16px;
+            color: var(--icon-gray);
+        }
+
+        .ni-task[data-state="success"] .ni-task-icon { color: var(--accent-new, #00897b); }
+        .ni-task[data-state="error"] .ni-task-icon { color: var(--color-danger); }
+        .ni-task[data-state="stopped"] .ni-task-icon { color: var(--text-muted); }
+
+        .ni-task-title {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .ni-task-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: none;
+        }
+
+        .ni-link {
+            padding: 0;
+            border: 0;
+            background: none;
+            font: inherit;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--accent-blue);
+            cursor: pointer;
+        }
+
+        .ni-link:hover,
+        .ni-link:focus-visible {
+            text-decoration: underline;
+        }
+
+        .ni-link:disabled {
+            color: var(--text-muted);
+            cursor: default;
+            text-decoration: none;
+        }
+
+        .ni-task-sub {
+            margin: 3px 0 0 24px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 11px;
+            font-variant-numeric: tabular-nums;
+            color: var(--text-muted);
+        }
+
+        .ni-task[data-state="error"] .ni-task-sub {
+            color: var(--color-danger);
+        }
+
+        .ni-task-bar {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 2px;
+            overflow: hidden;
+        }
+
+        .ni-task-bar > span {
+            display: block;
+            width: 0;
+            height: 100%;
+            background-color: var(--accent-blue);
+            transition: width 0.3s ease;
+        }
+
+        .ni-task-bar.indeterminate > span {
+            width: 35%;
+            animation: niShimmer 1.2s ease-in-out infinite;
+        }
+
+        @keyframes niShimmer {
+            from { transform: translateX(-100%); }
+            to { transform: translateX(300%); }
+        }
+
+        @keyframes niSpin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Peek: opens under its row, inline, so nothing covers the page and nothing takes focus. */
+        .ni-peek {
+            margin: 8px 0 2px 24px;
+        }
+
+        .ni-peek-meta {
+            margin-bottom: 6px;
+            font-size: 11px;
+            color: var(--text-muted);
+            overflow-wrap: anywhere;
+        }
+
+        .ni-peek-log,
+        .ni-pp-body,
+        .ni-log-full {
+            background-color: var(--bg-panel);
+            font-family: var(--font-mono);
+            font-size: 11px;
+            line-height: 1.45;
+            color: var(--text-main);
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        .ni-peek-log {
+            padding: 6px 8px;
+            max-height: 7.4em;
+            overflow: hidden;
+        }
+
+        .ni-peek-line.err { color: var(--color-danger); }
+        .ni-peek-empty { color: var(--text-muted); font-style: italic; }
+
+        .ni-peek-actions {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-top: 8px;
+        }
+
+        .ni-peek-actions .ni-icon-btn {
+            margin-left: auto;
+        }
+
+        .ni-icon-btn[aria-pressed="true"] {
+            color: var(--accent-blue);
+        }
+
+        .ni-log-full {
+            margin: 10px 0 0;
+            padding: 8px 10px;
+        }
+
+        .ni-log-full .err { color: var(--color-danger); }
+
+        /* ---- Floating Peek panel: a pinned task stays on screen after the island closes ---- */
+        #niPeekDock {
+            position: fixed;
+            right: 15px;
+            bottom: 32px;
+            width: 320px;
+            max-width: calc(100vw - 20px);
+            z-index: 9998; /* below the island (9999), above the editor, below modals */
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: none; /* only the panels take clicks: everything around them passes through */
+        }
+
+        #niPeekDock.dragged {
+            right: auto;
+            bottom: auto;
+        }
+
+        .ni-pp {
+            pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+            max-height: 180px;
+            overflow: hidden;
+            background-color: var(--bg-white);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-shadow: 0 4px 20px var(--shadow-color);
+            color: var(--text-main);
+            animation: ntFadeIn 0.25s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+        }
+
+        .ni-pp.fade-out {
+            animation: ntFadeOut 0.25s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+        }
+
+        .ni-pp-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 10px;
+            cursor: grab;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .ni-pp-icon { flex: none; font-size: 16px; color: var(--icon-gray); }
+        .ni-pp[data-state="success"] .ni-pp-icon { color: var(--accent-new, #00897b); }
+        .ni-pp[data-state="error"] .ni-pp-icon { color: var(--color-danger); }
+
+        .ni-pp-title {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .ni-pp-time {
+            flex: none;
+            font-size: 11px;
+            font-variant-numeric: tabular-nums;
+            color: var(--text-muted);
+        }
+
+        .ni-pp-body {
+            flex: 1 1 auto;
+            min-height: 0;
+            padding: 6px 10px;
+            max-height: 7.4em;
+            overflow: hidden;
+        }
+
+        .ni-pp-foot {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 6px 10px;
+            border-top: 1px solid var(--border-color);
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .ni-pp-foot .ni-pp-note {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .ni-pp[data-state="error"] .ni-pp-note { color: var(--color-danger); }
+
+        .ni-pp.collapsed .ni-pp-body,
+        .ni-pp.collapsed .ni-pp-foot {
+            display: none;
+        }
+
+        .ni-pp-more {
+            pointer-events: auto;
+            align-self: flex-end;
+            padding: 2px 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            background-color: var(--bg-white);
+            font: inherit;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--accent-blue);
+            cursor: pointer;
+        }
+
+        /* ---- Status-bar button: a spinner and the running count in place of the icon, then a brief check or cross ---- */
+        #nowIsland .ni-run {
+            display: none;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1;
+            font-variant-numeric: tabular-nums;
+            color: var(--accent-blue);
+        }
+
+        #nowIsland.has-running .ni-run,
+        #nowIsland.ni-flash .ni-run {
+            display: inline-flex;
+        }
+
+        #nowIsland.has-running > i:first-child,
+        #nowIsland.ni-flash > i:first-child {
+            display: none;
+        }
+
+        .ni-run-ring {
+            width: 12px;
+            height: 12px;
+            box-sizing: border-box;
+            border: 2px solid var(--accent-blue);
+            border-right-color: transparent;
+            border-radius: 50%;
+            animation: niSpin 0.8s linear infinite;
+        }
+
+        .ni-run-ring.flash {
+            width: auto;
+            height: auto;
+            border: 0;
+            border-radius: 0;
+            animation: none;
+            font-size: 14px;
+            line-height: 1;
+        }
+
+        .ni-run-ring.flash.ok { color: var(--accent-new, #00897b); }
+        .ni-run-ring.flash.bad { color: var(--color-danger); }
+        .ni-run-count:empty { display: none; }
+
+        /* A window that is not the active one and has something running. */
+        .window-tab.has-running::after {
+            content: '';
+            flex: none;
+            width: 9px;
+            height: 9px;
+            box-sizing: border-box;
+            border: 2px solid var(--accent-blue);
+            border-right-color: transparent;
+            border-radius: 50%;
+            animation: niSpin 0.8s linear infinite;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .ni-task-bar.indeterminate > span { animation: none; width: 100%; opacity: 0.45; }
+            .ni-run-ring,
+            .window-tab.has-running::after { animation: none; }
+            .ni-pp, .ni-pp.fade-out { animation: none; }
+            .ni-task-bar > span { transition: none; }
+        }
+
         /* Mobile Adaptations */
         @media (max-width: 768px) {
             /* Same spot as the app's own mobile toast: full width, above the status bar */
@@ -464,7 +853,26 @@
                 /* Adapts to account for the 45px activity bar */
                 left: 55px; 
                 width: auto;
-                height: 340px;
+                height: auto;
+                min-height: 340px; /* the app's existing phone height is the minimum; it grows (to 60vh) only when there is content */
+                max-height: 60vh;
+            }
+
+            /* Pinned Peek panels become a strip above the status bar, beside the activity bar, like the island itself. */
+            #niPeekDock {
+                left: 55px;
+                right: 10px;
+                bottom: 55px;
+                width: auto;
+                max-width: none;
+            }
+
+            body.hide-activity-bar #niPeekDock {
+                left: 10px;
+            }
+
+            html.is-android #niPeekDock {
+                bottom: 35px;
             }
             
             /* Dynamically adapts width if the layout hides the activity bar */
@@ -516,6 +924,7 @@
     const badge = panel.querySelector('#niUnreadBadge');
     const listeners = new Set();
     let openViewerId = null;
+    let viewerTask = null; // id of the background task whose full output the viewer shows (the viewer serves notifications and task output)
 
     function loadNotifications() {
         try {
@@ -571,13 +980,9 @@
         badge.hidden = unread === 0;
         if (nowIslandBtn) {
             nowIslandBtn.classList.toggle('has-unread', unread > 0);
-            if (unread > 0) {
-                nowIslandBtn.dataset.unread = badge.textContent; // same text as the tab badge (99+ cap)
-                nowIslandBtn.setAttribute('aria-label', 'Now Island, ' + unread + ' unread notification' + (unread === 1 ? '' : 's'));
-            } else {
-                delete nowIslandBtn.dataset.unread;
-                nowIslandBtn.removeAttribute('aria-label');
-            }
+            if (unread > 0) nowIslandBtn.dataset.unread = badge.textContent; // same text as the tab badge (99+ cap)
+            else delete nowIslandBtn.dataset.unread;
+            updateButtonLabel();
         }
 
         notifPane.textContent = '';
@@ -842,6 +1247,9 @@
 
     function hideViewer() {
         openViewerId = null;
+        viewerTask = null;
+        viewer._lv = null;
+        viewer.setAttribute('aria-label', 'Notification');
         viewer.classList.remove('show');
         viewer.textContent = '';
     }
@@ -858,7 +1266,7 @@
         if (!tabs[index]) index = 0; // a stale or hand-edited saved index
         tabs.forEach((t, i) => t.classList.toggle('active', i === index));
         panes.forEach(p => p.classList.toggle('active', p.dataset.pane === (tabs[index] && tabs[index].dataset.pane)));
-        if (index !== 1) hideViewer();
+        if (index !== 1 || viewerTask) hideViewer(); // the notifications viewer belongs to tab 1, the task-output viewer to tab 0
     }
 
     function openNotification(id) {
@@ -897,7 +1305,7 @@
     });
 
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && openViewerId && panel.classList.contains('show')) hideViewer();
+        if (e.key === 'Escape' && (openViewerId || viewerTask) && panel.classList.contains('show')) hideViewer();
     });
 
     // Another tab of the app added or removed something.
@@ -933,6 +1341,473 @@
         unreadCount,
         onChange: (fn) => { listeners.add(fn); return () => listeners.delete(fn); }
     });
+
+
+    // 5. Background tasks: RUNNING and RECENTLY FINISHED in the Now pane, Peek, the floating Peek panel, the status-bar spinner and the
+    //    spinner on a background window's tab. The registry is js/core/background-tasks.js (no DOM there); everything below is drawn with
+    //    createElement and textContent only, because a task's title and output come from user code, a repository or a file name.
+    const bg = window.CodeMiniBackground || null;
+    const nowPane = panel.querySelector('.ni-pane[data-pane="now"]');
+    const peekOpen = new Set();   // tasks whose Peek is expanded in the list
+    const isPhone = () => !!(window.matchMedia && window.matchMedia('(max-width: 768px)').matches);
+
+    function linkButton(text, label, onClick) {
+        const b = el('button', 'ni-link', text);
+        b.type = 'button';
+        if (label) b.setAttribute('aria-label', label);
+        // Same reason as iconButton: the node can be replaced by the next refresh before the click reaches the document.
+        b.addEventListener('click', (e) => { e.stopPropagation(); onClick(e); });
+        return b;
+    }
+
+    function pad2(v) { return String(v).padStart(2, '0'); }
+    function fmtElapsed(ms) {
+        const s = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+        return h ? h + ':' + pad2(m) + ':' + pad2(s % 60) : pad2(m) + ':' + pad2(s % 60);
+    }
+    function fmtTook(ms) {
+        const s = Math.max(1, Math.round(ms / 1000));
+        return s >= 60 ? Math.floor(s / 60) + ' min ' + (s % 60) + ' s' : s + ' s';
+    }
+    const AWAY_NOTE = { app: 'app in background', window: 'in another window', tab: 'in another tab' };
+    const END_ICON = { success: 'ri-checkbox-circle-fill', error: 'ri-close-circle-fill', stopped: 'ri-stop-circle-line' };
+
+    // The second line of a row ("Running 00:42, in another tab").
+    function subLine(s) {
+        if (s.state === 'running') {
+            const t = (s.stopping ? 'Stopping ' : 'Running ') + fmtElapsed(Date.now() - s.startedAt);
+            return AWAY_NOTE[s.awayReason] ? t + ', ' + AWAY_NOTE[s.awayReason] : t;
+        }
+        if (s.state === 'error') return s.text || 'It ended with an error';
+        if (s.state === 'stopped') return 'Stopped after ' + fmtTook(s.endedAt - s.startedAt);
+        return 'Finished in ' + fmtTook(s.endedAt - s.startedAt) + (s.text ? ', ' + s.text : '');
+    }
+
+    function openNowTab() {
+        panel.classList.add('show');
+        dismissAllToasts();
+        setActiveTab(0);
+        if (window.saveCurrentUIState) window.saveCurrentUIState();
+    }
+    function goTo(id) { if (bg && bg.goto(id)) setOpen(false); } // the target is on the page, so get out of its way
+    function togglePin(id) { if (bg) { if (bg.isPinned(id)) bg.unpin(id); else bg.pin(id); } }
+
+    // ---- the last lines of output, as plain text ----
+    function fillLog(box, lines, emptyText) {
+        const key = lines.map((l) => l.stream + ':' + l.text).join('\n');
+        if (box._key === key) return;
+        box._key = key;
+        box.textContent = '';
+        if (!lines.length) { box.appendChild(el('div', 'ni-peek-empty', emptyText || 'No output yet')); return; }
+        lines.forEach((l) => box.appendChild(el('div', 'ni-peek-line' + (l.stream === 'err' ? ' err' : ''), l.text || '\u00a0')));
+    }
+
+    // ---- list rows. Built once per task and updated in place: a refresh every second must not replace a button between
+    //      the press and the release of a click, nor drop keyboard focus. A row is rebuilt only when its shape changes (it ended). ----
+    function buildRow(s) {
+        const li = el('li', 'ni-task');
+        li.dataset.id = s.id;
+        li.dataset.state = s.state;
+        const r = li._r = { icon: el('i', 'ni-task-icon'), title: el('div', 'ni-task-title'), sub: el('div', 'ni-task-sub'), actions: el('div', 'ni-task-actions'),
+            peekBtn: null, stopBtn: null, bar: null, fill: null, peek: null };
+        r.peekBtn = linkButton('Peek', null, () => { if (peekOpen.has(s.id)) peekOpen.delete(s.id); else peekOpen.add(s.id); updateNowPane(); });
+        r.actions.appendChild(r.peekBtn);
+        if (s.state === 'running') {
+            if (s.canGoto) r.actions.appendChild(iconButton('ri-external-link-line', 'Go to', '', () => goTo(s.id)));
+            if (s.stoppable) { r.stopBtn = iconButton('ri-stop-mini-fill', 'Stop', 'danger', () => bg.stop(s.id)); r.actions.appendChild(r.stopBtn); }
+        } else {
+            r.actions.appendChild(iconButton('ri-close-line', 'Dismiss', '', () => bg.dismiss(s.id)));
+        }
+        const top = el('div', 'ni-task-top');
+        top.append(r.icon, r.title, r.actions);
+        li.append(top, r.sub);
+        if (s.state === 'running') {
+            r.bar = el('div', 'ni-task-bar');
+            r.bar.setAttribute('role', 'progressbar');
+            r.bar.setAttribute('aria-valuemin', '0');
+            r.bar.setAttribute('aria-valuemax', '100');
+            r.fill = el('span');
+            r.bar.appendChild(r.fill);
+            li.appendChild(r.bar);
+        }
+        return li;
+    }
+
+    function buildPeek(s) {
+        const root = el('div', 'ni-peek');
+        const pk = { root, meta: el('div', 'ni-peek-meta'), log: el('div', 'ni-peek-log'), stopLink: null, fullLink: null, pinBtn: null };
+        const actions = el('div', 'ni-peek-actions');
+        if (s.state === 'running' && s.stoppable) { pk.stopLink = linkButton('Stop', null, () => bg.stop(s.id)); actions.appendChild(pk.stopLink); }
+        pk.fullLink = linkButton('View full output', null, () => showLogViewer(s.id));
+        actions.appendChild(pk.fullLink);
+        pk.pinBtn = iconButton('ri-pushpin-2-line', 'Pin to screen', '', () => togglePin(s.id));
+        actions.appendChild(pk.pinBtn);
+        root.append(pk.meta, pk.log, actions);
+        return pk;
+    }
+
+    function updatePeek(pk, s) {
+        pk.meta.textContent = s.state === 'running'
+            ? 'Elapsed ' + fmtElapsed(Date.now() - s.startedAt) + (s.detail ? ', ' + s.detail : '') + (AWAY_NOTE[s.awayReason] ? ', ' + AWAY_NOTE[s.awayReason] : '')
+            : subLine(s);
+        fillLog(pk.log, bg.tail(s.id, 4));
+        if (pk.stopLink) pk.stopLink.disabled = s.stopping;
+        pk.fullLink.hidden = s.lines === 0;
+        pk.pinBtn.setAttribute('aria-pressed', String(s.pinned));
+        pk.pinBtn.title = s.pinned ? 'Unpin from screen' : 'Pin to screen';
+        pk.pinBtn.setAttribute('aria-label', pk.pinBtn.title);
+        const ic = pk.pinBtn.firstChild;
+        if (ic) ic.className = s.pinned ? 'ri-pushpin-2-fill' : 'ri-pushpin-2-line';
+    }
+
+    function updateRow(li, s) {
+        const r = li._r;
+        r.icon.className = 'ni-task-icon ' + (s.state === 'running' ? s.icon : END_ICON[s.state]);
+        r.title.textContent = s.title;
+        r.title.title = s.title;
+        r.sub.textContent = subLine(s);
+        r.peekBtn.setAttribute('aria-label', 'Peek: ' + s.title);
+        if (r.stopBtn) r.stopBtn.disabled = s.stopping;
+        if (r.bar) {
+            const known = s.progress !== null;
+            r.bar.classList.toggle('indeterminate', !known);
+            r.fill.style.width = known ? Math.round(s.progress * 100) + '%' : '';
+            if (known) r.bar.setAttribute('aria-valuenow', String(Math.round(s.progress * 100))); else r.bar.removeAttribute('aria-valuenow');
+        }
+        const open = peekOpen.has(s.id);
+        r.peekBtn.setAttribute('aria-expanded', String(open));
+        if (open) {
+            if (!r.peek) { r.peek = buildPeek(s); li.insertBefore(r.peek.root, r.bar || null); }
+            updatePeek(r.peek, s);
+        } else if (r.peek) {
+            r.peek.root.remove();
+            r.peek = null;
+        }
+    }
+
+    function reconcileRows(list, snaps) {
+        const have = new Map(Array.from(list.children).map((li) => [li.dataset.id, li]));
+        snaps.forEach((s, i) => {
+            let li = have.get(s.id);
+            if (li && li.dataset.state !== s.state) { li.remove(); li = null; }
+            if (!li) li = buildRow(s);
+            have.delete(s.id);
+            updateRow(li, s);
+            const at = list.children[i] || null;
+            if (at !== li) list.insertBefore(li, at);
+        });
+        have.forEach((li) => li.remove());
+    }
+
+    function buildSection(label, cls, listLabel) {
+        const root = el('div', 'ni-sec ' + cls);
+        const head = el('div', 'sb-section-header');
+        const left = el('span');
+        const badge = el('span', 'sb-count-badge', '0');
+        left.append(document.createTextNode(label), badge);
+        head.appendChild(left);
+        const list = el('ul', 'ni-task-list');
+        list.setAttribute('aria-label', listLabel);
+        root.append(head, list);
+        return { root, head, badge, list };
+    }
+
+    const secRunning = buildSection('RUNNING', 'ni-sec-running', 'Running tasks');
+    const secFinished = buildSection('RECENTLY FINISHED', 'ni-sec-finished', 'Recently finished tasks');
+    secFinished.head.appendChild(linkButton('Clear', 'Clear recently finished', () => { if (bg) bg.dismissAllFinished(); }));
+    const emptyNow = el('div', 'ni-empty');
+    emptyNow.append(el('i', 'ri-checkbox-circle-line'), el('span', null, 'Nothing is running'));
+    if (nowPane) nowPane.append(secRunning.root, secFinished.root, emptyNow);
+
+    function updateNowPane() {
+        if (!bg || !nowPane) return;
+        const run = bg.running(), fin = bg.finished();
+        secRunning.root.hidden = !run.length;
+        secFinished.root.hidden = !fin.length;
+        emptyNow.hidden = run.length + fin.length > 0;
+        secRunning.badge.textContent = String(run.length);
+        secFinished.badge.textContent = String(fin.length);
+        reconcileRows(secRunning.list, run);
+        reconcileRows(secFinished.list, fin);
+        const live = new Set(run.concat(fin).map((x) => x.id));
+        peekOpen.forEach((id) => { if (!live.has(id)) peekOpen.delete(id); });
+        if (viewerTask) updateLogViewer();
+    }
+
+    // ---- "View full output": the same slide-over the notifications use (it is not a modal) ----
+    function showLogViewer(id) {
+        if (!bg || !bg.get(id)) return;
+        openViewerId = null;
+        viewerTask = id;
+        viewer.setAttribute('aria-label', 'Task output');
+        viewer.textContent = '';
+        const header = el('div', 'ni-viewer-header');
+        const left = el('div', 'ni-viewer-left');
+        const title = el('div', 'ni-viewer-title');
+        left.append(iconButton('ri-arrow-left-line', 'Back', 'ni-viewer-back', hideViewer), title);
+        header.appendChild(left);
+        const content = el('div', 'ni-viewer-content');
+        const meta = el('div', 'ni-viewer-time');
+        const pre = el('pre', 'ni-log-full');
+        const actions = el('div', 'ni-viewer-actions');
+        const stopBtn = el('button', 'ni-btn', 'Stop');
+        stopBtn.type = 'button';
+        stopBtn.addEventListener('click', (e) => { e.stopPropagation(); bg.stop(id); });
+        const copyBtn = el('button', 'ni-btn', 'Copy output');
+        copyBtn.type = 'button';
+        copyBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const text = bg.log(id).map((l) => l.text).join('\n');
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(() => { copyBtn.textContent = 'Copied'; setTimeout(() => { copyBtn.textContent = 'Copy output'; }, 1500); },
+                        () => { copyBtn.textContent = 'Copy failed'; setTimeout(() => { copyBtn.textContent = 'Copy output'; }, 1500); });
+                }
+            } catch (err) { copyBtn.textContent = 'Copy failed'; }
+        });
+        actions.append(stopBtn, copyBtn);
+        content.append(meta, pre, actions);
+        viewer.append(header, content);
+        viewer._lv = { title, content, meta, pre, stopBtn };
+        viewer.classList.add('show');
+        updateLogViewer();
+    }
+
+    function updateLogViewer() {
+        const lv = viewer._lv, s = viewerTask && bg ? bg.get(viewerTask) : null;
+        if (!lv || !s) { hideViewer(); return; }
+        const atEnd = lv.content.scrollHeight - lv.content.scrollTop - lv.content.clientHeight < 24;
+        lv.title.textContent = s.title;
+        lv.title.title = s.title;
+        lv.meta.textContent = 'Started ' + new Date(s.startedAt).toLocaleTimeString() + '. ' + subLine(s);
+        const lines = bg.log(s.id);
+        const key = lines.map((l) => l.stream + ':' + l.text).join('\n');
+        if (lv.pre._key !== key) {
+            lv.pre._key = key;
+            lv.pre.textContent = '';
+            if (!lines.length) lv.pre.appendChild(el('span', 'ni-peek-empty', 'No output'));
+            lines.forEach((l) => lv.pre.appendChild(el('div', l.stream === 'err' ? 'err' : null, l.text || '\u00a0')));
+        }
+        lv.stopBtn.hidden = !(s.state === 'running' && s.stoppable);
+        lv.stopBtn.disabled = s.stopping;
+        if (atEnd) lv.content.scrollTop = lv.content.scrollHeight;
+    }
+
+    // ---- the status-bar button: spinner + running count instead of the icon, a brief check or cross, a tooltip ----
+    let runEl = null, runRing = null, runCount = null, flashTimer = null;
+    if (nowIslandBtn) {
+        runEl = el('span', 'ni-run');
+        runRing = el('span', 'ni-run-ring');
+        runRing.setAttribute('aria-hidden', 'true');
+        runCount = el('span', 'ni-run-count');
+        runEl.append(runRing, runCount);
+        nowIslandBtn.appendChild(runEl);
+    }
+
+    // One place writes the button's label, because both the unread count and the running count feed it.
+    function updateButtonLabel() {
+        if (!nowIslandBtn) return;
+        const running = bg ? bg.runningCount() : 0, unread = unreadCount();
+        const parts = [];
+        if (running) parts.push(running + ' running');
+        if (unread) parts.push(unread + ' unread');
+        if (!parts.length) { nowIslandBtn.removeAttribute('aria-label'); nowIslandBtn.removeAttribute('title'); return; }
+        nowIslandBtn.title = parts.join(', ');
+        // With nothing running this is the sentence it has always been.
+        nowIslandBtn.setAttribute('aria-label', running ? 'Now Island, ' + parts.join(', ') : 'Now Island, ' + unread + ' unread notification' + (unread === 1 ? '' : 's'));
+    }
+
+    function updateStatus() {
+        if (!bg || !nowIslandBtn) return;
+        const n = bg.runningCount();
+        nowIslandBtn.classList.toggle('has-running', n > 0);
+        runCount.textContent = n > 0 ? String(n) : '';
+        const f = bg.takeFlash();
+        if (f && f.state !== 'stopped') {
+            runRing.className = 'ni-run-ring flash ' + (f.state === 'error' ? 'bad ri-close-line' : 'ok ri-check-line');
+            nowIslandBtn.classList.add('ni-flash');
+            clearTimeout(flashTimer);
+            flashTimer = setTimeout(() => { nowIslandBtn.classList.remove('ni-flash'); runRing.className = 'ni-run-ring'; }, 1200);
+        }
+        updateButtonLabel();
+    }
+
+    // A window that is not the active one and has something running gets a small spinner on its tab.
+    function syncWindowTabs() {
+        const bar = document.getElementById('windowBar');
+        if (!bar || !bg) return;
+        let active = 'win_default';
+        try { active = localStorage.getItem('codemini_active_window') || 'win_default'; } catch (e) { /* default window */ }
+        const busy = new Set(bg.running().filter((s) => s.winId).map((s) => s.winId));
+        bar.querySelectorAll('.window-tab[data-id]').forEach((t) => t.classList.toggle('has-running', busy.has(t.dataset.id) && t.dataset.id !== active));
+    }
+
+    // ---- the floating Peek panel (a task the person pinned) ----
+    const dock = el('div');
+    dock.id = 'niPeekDock';
+    dock.hidden = true;
+    document.body.appendChild(dock);
+    const dockMore = el('button', 'ni-pp-more');
+    dockMore.type = 'button';
+    dockMore.addEventListener('click', (e) => { e.stopPropagation(); openNowTab(); });
+    const collapsedPanels = new Set(), keptPanels = new Set(), fadeTimers = new Map();
+    const PANEL_FADE_MS = 8000, PANEL_FADE_RESUME_MS = 3000;
+
+    function panelFor(id) { return Array.from(dock.children).find((c) => c.dataset && c.dataset.id === id) || null; }
+    function clearFade(id) { clearTimeout(fadeTimers.get(id)); fadeTimers.delete(id); }
+    function armFade(id, ms) {
+        clearFade(id);
+        fadeTimers.set(id, setTimeout(() => {
+            const p = panelFor(id);
+            if (!p || keptPanels.has(id)) { fadeTimers.delete(id); return; }
+            p.classList.add('fade-out');
+            // Animations can be switched off (reduced motion, Performance Mode): the timer, not animationend, finishes the job.
+            setTimeout(() => { fadeTimers.delete(id); if (bg) bg.unpin(id); }, 260);
+        }, ms));
+    }
+    function closePanel(id) { clearFade(id); if (bg) bg.unpin(id); } // the task itself carries on (or stays in RECENTLY FINISHED)
+
+    function buildPanel(s) {
+        const p = el('div', 'ni-pp');
+        p.dataset.id = s.id;
+        p.setAttribute('role', 'group');
+        const r = p._r = { icon: el('i', 'ni-pp-icon'), title: el('div', 'ni-pp-title'), time: el('span', 'ni-pp-time'), body: el('div', 'ni-pp-body'),
+            note: el('span', 'ni-pp-note'), foot: el('div', 'ni-pp-foot'), footKey: '', goBtn: null, keepBtn: null, collBtn: null };
+        const head = el('div', 'ni-pp-head');
+        r.keepBtn = iconButton('ri-pushpin-2-line', 'Keep open', '', () => {
+            if (keptPanels.has(s.id)) { keptPanels.delete(s.id); } else { keptPanels.add(s.id); clearFade(s.id); }
+            syncDock();
+        });
+        r.collBtn = iconButton('ri-subtract-line', 'Collapse', '', () => {
+            if (collapsedPanels.has(s.id)) collapsedPanels.delete(s.id); else collapsedPanels.add(s.id);
+            syncDock();
+        });
+        head.append(r.icon, r.title, r.time);
+        if (s.canGoto) head.appendChild(iconButton('ri-external-link-line', 'Go to', '', () => bg.goto(s.id)));
+        head.append(r.keepBtn, r.collBtn, iconButton('ri-close-line', 'Close', '', () => closePanel(s.id)));
+        p.append(head, r.body, r.foot);
+        if (isPhone()) collapsedPanels.add(s.id); // on a phone a panel starts as a one-line strip
+        // Hovering or focusing it holds the countdown, like the toasts.
+        p.addEventListener('mouseenter', () => clearFade(s.id));
+        p.addEventListener('mouseleave', () => { if (fadeTimers.has(s.id) || /^(success|stopped)$/.test(p.dataset.state)) { if (!keptPanels.has(s.id)) armFade(s.id, PANEL_FADE_RESUME_MS); } });
+        p.addEventListener('focusin', () => clearFade(s.id));
+        // Esc only does something while the panel itself has focus: it never steals the key from the editor.
+        p.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); closePanel(s.id); } });
+        // A swipe to the right dismisses it on a phone.
+        let sx = 0, sy = 0;
+        p.addEventListener('touchstart', (e) => { const t = e.touches[0]; sx = t.clientX; sy = t.clientY; }, { passive: true });
+        p.addEventListener('touchend', (e) => {
+            if (!isPhone()) return;
+            const t = e.changedTouches[0];
+            if (t.clientX - sx > 70 && Math.abs(t.clientY - sy) < 40) closePanel(s.id);
+        }, { passive: true });
+        return p;
+    }
+
+    function updatePanel(p, s) {
+        const r = p._r, id = s.id;
+        p.dataset.state = s.state;
+        p.setAttribute('aria-label', 'Task: ' + s.title);
+        r.icon.className = 'ni-pp-icon ' + (s.state === 'running' ? s.icon : END_ICON[s.state]);
+        r.title.textContent = s.title;
+        r.title.title = s.title;
+        r.time.textContent = s.state === 'running' ? fmtElapsed(Date.now() - s.startedAt) : fmtTook(s.endedAt - s.startedAt);
+        fillLog(r.body, bg.tail(id, 4));
+        const collapsed = collapsedPanels.has(id);
+        p.classList.toggle('collapsed', collapsed);
+        r.collBtn.title = collapsed ? 'Expand' : 'Collapse';
+        r.collBtn.setAttribute('aria-label', r.collBtn.title);
+        r.collBtn.firstChild.className = collapsed ? 'ri-add-line' : 'ri-subtract-line';
+        r.keepBtn.setAttribute('aria-pressed', String(keptPanels.has(id)));
+        // The foot is rebuilt only when what it offers changes.
+        const key = s.state + '|' + s.stopping + '|' + s.stoppable + '|' + s.canGoto;
+        if (r.footKey !== key) {
+            r.footKey = key;
+            r.foot.textContent = '';
+            r.foot.appendChild(r.note);
+            if (s.state === 'running' && s.stoppable) { const b = linkButton('Stop', null, () => bg.stop(id)); b.disabled = s.stopping; r.foot.appendChild(b); }
+            if (s.state === 'error') r.foot.appendChild(linkButton('Open', null, () => { if (!bg.goto(id)) openNowTab(); }));
+        }
+        r.note.textContent = s.state === 'running' ? (s.stopping ? 'Stopping' : 'Running') + (s.detail ? ', ' + s.detail : '')
+            : s.state === 'error' ? (s.text || 'It ended with an error') : s.state === 'stopped' ? 'Stopped' : 'Finished in ' + fmtTook(s.endedAt - s.startedAt);
+        // Success fades after a while unless it is hovered or kept; a failure stays until it is closed.
+        if (s.state === 'success' || s.state === 'stopped') {
+            if (!keptPanels.has(id) && !fadeTimers.has(id) && !p.matches(':hover') && !p.contains(document.activeElement)) armFade(id, PANEL_FADE_MS);
+        } else clearFade(id);
+    }
+
+    let dockDragged = false;
+    function placeDock(x, y) {
+        const w = dock.offsetWidth, h = dock.offsetHeight;
+        x = Math.min(Math.max(0, x), Math.max(0, window.innerWidth - w));
+        y = Math.min(Math.max(0, y), Math.max(0, window.innerHeight - h));
+        dockDragged = true;
+        dock.classList.add('dragged');
+        dock.style.left = x + 'px';
+        dock.style.top = y + 'px';
+    }
+    function resetDockPlace() { dockDragged = false; dock.classList.remove('dragged'); dock.style.left = ''; dock.style.top = ''; }
+
+    function syncDock() {
+        if (!bg) return;
+        const pinned = bg.pinned();
+        const covered = panel.classList.contains('show'); // hidden while the island is open: the same rows are in front of the person
+        dock.hidden = covered || !pinned.length;
+        if (dock.hidden) return;
+        if (isPhone() && dockDragged) resetDockPlace();
+        const max = isPhone() ? 2 : 3, shown = pinned.slice(0, max);
+        const have = new Map(Array.from(dock.children).filter((c) => c.classList.contains('ni-pp')).map((c) => [c.dataset.id, c]));
+        shown.forEach((s, i) => {
+            let p = have.get(s.id);
+            if (!p) p = buildPanel(s);
+            have.delete(s.id);
+            updatePanel(p, s);
+            const at = dock.children[i] || null;
+            if (at !== p) dock.insertBefore(p, at);
+        });
+        have.forEach((p, id) => p.remove());
+        const live = new Set(pinned.map((x) => x.id));
+        [collapsedPanels, keptPanels].forEach((set) => set.forEach((id) => { if (!live.has(id)) set.delete(id); }));
+        Array.from(fadeTimers.keys()).forEach((id) => { if (!live.has(id)) clearFade(id); });
+        if (pinned.length > shown.length) {
+            dockMore.textContent = '+' + (pinned.length - shown.length) + ' more';
+            if (dockMore.parentNode !== dock) dock.appendChild(dockMore);
+        } else if (dockMore.parentNode === dock) dock.removeChild(dockMore);
+        if (dockDragged) placeDock(parseFloat(dock.style.left) || 0, parseFloat(dock.style.top) || 0); // the dock may have grown: keep it on screen
+    }
+
+    // Drag by the header (not on a phone, where the strip has a fixed place).
+    let drag = null;
+    dock.addEventListener('pointerdown', (e) => {
+        const head = e.target.closest ? e.target.closest('.ni-pp-head') : null;
+        if (!head || e.target.closest('button') || isPhone() || e.button > 0) return;
+        const rect = dock.getBoundingClientRect();
+        drag = { id: e.pointerId, dx: e.clientX - rect.left, dy: e.clientY - rect.top };
+        try { head.setPointerCapture(e.pointerId); } catch (err) { /* a synthetic pointer: the move events still arrive */ }
+        e.preventDefault();
+    });
+    dock.addEventListener('pointermove', (e) => { if (drag && e.pointerId === drag.id) placeDock(e.clientX - drag.dx, e.clientY - drag.dy); });
+    const endDrag = (e) => { if (drag && e.pointerId === drag.id) drag = null; };
+    dock.addEventListener('pointerup', endDrag);
+    dock.addEventListener('pointercancel', endDrag);
+    window.addEventListener('resize', () => { if (dockDragged && !dock.hidden) placeDock(parseFloat(dock.style.left) || 0, parseFloat(dock.style.top) || 0); });
+
+    function syncAll() {
+        updateStatus();
+        syncWindowTabs();
+        if (panel.classList.contains('show')) updateNowPane();
+        syncDock();
+    }
+
+    if (bg) {
+        bg.subscribe(syncAll);
+        // The island opens and closes by toggling a class from several places (button, toast, restore): watch the class instead of every caller.
+        if (typeof MutationObserver === 'function') new MutationObserver(() => { if (panel.classList.contains('show')) updateNowPane(); syncDock(); }).observe(panel, { attributes: true, attributeFilter: ['class'] });
+        // The window bar is rebuilt from scratch whenever windows change: put the spinners back.
+        const winBar = document.getElementById('windowBar');
+        if (winBar && typeof MutationObserver === 'function') new MutationObserver(syncWindowTabs).observe(winBar, { childList: true });
+        syncAll();
+    }
 
     commit(); // first render (also persists the "update applied" conversion above)
 
@@ -977,6 +1852,7 @@
                 // new window "remembered" the old window's last tab choice.
                 setActiveTab(activeTabIndex);
                 if (!panel.classList.contains('show')) hideViewer();
+                if (bg) syncAll();
             };
         }
 

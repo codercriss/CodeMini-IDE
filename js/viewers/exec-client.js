@@ -43,8 +43,21 @@
             }
             var events = [];
             var ask = function (text) { return window.inlineInputPrompt ? window.inlineInputPrompt(text) : Promise.resolve(window.prompt(text) || ''); };
-            try { return { events: events, res: await window.CodeMiniExec.run(undefined, req, function (e) { events.push(e); }, ask) }; }
-            catch (e) { return { events: events, res: { value: null, plots: [], error: { name: 'Error', message: e.message, text: e.message } } }; }
+            // Now Island: listed under RUNNING (Peek shows the output as it arrives) only if it takes a while. There is no Stop here: the
+            // Terminal has none, and stopping would reset the window's host (its variables) for every surface that shares it.
+            var snip = String((req && req.code) || '').trim().split('\n')[0].slice(0, 40);
+            var task = window.CodeMiniBackground ? window.CodeMiniBackground.start({ kind: 'terminal', title: 'Terminal ' + ((req && req.lang) || '') + ': ' + snip, source: 'Terminal' }) : null;
+            try {
+                var res = await window.CodeMiniExec.run(undefined, req, function (e) {
+                    events.push(e);
+                    if (task && e.kind !== 'html') task.log(String(e.text), (e.kind === 'stderr' || e.kind === 'error') ? 'err' : 'out');
+                }, ask);
+                if (task) { if (res && res.error) task.fail(String(res.error.message || res.error.text || 'The code ended with an error')); else task.finish('success'); }
+                return { events: events, res: res };
+            } catch (e) {
+                if (task) task.fail(e.message);
+                return { events: events, res: { value: null, plots: [], error: { name: 'Error', message: e.message, text: e.message } } };
+            }
         },
         async reset(winId, lang) { var api = await runner().execHost(key(winId)); return api.reset(lang); },
         kill(winId) { var R = runner(); if (R) R.killHost(key(winId)); },

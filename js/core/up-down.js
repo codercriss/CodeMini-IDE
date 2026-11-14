@@ -647,8 +647,16 @@ function notifyZipFailed(text) {
     } else console.error(text);
 }
 
+// Now Island: building a big ZIP is a background task (RUNNING, with a progress line). Nothing appears for one that is ready within a second.
 async function handleDownloadZip() {
     if (downloadSelectedFiles.size === 0) return;
+    const task = window.CodeMiniBackground ? window.CodeMiniBackground.start({ kind: 'export', title: 'Export ZIP', source: 'Explorer' }) : null;
+    const outcome = { state: 'error', text: 'The ZIP was not finished' }; // what the task says if something throws before the end
+    try { await _downloadZipCore(task, outcome); }
+    finally { if (task) task.finish(outcome.state, outcome.text); }
+}
+
+async function _downloadZipCore(task, outcome) {
 
     // Captured before the JSZip load below, which only happens once per
     // session but can take a moment - if the user switches windows while it's
@@ -660,6 +668,7 @@ async function handleDownloadZip() {
     let JSZipLib;
     try { JSZipLib = await loadJSZip(); }
     catch (e) {
+        outcome.text = 'The ZIP library could not be loaded';
         notifyZipFailed('The ZIP library could not be loaded. It needs a connection the first time (after that it works offline). ' + (e && e.message ? '(' + e.message + ')' : ''));
         return;
     }
@@ -688,12 +697,16 @@ async function handleDownloadZip() {
 
     selectionRoots(downloadSelectedFiles, allFiles).forEach(f => buildZip(f, zip));
 
+    const zipped = zip.files ? Object.keys(zip.files).filter((n) => !zip.files[n].dir).length : 0;
     try {
-        const content = await zip.generateAsync({ type: 'blob' });
+        const content = await zip.generateAsync({ type: 'blob' }, (m) => { if (task) task.update({ progress: m.percent / 100, detail: m.currentFile ? 'Adding ' + m.currentFile : '' }); });
         triggerBlobDownload(content, `codemini_archive_${Date.now()}.zip`);
+        outcome.state = 'success';
+        outcome.text = zipped + ' file' + (zipped === 1 ? '' : 's') + (lockedSkipped ? ', ' + lockedSkipped + ' locked skipped' : '');
         toggleDownloadMode();
         notifyLockedSkipped(lockedSkipped);
     } catch (e) {
+        outcome.text = 'The ZIP could not be built';
         notifyZipFailed('The ZIP could not be built: ' + (e && e.message ? e.message : e));
     }
 }

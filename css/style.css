@@ -4992,3 +4992,28 @@ html.is-pwa code, html.is-pwa samp {
     .sn-input, .sn-body { width: 100%; }
     .sj-state { margin-left: 0; }
 }
+
+/* ---- Shared sidebar / island pieces (UI/UX specs, "Shared patterns to reuse") ----
+   Values copied from Source Control's .git-section-header and .git-count-badge, under neutral names, so Now Island, Deploy, Tests, Agent Mini and
+   the rest do not depend on git.js injecting its own styles. Source Control keeps its own .git-* rules untouched.
+   Not to be confused with .sb-color / .sb-reset-btn above: there "sb" means the status bar. */
+.sb-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    color: var(--text-muted);
+}
+
+.sb-count-badge {
+    background: var(--bg-panel);
+    color: var(--text-muted);
+    padding: 1px 6px;
+    border-radius: 9px;
+    font-size: 10px;
+    margin-left: 4px;
+    border: 1px solid var(--border-color);
+}

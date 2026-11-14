@@ -1927,15 +1927,28 @@ async function _runOnHost(code, ext, winId) {
     if (lang === 'php' && !code.trim().startsWith('<?php')) code = `<?php\nerror_reporting(E_ALL);\nini_set('display_errors', 1);\n${code.trim()}\n?>`;
     const run = { interrupted: false };
     window._bpHostRun[winId] = run;
+    // Now Island: a run that takes a while is listed under RUNNING (Peek shows the output, Stop ends it, Go to opens the bottom Console).
+    const fileLabel = ((document.getElementById('activeFileStatus') || {}).textContent || '').trim();
+    const bgTask = window.CodeMiniBackground ? window.CodeMiniBackground.start({
+        kind: 'run', title: 'Run: ' + (fileLabel && fileLabel !== 'Workspace' ? fileLabel : '.' + ext), winId, source: 'Editor',
+        isHidden: () => { const pn = document.getElementById('problemsPanel'); return !pn || pn.style.display === 'none'; },
+        onGoto: () => { const pn = document.getElementById('problemsPanel'); if (pn) pn.style.display = 'flex'; document.querySelector('.bottom-panel-tab[data-target="consolePanelContent"]')?.click(); },
+        onStop: () => { run.interrupted = true; window.CodeMiniExec.kill(winId); }
+    }) : null;
+    let failure = '';
     const kinds = { error: 'error', stderr: 'error', warn: 'system', info: 'system' };
     const ask = (text) => (window.inlineInputPrompt ? window.inlineInputPrompt(text) : Promise.resolve(window.prompt(text) || ''));
     try {
         const trusted = !window.WorkspaceTrust || window.WorkspaceTrust.isTrusted();
         // html events and plots are not shown by this panel (it never showed them), so they are ignored here.
         const res = await window.CodeMiniExec.run(winId, { lang, code, opts: { trusted, autoInstall: false, sep: ' ' } },
-            (e) => { if (e.kind !== 'html') window.printToBottomConsole(String(e.text).replace(/\n$/, ''), kinds[e.kind] || 'normal'); }, ask);
+            (e) => {
+                if (e.kind !== 'html') window.printToBottomConsole(String(e.text).replace(/\n$/, ''), kinds[e.kind] || 'normal');
+                if (bgTask && e.kind !== 'html') bgTask.log(String(e.text), (e.kind === 'error' || e.kind === 'stderr') ? 'err' : 'out');
+            }, ask);
         const err = res.error;
         if (err) {
+            failure = String(err.message || err.text || 'The code ended with an error');
             if (lang === 'python') window.printToBottomConsole(err.text || `${err.name}: ${err.message}`, 'error');
             else if (lang === 'ruby') window.printToBottomConsole(`[Ruby Error] ${err.message}`, 'error');
             else window.printToBottomConsole(lang === 'javascript' ? `[Error] ${err.message}` : String(err.message), 'error');
@@ -1945,8 +1958,9 @@ async function _runOnHost(code, ext, winId) {
     } catch (e) {
         // Stop shuts the host down on purpose; that is not a failure.
         if (run.interrupted) window.printToBottomConsole("[Execution Interrupted] Stopped: this window's isolated host was shut down, so its variables were reset.", 'error');
-        else window.printToBottomConsole(`[System Error] ${e.message}`, 'error');
+        else { failure = e.message; window.printToBottomConsole(`[System Error] ${e.message}`, 'error'); }
     } finally {
+        if (bgTask) { if (run.interrupted) bgTask.finish('stopped', 'Stopped'); else if (failure) bgTask.fail(failure); else bgTask.finish('success'); }
         if (window._bpHostRun[winId] === run) delete window._bpHostRun[winId];
     }
     return true;

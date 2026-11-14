@@ -1754,9 +1754,11 @@ json.dumps({
         const allCells = pane.querySelectorAll('.cell');
         const runStart = Date.now(), runWin = (typeof _getWinId === 'function') ? _getWinId() : null;
         let runStopped = false;
-        for (let i = 0; i < allCells.length; i++) {
+        const runTask = window.nbBgBegin ? window.nbBgBegin(pane) : null; // Now Island: the whole run is one task, however many cells
+        try { for (let i = 0; i < allCells.length; i++) {
+            if (runTask) runTask.update({ progress: i / allCells.length });
             if (window.kernelInterrupted) { runStopped = true; break; } pane.querySelectorAll('.cell').forEach(cl => cl.classList.remove('active')); allCells[i].classList.add('active'); await runCell(allCells[i], pane);
-        }
+        } } finally { if (window.nbBgEnd) window.nbBgEnd(runTask, runStopped); }
         if (window.notifyNotebookRunDone) window.notifyNotebookRunDone(pane, runStart, runWin, runStopped);
         return;
     }
@@ -1765,12 +1767,14 @@ json.dumps({
         const allCells = pane.querySelectorAll('.cell');
         const runStart = Date.now(), runWin = (typeof _getWinId === 'function') ? _getWinId() : null;
         let runStopped = false;
-        for (let i = 0; i < allCells.length; i++) {
+        const runTask = window.nbBgBegin ? window.nbBgBegin(pane) : null; // Now Island: the whole run is one task, however many cells
+        try { for (let i = 0; i < allCells.length; i++) {
+            if (runTask) runTask.update({ progress: i / allCells.length });
             if (window.kernelInterrupted) { runStopped = true; break; } 
             pane.querySelectorAll('.cell').forEach(cl => cl.classList.remove('active')); 
             allCells[i].classList.add('active'); 
             await runCell(allCells[i], pane);
-        }
+        } } finally { if (window.nbBgEnd) window.nbBgEnd(runTask, runStopped); }
         if (window.notifyNotebookRunDone) window.notifyNotebookRunDone(pane, runStart, runWin, runStopped);
         return;
     }
