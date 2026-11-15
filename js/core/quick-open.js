@@ -415,6 +415,11 @@
         const pick = state.pick;
         const parsed = pick ? { mode: 'all', text: String(query || '').trim() } : parseQuery(query);
         let data = await loadFiles(parsed.mode === 'all' && !parsed.text && !query);
+        // The .codemini config folder stays out of the results unless the query asks for it (feature 23).
+        if (W.CodeMiniConfig && !W.CodeMiniConfig.wantsConfig(query)) {
+            const keep = (x) => !W.CodeMiniConfig.isConfigPath(x.path);
+            data = Object.assign({}, data, { files: data.files.filter(keep), folders: (data.folders || []).filter(keep) });
+        }
         if (pick) data = Object.assign({}, data, { files: data.files.filter((f) => f.id !== pick.excludeId) });
         if (token !== state.token) return null; // a newer keystroke superseded this one
         const sections = []; let note = '';

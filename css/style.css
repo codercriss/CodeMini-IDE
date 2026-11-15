@@ -5017,3 +5017,13 @@ html.is-pwa code, html.is-pwa samp {
     margin-left: 4px;
     border: 1px solid var(--border-color);
 }
+
+/* The workspace config folder (.codemini) is configuration, not content: its row is dimmed (UI/UX specs, feature 23). */
+.file-item.codemini-config .file-name-wrap,
+.file-item.codemini-config .file-item-right {
+    color: var(--text-muted);
+}
+
+.file-item.codemini-config .file-icon {
+    opacity: 0.7;
+}

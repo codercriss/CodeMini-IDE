@@ -1687,6 +1687,7 @@ window.createNewTab = function(title, iconClass, isUnsaved = false, contentHTML 
                     guides: { bracketPairs: window.appSettings ? window.appSettings.bracketPairs : true }
                 });
 
+                try { if (tabType === 'monaco' && window.CodeMiniConfig) window.CodeMiniConfig.attachEditor(editor, tab); } catch (e) { /* a schema must never break opening a file */ }
                 try { if (tabType === 'monaco' && window.CodeMiniHistory) window.CodeMiniHistory.noteOpened(tab, String(contentHTML || ''), editor); } catch (e) { /* history must never break opening */ }
                 let saveTimeout;
                 editor.onDidChangeModelContent(() => {

@@ -2222,6 +2222,8 @@ function renderFileList(allFiles) {
     const currentFolderId = folderStack[folderStack.length - 1].id;
     fileList.innerHTML = '';
     explorerRenderedRows = [];
+    // Settings > "Hide .codemini folder": the workspace config folder and everything in it stay out of the list (feature 23).
+    if (window.CodeMiniConfig) { const hide = window.CodeMiniConfig.explorerHiddenIds(allFiles); if (hide.size) allFiles = allFiles.filter((f) => !hide.has(f.id)); }
     
     const sortFiles = (filesArray) => {
         return filesArray.sort((a, b) => {
@@ -2287,6 +2289,7 @@ function createFileElement(file, level, allFilesContext) {
     const newItem = document.createElement('div'); 
     newItem.className = 'file-item'; 
     if (window.isTreeViewMode) newItem.classList.add('tree-view-item');
+    if (window.CodeMiniConfig && window.CodeMiniConfig.isConfigFolder(file)) newItem.classList.add('codemini-config'); // shown dimmed: it is configuration, not content
     
     if (Array.from(selectedFiles).some(f => f.id === file.id)) newItem.classList.add('selected-file');
     if (Array.from(downloadSelectedFiles).some(f => f.id === file.id)) newItem.classList.add('download-selected-file');

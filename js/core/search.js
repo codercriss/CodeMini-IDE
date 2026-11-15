@@ -284,8 +284,9 @@
             }
             const tx = dbInstance.transaction('filesystem', 'readonly');
             tx.objectStore('filesystem').getAll().onsuccess = (req) => {
-                const files = req.target.result;
+                let files = req.target.result;
                 dbInstance.close(); // done with it: an open connection here blocks deleting a workspace's database later
+                if (window.CodeMiniConfig) files = window.CodeMiniConfig.withoutConfig(files, query); // .codemini/ is skipped unless the query asks for it (feature 23)
                 const matches = [];
 
                 files.forEach(file => {

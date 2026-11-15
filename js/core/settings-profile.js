@@ -109,7 +109,7 @@ window.getPrefixedKey = function(baseKey, winId = null, isProfile = null) {
 // (js/core/settings-json.js), so there is one list of what a setting is called and what its default is.
 window.getDefaultSettings = function() {
   return {
-      explorerDefaultView: 'List View', treeViewIndent: 15, profileAccentTint: true, syncProfileSettings: false, confirmBeforeExit: false, showBreadcrumbs: true, compactExplorer: false, performanceMode: false, clearTrashOnExit: false,
+      explorerDefaultView: 'List View', treeViewIndent: 15, profileAccentTint: true, syncProfileSettings: false, confirmBeforeExit: false, showBreadcrumbs: true, compactExplorer: false, hideCodeminiFolder: false, performanceMode: false, clearTrashOnExit: false,
       autoSave: 'After Delay', autoSaveDelay: 1000, hotExit: 'On', localHistory: 'On', historyMaxEntries: 50, historyMaxDays: 14, formatOnSave: false, restoreSession: true, enableTrashBin: true, autoCheckUpdates: true, maxMemory: 1024, fontSize: 13, fontFamily: "'Fira Code', monospace", fontWeight: 'normal', lineHeight: 21, letterSpacing: 0.3, fontLigatures: true, tabSize: 4, insertSpaces: true, wordWrap: 'off', minimap: false, lineNumbers: 'on', renderWhitespace: 'none', bracketPairs: true, smoothScrolling: true, cursorStyle: 'line', cursorBlinking: 'blink', mouseWheelZoom: false, editorFolding: true, renderLineHighlight: 'line', matchBrackets: 'always', cursorWidth: 2, colorTheme: 'CodeMini Light', iconTheme: 'Remix Icons', accentColor: '#3794ff', statusBarBackground: '', statusBarForeground: '', sidebarPosition: 'Left', activityBar: true, showWindowBar: true, windowOpacity: 100, nbAutoInstall: true, nbClearOnRestart: false, nbConfirmDelete: true, nbPlotBackground: 'White', nbCellFontSize: 13, nbCellFontFamily: "'Fira Code', monospace", nbCellLineHeight: 21, nbCellLetterSpacing: 0.3, nbCellLineNumbers: 'off', nbCellWordWrap: 'on', nbCellFolding: false, nbCellMinimap: false, nbCellRenderWhitespace: 'none', nbCellBracketPairs: true, nbCellCursorStyle: 'line', nbCellCursorBlinking: 'expand', nbCellSmoothScrolling: true, consoleAutoClear: false, consoleShowTimestamps: false, consoleAutoInstall: true, consoleMaxHistory: 50, consoleFontSize: 14, consoleFontFamily: "var(--font-mono)", consoleLineHeight: 21, consoleWordWrap: 'on', termFontSize: 13, termFontFamily: "'Fira Code', Consolas, monospace", termTextColor: "#d4d4d4", termPromptColor: "#4caf50", termCmdColor: "#ffffff", termHistorySize: 100,
       workspaceTrustEnabled: true, workspaceTrustUntrustedFiles: 'Prompt', workspaceTrustEmptyWindow: true, workspaceTrustStartupPrompt: 'Once', workspaceTrustBanner: 'Until Dismissed',
       isolationMode: 'Isolated', isolationPreview: 'Use global', isolationConsole: 'Use global', isolationTerminal: 'Use global', isolationNotebooks: 'Use global'
@@ -147,6 +147,7 @@ window.reloadSettings = function(winId = null, isProfile = false) {
     confirmBeforeExit: localStorage.getItem(getPrefixedKey('confirmBeforeExit')) === 'true',
     showBreadcrumbs: localStorage.getItem(getPrefixedKey('showBreadcrumbs')) !== 'false',
     compactExplorer: localStorage.getItem(getPrefixedKey('compactExplorer')) === 'true',
+    hideCodeminiFolder: localStorage.getItem(getPrefixedKey('hideCodeminiFolder')) === 'true',
 
     // New Application Settings
     performanceMode: localStorage.getItem(getPrefixedKey('performanceMode')) === 'true',
@@ -317,7 +318,7 @@ window.saveSetting = function(key, value) {
       }
   }
 
-  if (key === 'iconTheme' && typeof loadFilesFromDB === 'function') loadFilesFromDB();
+  if ((key === 'iconTheme' || key === 'hideCodeminiFolder') && typeof loadFilesFromDB === 'function') loadFilesFromDB();
 
   if (['fontSize', 'fontFamily', 'fontWeight', 'lineHeight', 'letterSpacing', 'fontLigatures', 'tabSize', 'insertSpaces', 'wordWrap', 'minimap', 'lineNumbers', 'renderWhitespace', 'bracketPairs', 'smoothScrolling', 'cursorStyle', 'cursorBlinking', 'colorTheme', 'themePack', 'mouseWheelZoom', 'editorFolding', 'renderLineHighlight', 'matchBrackets', 'cursorWidth'].includes(key)) {
     if (typeof window.updateMonacoGlobalSettings === 'function') window.updateMonacoGlobalSettings();
@@ -1270,6 +1271,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="settings-item"><div class="settings-item-info"><strong>Global Profile Sync</strong><span>Force new isolated profiles to inherit settings from the Native window</span></div><div class="settings-control"><input type="checkbox" data-setting="syncProfileSettings"></div></div>
           <div class="settings-item"><div class="settings-item-info"><strong>Confirm Before Exit</strong><span>Prompt for confirmation before closing the browser tab</span></div><div class="settings-control"><input type="checkbox" data-setting="confirmBeforeExit"></div></div>
           <div class="settings-item"><div class="settings-item-info"><strong>Show Breadcrumbs</strong><span>Display the navigation path above the file list</span></div><div class="settings-control"><input type="checkbox" data-setting="showBreadcrumbs"></div></div>
+          <div class="settings-item"><div class="settings-item-info"><strong>Hide .codemini Folder</strong><span>Keep the workspace config folder out of the Explorer list (it is still there, and Quick Open finds it when you type .codemini)</span></div><div class="settings-control"><input type="checkbox" data-setting="hideCodeminiFolder"></div></div>
           <div class="settings-item"><div class="settings-item-info"><strong>Compact Explorer</strong><span>Reduce padding in the file and folder lists</span></div><div class="settings-control"><input type="checkbox" data-setting="compactExplorer"></div></div>
 
           <h3 class="settings-category-title">Workspace</h3>
