@@ -165,22 +165,83 @@
         return { text: src + sep + (src.trim() ? '\n' : '') + '# CodeMini: private to this machine\n' + line + '\n', changed: true };
     }
 
-    // Workspace settings are committed with the project, so a cloned repository must never be able to loosen anything that protects the person:
-    // Workspace Trust, Isolation and the other security settings stay profile-level. Whatever else is checked against the settings list
-    // (js/core/settings-json.js has the same rule for the User file, and a test keeps the two in step).
+    // Workspace settings are committed with the project, so a cloned repository must never be able to change anything that protects the person
+    // or their data. Two layers:
+    //   * the security settings (Workspace Trust, Isolation, profile sync) are never settable here, the same rule as the User settings.json (a test keeps
+    //     the two in step);
+    //   * and of the rest, only DISPLAY and EDITOR behaviour may be set by a workspace: an allow-list, not a deny-list, so a setting added later is
+    //     personal until someone decides otherwise. Left out on purpose: the Trash Bin and clearing it (a project must not make deletes permanent),
+    //     local history and its limits, hot exit, restore session, confirm-before-exit, update checks, memory, package auto-install, window and layout
+    //     choices, and anything about notebook, console or terminal behaviour (as opposed to how they look).
+    const WORKSPACE_ALLOWED = new Set([
+        'fontSize', 'fontFamily', 'fontWeight', 'lineHeight', 'letterSpacing', 'fontLigatures', 'tabSize', 'insertSpaces', 'wordWrap', 'minimap', 'lineNumbers',
+        'renderWhitespace', 'bracketPairs', 'smoothScrolling', 'cursorStyle', 'cursorBlinking', 'mouseWheelZoom', 'editorFolding', 'renderLineHighlight',
+        'matchBrackets', 'cursorWidth', 'formatOnSave', 'autoSave', 'autoSaveDelay',
+        'explorerDefaultView', 'treeViewIndent', 'showBreadcrumbs', 'compactExplorer', 'hideCodeminiFolder',
+        'colorTheme', 'iconTheme', 'accentColor', 'statusBarBackground', 'statusBarForeground',
+        'nbCellFontSize', 'nbCellFontFamily', 'nbCellLineHeight', 'nbCellLetterSpacing', 'nbCellLineNumbers', 'nbCellWordWrap', 'nbCellFolding', 'nbCellMinimap',
+        'nbCellRenderWhitespace', 'nbCellBracketPairs', 'nbCellCursorStyle', 'nbCellCursorBlinking', 'nbCellSmoothScrolling', 'nbPlotBackground',
+        'consoleFontSize', 'consoleFontFamily', 'consoleLineHeight', 'consoleWordWrap',
+        'termFontSize', 'termFontFamily', 'termTextColor', 'termPromptColor', 'termCmdColor'
+    ]);
     const isSecurityKey = (key) => /^(isolation|workspaceTrust)/.test(key) || key === 'syncProfileSettings';
-    function filterWorkspaceSettings(obj, defaults) {
+    const isWorkspaceSettable = (key) => WORKSPACE_ALLOWED.has(key) && !isSecurityKey(key);
+
+    // `schema` (optional) is the Settings screen's own schema (type, allowed options, number range) so a value the Settings screen would refuse is refused here too.
+    function filterWorkspaceSettings(obj, defaults, schema) {
         const accepted = {}, rejected = [];
         if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) return { accepted, rejected: [{ key: '', reason: 'Workspace settings are an object: { "setting": value }.' }] };
+        const props = (schema && schema.properties) || {};
         Object.keys(obj).forEach((k) => {
             if (k === '$schema') return;
-            if (isSecurityKey(k)) { rejected.push({ key: k, reason: 'is a security setting: it can only be changed in Settings > Security, never by a workspace.' }); return; }
             const d = defaults ? defaults[k] : undefined;
+            if (isSecurityKey(k)) { rejected.push({ key: k, reason: 'is a security setting: it can only be changed in Settings > Security, never by a workspace.' }); return; }
             if (d === undefined) { rejected.push({ key: k, reason: 'is not a CodeMini setting.' }); return; }
-            if (typeof obj[k] !== typeof d || !['boolean', 'number', 'string'].includes(typeof d)) { rejected.push({ key: k, reason: 'must be ' + (typeof d === 'boolean' ? 'true or false' : typeof d === 'number' ? 'a number' : 'text') + '.' }); return; }
-            accepted[k] = obj[k];
+            if (!WORKSPACE_ALLOWED.has(k)) { rejected.push({ key: k, reason: 'is a personal setting: a workspace cannot change it. Set it in Settings.' }); return; }
+            const v = obj[k];
+            if (!['boolean', 'number', 'string'].includes(typeof d) || typeof v !== typeof d) { rejected.push({ key: k, reason: 'must be ' + (typeof d === 'boolean' ? 'true or false' : typeof d === 'number' ? 'a number' : 'text') + '.' }); return; }
+            const p = props[k];
+            if (p && Array.isArray(p.enum) && !p.enum.includes(v)) { rejected.push({ key: k, reason: 'must be one of ' + p.enum.map((x) => JSON.stringify(x)).join(', ') + '.' }); return; }
+            if (typeof v === 'number' && (!Number.isFinite(v) || (p && ((p.minimum != null && v < p.minimum) || (p.maximum != null && v > p.maximum))))) {
+                rejected.push({ key: k, reason: 'must be ' + (p && p.minimum != null && p.maximum != null ? 'between ' + p.minimum + ' and ' + p.maximum : p && p.minimum != null ? 'at least ' + p.minimum : p && p.maximum != null ? 'at most ' + p.maximum : 'a finite number') + '.' }); return;
+            }
+            accepted[k] = v;
         });
         return { accepted, rejected };
+    }
+
+    // ---- the workspace settings overlay: what .codemini/settings.json says, as a pure function of the file ----
+    // -> { exists, error: { message, line, column } | null, accepted: {key: value}, rejected: [{key, reason}] }
+    function computeOverlay(rec, defaults, schema) {
+        if (!rec) return { exists: false, error: null, accepted: {}, rejected: [] };
+        if (rec.isLocked) return { exists: true, error: { message: 'The file is locked.', line: 1, column: 1 }, accepted: {}, rejected: [] };
+        const p = parseJsonc(rec.content);
+        if (!p.ok) return { exists: true, error: { message: p.message, line: p.line, column: p.column }, accepted: {}, rejected: [] };
+        const f = filterWorkspaceSettings(p.value, defaults, schema);
+        return { exists: true, error: null, accepted: f.accepted, rejected: f.rejected };
+    }
+    // The settings file in a list of records: .codemini/settings.json directly inside the top-level config folder.
+    function findSettingsRecord(records) {
+        const ids = configFolderIds(records);
+        return (records || []).find((r) => r.type === 'file' && r.name === 'settings.json' && ids.has(r.parentId)) || null;
+    }
+    // Changes when the database, or the file's text or lock, changes: nothing else.
+    function overlaySignature(dbName, rec) {
+        if (!rec) return String(dbName) + '|none';
+        const text = String(rec.content || '');
+        let h = 5381; for (let i = 0; i < text.length; i++) h = ((h * 33) ^ text.charCodeAt(i)) >>> 0;
+        return String(dbName) + '|' + rec.id + '|' + (rec.isLocked ? 'L' : 'u') + '|' + text.length + '|' + h;
+    }
+    // The settings as the PERSON has them: a copy of the effective settings with each overridden key put back to their own value.
+    function userSettingsView(effective, userValues) {
+        const out = Object.assign({}, effective || {});
+        Object.keys(userValues || {}).forEach((k) => { out[k] = userValues[k]; });
+        return out;
+    }
+    // Keys whose overridden value differs between two accepted sets (added, removed or changed).
+    function overlayKeysChanged(prev, next) {
+        const keys = new Set(Object.keys(prev || {}).concat(Object.keys(next || {})));
+        return Array.from(keys).filter((k) => !(prev && k in prev && next && k in next && prev[k] === next[k]));
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -267,7 +328,8 @@
 
     const api = {
         DIR, FILES, rootParentId, configFolderIds, isInConfig, isConfigPath, wantsConfig, withoutConfig, validName,
-        stripJsonc, parseJsonc, gitignoreWithLocal, isSecurityKey, filterWorkspaceSettings,
+        stripJsonc, parseJsonc, gitignoreWithLocal, isSecurityKey, isWorkspaceSettable, WORKSPACE_ALLOWED, filterWorkspaceSettings,
+        computeOverlay, findSettingsRecord, overlaySignature, userSettingsView, overlayKeysChanged,
         _store: { readFile, ensureFile, ensureFolder, addLocalToGitignore, locate }
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
@@ -315,10 +377,12 @@
     // ---- templates and schemas that features register ----
     const templates = {}, schemas = {};
     function registerTemplate(name, text) { if (validName(name)) templates[name] = text; }
+    // A schema is an object, or a function that returns one when it is needed (the settings schema is built from the Settings screen, which is not there yet at load).
+    const resolveSchema = (name) => { const sc = schemas[name]; if (typeof sc !== 'function') return sc || null; try { return sc() || null; } catch (e) { return null; } };
     function registerSchema(name, schema) {
         if (!validName(name)) return;
         schemas[name] = schema;
-        if (W.CodeMiniJsonSchemas) W.CodeMiniJsonSchemas.add(schemaUri(name), [], schema); // known by its address, so a "$schema" entry resolves without any network
+        if (typeof schema !== 'function' && W.CodeMiniJsonSchemas) W.CodeMiniJsonSchemas.add(schemaUri(name), [], schema); // known by its address, so a "$schema" entry resolves without any network
     }
     const schemaUri = (name) => 'codemini://schema/' + name;
 
@@ -358,7 +422,7 @@
             if (!rec) return false;
             const ids = configFolderIds(records);
             if (!ids.size || !rec.parentId || !ids.has(rec.parentId)) return false; // only files directly inside .codemini/ have a schema
-            const schema = schemas[rec.name];
+            const schema = resolveSchema(rec.name);
             if (!schema) return false;
             const model = editor.getModel();
             if (!model) return false;
@@ -391,10 +455,122 @@
         return made;
     }
 
+
+    // ---------------------------------------------------------------------------------------------
+    // Workspace settings overlay: .codemini/settings.json overrides the person's own value for the settings a workspace may set
+    // ---------------------------------------------------------------------------------------------
+    // Nothing is saved for an overridden setting: the person's own value stays in their storage, and this only changes what the app uses while that
+    // workspace is open. Taking the key out of the file (or leaving the workspace) gives their value back.
+    let overlay = { sig: '', dbName: '', exists: false, error: null, accepted: {}, rejected: [], userValues: {} };
+    const dbNameNow = () => { const d = curDb(); return d ? d.name : ''; };
+
+    function settingsSchema() {
+        const SJ = W.CodeMiniSettingsJson;
+        if (!SJ || typeof SJ.buildSchema !== 'function' || typeof W.getDefaultSettings !== 'function') return null;
+        const full = SJ.buildSchema(W.getDefaultSettings(), typeof W.getSettingsDescriptors === 'function' ? W.getSettingsDescriptors() : []);
+        const properties = { $schema: { type: 'string', description: 'Where the schema for this file comes from. Leave it as it is.' } };
+        Object.keys(full.properties).forEach((k) => { if (isWorkspaceSettable(k)) properties[k] = full.properties[k]; });
+        return { type: 'object', description: 'CodeMini settings for this workspace. They override your own for as long as the workspace is open. Only display and editor settings can be set here.', properties, additionalProperties: false };
+    }
+
+    function announce(next) {
+        if (!W.CodeMiniNotifications || typeof W.CodeMiniNotifications.add !== 'function') return;
+        let text = '';
+        if (next.error) text = 'The file is not valid: ' + next.error.message + ' (line ' + next.error.line + '). None of it was applied.';
+        else if (next.rejected.length) text = next.rejected.slice(0, 3).map((r) => (r.key ? '"' + r.key + '" ' : '') + r.reason).join(' ') + (next.rejected.length > 3 ? ' And ' + (next.rejected.length - 3) + ' more.' : '');
+        if (!text) return;
+        W.CodeMiniNotifications.add({ id: 'ws-settings-problems', source: 'Workspace settings', kind: 'warning', title: next.error ? 'Workspace settings were not applied' : 'Some workspace settings were not applied', text });
+    }
+
+    // Reapply what the app uses (the settings are rebuilt from the person's own, with the overlay on top), then run each changed setting's usual side effects.
+    function applyChange(keys) {
+        if (typeof W.reloadSettings === 'function') W.reloadSettings();
+        if (typeof W.saveSetting === 'function' && W.appSettings) keys.forEach((k) => { try { W.saveSetting(k, W.appSettings[k], { transient: true }); } catch (e) { /* one setting must not stop the rest */ } });
+    }
+
+    // Called with the records of the open database whenever Explorer loads them (so on every entry to a workspace and every save).
+    function noteFiles(records) {
+        const rec = findSettingsRecord(records), sig = overlaySignature(dbNameNow(), rec);
+        if (sig === overlay.sig) return;
+        const prev = overlay.accepted;
+        const next = computeOverlay(rec, typeof W.getDefaultSettings === 'function' ? W.getDefaultSettings() : null, settingsSchema());
+        overlay = Object.assign({ sig, dbName: dbNameNow(), userValues: {} }, next);
+        announce(next);
+        const keys = overlayKeysChanged(prev, next.accepted);
+        if (keys.length) applyChange(keys);
+        else if (typeof W.syncUI === 'function') W.syncUI();
+    }
+    // The editor saved a file (possibly in a database that is not the open one): if it was a settings.json, look again.
+    async function noteSaved(o) {
+        try {
+            if (!o || !o.file || o.file.name !== 'settings.json') return;
+            const s = browserStore(); if (!s) return;
+            noteFiles(await s.getAll());
+        } catch (e) { /* never in the way of saving */ }
+    }
+    const isOverridden = (key) => overlay.dbName !== '' && overlay.dbName === dbNameNow() && Object.prototype.hasOwnProperty.call(overlay.accepted, key);
+    // Called by reloadSettings after it has rebuilt the settings from the person's own storage.
+    function applyOverlay(settings) {
+        overlay.userValues = {};
+        if (!settings || !overlay.dbName || overlay.dbName !== dbNameNow()) return;
+        Object.keys(overlay.accepted).forEach((k) => { if (k in settings) { overlay.userValues[k] = settings[k]; settings[k] = overlay.accepted[k]; } });
+    }
+    const userView = (effective) => userSettingsView(effective, overlay.dbName === dbNameNow() ? overlay.userValues : {});
+
+    // The Settings screen: an overridden control shows the workspace's value, is locked, and says so, with a way to the file.
+    function decorateSettings(container) {
+        if (!container) return;
+        const entries = Array.from(container.querySelectorAll('[data-setting]')).map((i) => [i, i.dataset.setting]);
+        // The status bar colors are custom controls without a data-setting.
+        [['statusBarBackgroundInput', 'statusBarBackground'], ['statusBarForegroundInput', 'statusBarForeground']].forEach(([id, key]) => { const i = container.querySelector('#' + id); if (i) entries.push([i, key]); });
+        entries.forEach(([input, key]) => {
+            const row = input.closest('.settings-item'), on = isOverridden(key);
+            const strong = row && row.querySelector('.settings-item-info strong');
+            const badge = row && row.querySelector('.ws-badge');
+            if (on) {
+                if (input.dataset.wsLocked !== '1') { input.dataset.wsLocked = '1'; }
+                input.disabled = true;
+                if (row) row.classList.add('ws-locked');
+                if (strong && !badge) {
+                    const b = document.createElement('button');
+                    b.type = 'button'; b.className = 'ws-badge'; b.textContent = 'Set by workspace';
+                    b.title = 'This workspace sets it in ' + DIR + '/settings.json. Open the file; remove the line there to use your own value.';
+                    b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); open('settings.json'); });
+                    strong.appendChild(b);
+                }
+            } else if (input.dataset.wsLocked === '1') {
+                delete input.dataset.wsLocked;
+                // Two controls are locked by the Theme Pack logic in syncUI, which has just run: leave those as it set them.
+                if (input.id !== 'colorThemeSelect' && input.id !== 'accentColorInput') input.disabled = false;
+                if (row) row.classList.remove('ws-locked');
+                if (badge) badge.remove();
+            }
+        });
+    }
+
+    // ---- the Workspace settings entry in the workspace menu ----
+    function addWorkspaceMenuEntry(dropdown) {
+        if (!dropdown || dropdown.querySelector('.ws-config-entry')) return;
+        const item = document.createElement('div');
+        item.className = 'dropdown-item ws-config-entry';
+        item.style.borderTop = '1px solid var(--border-color)';
+        const icon = document.createElement('i'); icon.className = 'ri-settings-3-line';
+        const label = document.createElement('span'); label.textContent = 'Workspace settings';
+        item.append(icon, label);
+        item.title = 'Open ' + DIR + '/settings.json (created if it is not there)';
+        item.addEventListener('click', () => { dropdown.classList.remove('show'); open('settings.json').catch((e) => toast('Could not open it: ' + e.message)); });
+        dropdown.appendChild(item);
+    }
+
+    // What "Initialize .codemini" and the first "Workspace settings" create. A small file that does something: it says which schema describes it.
+    registerTemplate('settings.json', '{\n  "$schema": "' + schemaUri('settings.json') + '"\n}\n');
+    registerSchema('settings.json', settingsSchema);
+
     Object.assign(api, {
         read, readJson, ensure, open, canRun, isTrusted, registerTemplate, registerSchema, schemaUri, attachEditor,
         explorerHiddenIds, isConfigFolder, initialize, offerGitignore,
-        templates: () => Object.assign({}, templates), schemaFor: (name) => schemas[name] || null
+        noteFiles, noteSaved, applyOverlay, isOverridden, userSettingsView: userView, decorateSettings, addWorkspaceMenuEntry, overlay: () => ({ exists: overlay.exists, error: overlay.error, accepted: Object.assign({}, overlay.accepted), rejected: overlay.rejected.slice(), dbName: overlay.dbName }),
+        templates: () => Object.assign({}, templates), schemaFor: (name) => resolveSchema(name)
     });
     W.CodeMiniConfig = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -102,7 +102,9 @@ const ok = (c, n, x) => { c ? (pass++, console.log('  PASS', n)) : (fail++, cons
 
   console.log('\n[commands: > and F1]');
   await page.keyboard.press('Control+P'); await sleep(300); await type('>zen');
-  r = await rows(); ok(r.length === 1 && r[0].label === 'Toggle Zen Mode', '">zen" lists only the matching command', r);
+  // Fuzzy matching is the point of the palette: letters in order across a name match ("Initialize .codemini" has z, e, n in that order). So the claim is
+  // that the command named Zen is the best match, first and selected, and that commands without those letters in order are not listed.
+  r = await rows(); ok(r.length >= 1 && r[0].label === 'Toggle Zen Mode' && r[0].sel === true && !r.some(x => /^(Format Code|Close Active Tab|Open Settings)/.test(x.label)), '">zen" puts the matching command first and selected, and lists no command without those letters in order', r);
   ok(await ev(() => document.querySelector('.qo-hint-chip.active').textContent === '>commands'), 'the hint row marks command mode');
   await page.keyboard.press('Enter'); await sleep(300);
   ok(await ev(() => document.body.classList.contains('zen-mode')), 'Enter runs it');

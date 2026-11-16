@@ -692,6 +692,7 @@ document.getElementById('workspaceMenuBtn')?.addEventListener('click', (e) => {
 
                 wsDrop.appendChild(item);
             });
+            if (window.CodeMiniConfig) window.CodeMiniConfig.addWorkspaceMenuEntry(wsDrop); // "Workspace settings": .codemini/settings.json
             wsDrop.classList.toggle('show');
         };
     };

@@ -244,6 +244,8 @@
             { name: 'Open Keyboard Shortcuts', icon: 'ri-keyboard-line', run: () => { if (typeof W.openSettingsTab === 'function') W.openSettingsTab('keybinds'); } },
             { name: 'Configure Snippets', icon: 'ri-braces-line', run: () => { if (W.CodeMiniSnippets) W.CodeMiniSnippets.open(); } },
             { name: 'Open Settings (JSON)', icon: 'ri-file-settings-line', run: () => { if (W.CodeMiniSettingsJson) W.CodeMiniSettingsJson.open(); } },
+            { name: 'Open Workspace Settings (JSON)', icon: 'ri-settings-3-line', run: () => { if (W.CodeMiniConfig) W.CodeMiniConfig.open('settings.json').catch((e) => { if (W.showSuccessToast) W.showSuccessToast('Could not open it: ' + e.message); }); } },
+            { name: 'Initialize .codemini', icon: 'ri-folder-settings-line', run: () => { if (W.CodeMiniConfig) W.CodeMiniConfig.initialize().catch((e) => { if (W.showSuccessToast) W.showSuccessToast('Could not set it up: ' + e.message); }); } },
             { name: 'Show Local History for Active File', icon: 'ri-history-line', run: () => {
                 const tab = W.CodeMiniDiff && W.CodeMiniDiff.activeFileTab();
                 if (!tab || !W.CodeMiniHistory) { if (W.showSuccessToast) W.showSuccessToast('Open a code file first.'); return; }

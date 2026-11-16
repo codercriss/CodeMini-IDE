@@ -153,6 +153,113 @@ const NOISE = /monaco|pyodide|loadPyodide|initSqlJs|Failed to fetch|net::|requir
   ok(await ev(() => window.CodeMiniJsonSchemas.list().some(s => s.uri === 'codemini://schema/tasks.json') === false), 'the stubbed registry did not leak into the real one');
   ok(await ev(() => { window.CodeMiniConfig.registerSchema('tests.json', { title: 'real' }); return window.CodeMiniJsonSchemas.list().some(s => s.uri === 'codemini://schema/tests.json'); }), 'with the real registry it is stored there');
 
+  console.log('\n[9] Initialize .codemini');
+  await ev(() => { window.__modals = []; const real = window.showCustomModal; window.__realModal = real; window.showCustomModal = (o, cb) => { window.__modals.push({ o, cb }); }; });
+  const init = await ev(async () => window.CodeMiniConfig.initialize());
+  ok(JSON.stringify(init) === '["settings.json"]', 'it creates only what is missing: the settings file (tasks.json and local/ were already there and are left alone)', init);
+  const st = await ev(async () => { const r = await window.CodeMiniConfig.read('settings.json'); return { text: r.text, local: await new Promise(res => { db.transaction('filesystem').objectStore('filesystem').getAll().onsuccess = e => res(e.target.result.some(x => x.name === 'local' && x.parentId === 'cfg' && x.type === 'folder')); }) }; });
+  ok(st.text === '{\n  "$schema": "codemini://schema/settings.json"\n}\n' && st.local, 'the starter settings file names its schema and does nothing else', st);
+  const offer = await ev(() => window.__modals.map(m => m.o.title));
+  ok(offer.length === 1 && offer[0] === 'Keep local state out of Git?', 'it offers to keep .codemini/local/ out of Git', offer);
+  await ev(async () => { await window.__modals[0].cb(); }); await sleep(500);
+  const gi = await ev(() => new Promise(res => { db.transaction('filesystem').objectStore('filesystem').getAll().onsuccess = e => { const g = e.target.result.find(x => x.name === '.gitignore' && x.parentId === 'root'); res(g ? g.content : null); }; }));
+  ok(gi && /\.codemini\/local\//.test(gi), 'accepting creates .gitignore with the line', gi);
+  await ev(async () => { window.__modals.length = 0; await window.CodeMiniConfig.initialize(); });
+  ok(await ev(() => window.__modals.length === 0), 'a second Initialize creates nothing and does not ask again');
+  await ev(() => { window.showCustomModal = window.__realModal; });
+
+  console.log('\n[10] every setting is decided');
+  const dec = await ev(() => { const d = Object.keys(window.getDefaultSettings()), C = window.CodeMiniConfig; return { all: d, allowedMissing: Array.from(C.WORKSPACE_ALLOWED).filter(k => !d.includes(k)), nonScalar: Array.from(C.WORKSPACE_ALLOWED).filter(k => !['boolean', 'number', 'string'].includes(typeof window.getDefaultSettings()[k])), personal: d.filter(k => !C.isSecurityKey(k) && !C.WORKSPACE_ALLOWED.has(k)).sort() }; });
+  ok(dec.allowedMissing.length === 0 && dec.nonScalar.length === 0, 'every allowed setting exists and is a plain value', dec);
+  const PERSONAL = ['activityBar', 'autoCheckUpdates', 'clearTrashOnExit', 'confirmBeforeExit', 'consoleAutoClear', 'consoleAutoInstall', 'consoleMaxHistory', 'consoleShowTimestamps', 'enableTrashBin', 'historyMaxDays', 'historyMaxEntries', 'hotExit', 'localHistory', 'maxMemory',
+    'nbAutoInstall', 'nbClearOnRestart', 'nbConfirmDelete', 'performanceMode', 'profileAccentTint', 'restoreSession', 'showWindowBar', 'sidebarPosition', 'termHistorySize', 'windowOpacity'];
+  ok(JSON.stringify(dec.personal) === JSON.stringify(PERSONAL), 'each setting is allowed, a security setting, or on the reviewed personal list: a NEW setting fails here until someone decides whether a workspace may set it', { notDecided: dec.personal.filter(k => !PERSONAL.includes(k)), gone: PERSONAL.filter(k => !dec.personal.includes(k)) });
+
+  console.log('\n[11] the workspace settings overlay');
+  await ev(() => { window.__notes = []; window.CodeMiniNotifications.onChange(l => { window.__notes = l; }); window.__monacoUpdates = 0; window.updateMonacoGlobalSettings = () => { window.__monacoUpdates++; }; window.__opened = []; window.openFileInTab = (f) => { window.__opened.push(f.name); }; });
+  const userKey = (k) => ev((k) => Object.keys(localStorage).filter(x => new RegExp('(^|_)' + k + '$').test(x)).map(x => localStorage.getItem(x)), k);
+  await ev(() => { saveSetting('fontSize', 14); saveSetting('tabSize', 4); saveSetting('enableTrashBin', true); });
+  // Overwrites the settings file Initialize made (one file, one id), as saving it in an editor tab would.
+  const putSettings = (text) => ev((text) => new Promise(res => { const st0 = db.transaction('filesystem').objectStore('filesystem').getAll(); st0.onsuccess = () => { const cur = st0.result.find(x => x.name === 'settings.json' && x.parentId === 'cfg'); const tx = db.transaction('filesystem', 'readwrite'); tx.objectStore('filesystem').put(Object.assign({ id: 'cfg-settings', parentId: 'cfg', name: 'settings.json', type: 'file', isLocked: false, timestamp: 1 }, cur || {}, { content: text, timestamp: Date.now() })); tx.oncomplete = () => { loadFilesFromDB(); res(); }; }; }), text);
+  await putSettings('{\n // project style\n "$schema": "codemini://schema/settings.json",\n "fontSize": 17,\n "wordWrap": "on",\n "enableTrashBin": false,\n "isolationMode": "Normal",\n "tabSize": "two",\n}\n');
+  await sleep(500);
+  let eff = await ev(() => ({ fontSize: appSettings.fontSize, wordWrap: appSettings.wordWrap, trash: appSettings.enableTrashBin, iso: appSettings.isolationMode, tab: appSettings.tabSize, monaco: window.__monacoUpdates, over: window.CodeMiniConfig.isOverridden('fontSize'), notOver: window.CodeMiniConfig.isOverridden('tabSize') }));
+  ok(eff.fontSize === 17 && eff.wordWrap === 'on' && eff.over, 'the workspace\'s display settings are what the app uses', eff);
+  ok(eff.trash === true && eff.iso !== 'Normal' && eff.tab === 4 && !eff.notOver, 'a personal setting, a security setting and a wrongly typed value are NOT applied', eff);
+  ok(eff.monaco >= 1, 'the editor is told (the usual side effect of changing the setting ran)', eff);
+  ok((await userKey('fontSize')).every(v => v === '14'), 'and nothing was written into the person\'s own settings', await userKey('fontSize'));
+  const note = await ev(() => window.__notes.find(n => n.id === 'ws-settings-problems'));
+  ok(note && /enableTrashBin/.test(note.text) && /isolationMode/.test(note.text) && /tabSize/.test(note.text) && /personal setting/.test(note.text) && /security setting/.test(note.text), 'a notification says which lines were not applied, and why', note);
+  ok(await ev(() => window.CodeMiniConfig.userSettingsView(appSettings).fontSize === 14 && window.CodeMiniConfig.userSettingsView(appSettings).wordWrap !== 'on'), 'the person\'s own view (what the User settings.json shows) still has their value, not the workspace\'s');
+
+  console.log('\n[12] the Settings screen');
+  await ev(() => window.openSettingsTab('editor')); await sleep(600);
+  const ui = await ev(() => {
+    const c = document.querySelector('.settings-container'), input = c.querySelector('[data-setting="fontSize"]'), row = input.closest('.settings-item'), other = c.querySelector('[data-setting="tabSize"]');
+    const badge = row.querySelector('.ws-badge');
+    return { value: input.value, disabled: input.disabled, locked: row.classList.contains('ws-locked'), badge: badge && badge.textContent, tag: badge && badge.tagName, title: badge && badge.title, otherDisabled: other.disabled, otherBadge: !!other.closest('.settings-item').querySelector('.ws-badge'), badges: c.querySelectorAll('.ws-badge').length };
+  });
+  ok(ui.value === '17' && ui.disabled && ui.locked, 'an overridden control shows the workspace\'s value and is locked', ui);
+  ok(ui.badge === 'Set by workspace' && ui.tag === 'BUTTON' && /settings\.json/.test(ui.title), 'with a "Set by workspace" badge (a button) that explains and leads to the file', ui);
+  ok(!ui.otherDisabled && !ui.otherBadge, 'other settings are untouched', ui);
+  const wordWrapBadge = await ev(() => !!document.querySelector('[data-setting="wordWrap"]').closest('.settings-item').querySelector('.ws-badge'));
+  ok(wordWrapBadge && (await ev(() => document.querySelectorAll('.ws-badge').length)) === 2, 'one badge per overridden setting (two here), and syncing again does not stack more', await ev(() => document.querySelectorAll('.ws-badge').length));
+  await ev(() => { syncUI(); syncUI(); });
+  ok((await ev(() => document.querySelectorAll('.ws-badge').length)) === 2, 'repeated syncs keep exactly one badge each');
+  await ev(() => { window.__opened.length = 0; document.querySelector('[data-setting="fontSize"]').closest('.settings-item').querySelector('.ws-badge').click(); }); await sleep(400);
+  ok(await ev(() => window.__opened.includes('settings.json')), 'the badge opens .codemini/settings.json', await ev(() => window.__opened));
+  // saving the person's own value while it is overridden: kept for them, not used
+  await ev(() => saveSetting('fontSize', 20)); await sleep(100);
+  ok(await ev(() => appSettings.fontSize === 17) && (await userKey('fontSize')).every(v => v === '20'), 'saving the setting meanwhile stores THEIR value and keeps using the workspace\'s');
+
+  console.log('\n[13] taking it back');
+  await putSettings('{ "wordWrap": "on" }'); await sleep(500);
+  const back = await ev(() => { const input = document.querySelector('[data-setting="fontSize"]'), row = input.closest('.settings-item'); return { fontSize: appSettings.fontSize, disabled: input.disabled, badge: !!row.querySelector('.ws-badge'), locked: row.classList.contains('ws-locked'), wrap: appSettings.wordWrap, over: window.CodeMiniConfig.isOverridden('fontSize') }; });
+  ok(back.fontSize === 20 && !back.over, 'removing the line gives the person\'s own value back (the one they saved meanwhile)', back);
+  ok(!back.disabled && !back.badge && !back.locked && back.wrap === 'on', 'the control is unlocked and the badge gone, while the other override stays', back);
+  const brk = await (async () => { await putSettings('{\n "fontSize": 30\n "wordWrap": "on"\n}'); await sleep(500); return ev(() => ({ fontSize: appSettings.fontSize, wrap: appSettings.wordWrap, note: (window.__notes.find(n => n.id === 'ws-settings-problems') || {}).title, text: (window.__notes.find(n => n.id === 'ws-settings-problems') || {}).text })); })();
+  ok(brk.fontSize === 20 && brk.wrap !== 'on' && /not applied/i.test(brk.note) && /line 3/.test(brk.text), 'a broken file applies NOTHING (not half of it), and the notification gives the line', brk);
+  await putSettings('{ "fontSize": 25 }'); await sleep(500);
+  ok(await ev(() => appSettings.fontSize === 25), 'fixing the file applies it');
+  await putSettings('{ "fontSize": 25, "wordWrap": "banana" }'); await sleep(500);
+  ok(await ev(() => appSettings.wordWrap !== 'banana' && appSettings.fontSize === 25 && /must be one of "off", "on"/.test((window.__notes.find(n => n.id === 'ws-settings-problems') || {}).text)), 'a value that is not one of the Settings screen\'s options is refused, with the options (the valid line beside it still applies)', await ev(() => (window.__notes.find(n => n.id === 'ws-settings-problems') || {}).text));
+
+  console.log('\n[14] another workspace, and coming back');
+  await putSettings('{ "fontSize": 18 }'); await sleep(500);
+  ok(await ev(() => appSettings.fontSize === 18), 'back to a file that applies');
+  await ev(() => new Promise(res => { window.__rootDb = db.name; window.__rootStack = folderStack; initDatabase('CodeMiniDB_WS_cfgtest', () => { folderStack = [{ id: 'wsx', name: 'X', isWorkspaceRoot: true, parentDb: cellActiveWindow.db }]; loadFilesFromDB(); res(); }); })); await sleep(600);
+  const other = await ev(() => ({ fontSize: appSettings.fontSize, over: window.CodeMiniConfig.isOverridden('fontSize') }));
+  ok(other.fontSize === 20 && !other.over, 'inside a workspace with no settings file, the other workspace\'s value is gone', other);
+  await ev(() => new Promise(res => { initDatabase(window.__rootDb, () => { folderStack = window.__rootStack; loadFilesFromDB(); res(); }); })); await sleep(600);
+  ok(await ev(() => appSettings.fontSize === 18), 'and it applies again when that workspace is open');
+  await ev(() => new Promise(res => { const st0 = db.transaction('filesystem').objectStore('filesystem').getAll(); st0.onsuccess = () => { const cur = st0.result.find(x => x.name === 'settings.json' && x.parentId === 'cfg'); const tx = db.transaction('filesystem', 'readwrite'); tx.objectStore('filesystem').delete(cur.id); tx.oncomplete = () => { loadFilesFromDB(); res(); }; }; })); await sleep(500);
+  ok(await ev(() => appSettings.fontSize === 20 && !window.CodeMiniConfig.isOverridden('fontSize')), 'deleting the file removes every override');
+
+  console.log('\n[15] the workspace settings schema');
+  const wsch = await ev(() => { const sc = window.CodeMiniConfig.schemaFor('settings.json'); return sc && { has: Object.keys(sc.properties), extra: sc.additionalProperties, fontSize: sc.properties.fontSize, wordWrap: sc.properties.wordWrap }; });
+  ok(wsch && wsch.has.includes('$schema') && wsch.has.includes('fontSize') && wsch.has.includes('wordWrap'), 'it offers $schema and the settings a workspace may set', wsch && wsch.has.length);
+  ok(wsch && !wsch.has.includes('enableTrashBin') && !wsch.has.includes('isolationMode') && !wsch.has.includes('hotExit') && wsch.extra === false, 'and not the personal or security ones: Monaco flags them as not allowed', wsch && wsch.extra);
+  ok(wsch && wsch.fontSize.type === 'number' && Array.isArray(wsch.wordWrap.enum) && wsch.wordWrap.enum.includes('on'), 'with the Settings screen\'s own types and options (so Monaco offers "on" and "off" for wordWrap)', wsch);
+
+  console.log('\n[16] commands and the menu entry');
+  await ev(() => { window.openFileInTab = (f) => { window.__opened.push(f.name); }; window.__opened.length = 0; });
+  await page.keyboard.press('Control+P'); await sleep(400);
+  await page.fill(input, '>workspace'); await sleep(350);
+  const cmds = await rows();
+  ok(cmds.some(x => x.label === 'Open Workspace Settings (JSON)'), 'the palette has "Open Workspace Settings (JSON)"', cmds.map(x => x.label));
+  await page.fill(input, '>initialize'); await sleep(350);
+  ok((await rows()).some(x => x.label === 'Initialize .codemini'), 'and "Initialize .codemini"');
+  await page.fill(input, '>workspace'); await sleep(350);
+  await page.keyboard.press('Enter'); await sleep(700);
+  ok(await ev(() => window.__opened.includes('settings.json')), 'running it opens (and creates, if needed) .codemini/settings.json', await ev(() => window.__opened));
+  await ev(() => document.getElementById('workspaceMenuBtn').click()); await sleep(700);
+  const menu = await ev(() => { const e = document.querySelector('#workspaceDropdown .ws-config-entry'); return { has: !!e, text: e && e.textContent.trim(), last: e && e === e.parentNode.lastElementChild }; });
+  ok(menu.has && menu.text === 'Workspace settings' && menu.last, 'the workspace menu ends with "Workspace settings"', menu);
+  await ev(() => document.getElementById('workspaceMenuBtn').click()); await sleep(500);
+  ok(await ev(() => document.querySelectorAll('#workspaceDropdown .ws-config-entry').length) === 1, 'opening the menu again does not add a second one');
+  await ev(() => { window.__opened.length = 0; document.querySelector('#workspaceDropdown .ws-config-entry').click(); }); await sleep(500);
+  ok(await ev(() => window.__opened.includes('settings.json') && !document.getElementById('workspaceDropdown').classList.contains('show')), 'clicking it opens the file and closes the menu');
+
   console.log('\n[8] the setting');
   ok(await ev(() => window.getDefaultSettings().hideCodeminiFolder === false && typeof window.appSettings.hideCodeminiFolder === 'boolean'), 'a default of false, loaded as a boolean');
   ok(await ev(() => window.CodeMiniSettingsJson && (() => { const d = window.CodeMiniSettingsJson.buildDocument(window.getDefaultSettings(), window.appSettings); return 'hideCodeminiFolder' in d; })()), 'and it is a normal (non-security) entry in the User settings.json');

@@ -144,7 +144,8 @@
         if (have) { if (typeof W.switchTab === 'function') W.switchTab(have.dataset.target); return have; }
         const defaults = W.getDefaultSettings();
         const descriptors = typeof W.getSettingsDescriptors === 'function' ? W.getSettingsDescriptors() : [];
-        const doc = buildDocument(defaults, W.appSettings);
+        // Their own values: while a workspace overrides a setting, W.appSettings holds the workspace's, and saving that would copy it into their settings.
+        const doc = buildDocument(defaults, W.CodeMiniConfig ? W.CodeMiniConfig.userSettingsView(W.appSettings) : W.appSettings);
         W.createNewTab('settings.json', 'ri-braces-line', false, JSON.stringify(doc, null, 2) + '\n', 'monaco', null);
         const group = document.getElementById(typeof activeGroupId !== 'undefined' && activeGroupId ? activeGroupId : 'editorGroup1') || document.getElementById('editorGroup1');
         const tab = group && group.querySelector('.tab.active');

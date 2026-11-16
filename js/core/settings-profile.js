@@ -256,6 +256,9 @@ window.reloadSettings = function(winId = null, isProfile = false) {
     termHistorySize: parseInt(localStorage.getItem(getPrefixedKey('termHistorySize'))) || 100
   };
 
+  // The open workspace's .codemini/settings.json overrides the settings it is allowed to set, on top of the person's own (js/core/codemini-config.js).
+  if (window.CodeMiniConfig) window.CodeMiniConfig.applyOverlay(window.appSettings);
+
   if (typeof applyTheme === 'function') applyTheme();
   if (typeof syncUI === 'function') syncUI();
   // Shortcuts and snippets are per window / profile too: a window switch reloads them with the settings.
@@ -287,10 +290,16 @@ window.getIsolationSettings = function() {
   return { global: mode[s.isolationMode] || 'runner', surfaces: { preview: mode[s.isolationPreview] || null, console: mode[s.isolationConsole] || null, terminal: mode[s.isolationTerminal] || null, notebooks: mode[s.isolationNotebooks] || null } };
 };
 
-window.saveSetting = function(key, value) {
+// opts.transient: apply the value and run its side effects without storing it. The workspace settings overlay uses that, so a workspace's value is
+// never written into the person's own settings.
+window.saveSetting = function(key, value, opts) {
+  const transient = !!(opts && opts.transient);
   // Status bar colors are stored as '' (not chosen) or a plain #rrggbb, whoever asks (the Settings screen, settings.json).
   if (key === 'statusBarBackground' || key === 'statusBarForeground') value = window.normalizeStatusBarColor(value);
-  window.appSettings[key] = value;
+  // While the open workspace overrides this setting, the person's value is stored (it is theirs, and comes back when the override goes) but what the app
+  // uses stays the workspace's.
+  const overridden = !transient && window.CodeMiniConfig && window.CodeMiniConfig.isOverridden(key);
+  if (!overridden) window.appSettings[key] = value;
   const winId = typeof cellActiveWinId !== 'undefined' ? cellActiveWinId : (localStorage.getItem('codemini_active_window') || 'win_default');
   const activeWin = (typeof cellWindows !== 'undefined' ? cellWindows : JSON.parse(localStorage.getItem('codemini_windows'))).find(w => w.id === winId) || { profile: false };
   
@@ -302,7 +311,7 @@ window.saveSetting = function(key, value) {
   let prefixedKey = (activeWin.profile && !syncProfilesActive) ? `codemini_${winId}_${key}` : `codemini_${key}`;
   if (key === 'syncProfileSettings') prefixedKey = 'codemini_syncProfileSettings';
 
-  localStorage.setItem(prefixedKey, value);
+  if (!transient) localStorage.setItem(prefixedKey, value);
 
   if (['colorTheme', 'themePack', 'accentColor', 'statusBarBackground', 'statusBarForeground', 'windowOpacity', 'sidebarPosition', 'activityBar', 'showWindowBar', 'profileAccentTint', 'performanceMode', 'showBreadcrumbs', 'compactExplorer'].includes(key)) {
       if (typeof window.applyTheme === 'function') window.applyTheme();
@@ -689,6 +698,9 @@ document.addEventListener('DOMContentLoaded', () => {
           : sbHint.dataset.baseText;
       }
     }
+
+    // Settings the open workspace overrides show its value, locked, with a badge that leads to the file (js/core/codemini-config.js).
+    if (window.CodeMiniConfig) window.CodeMiniConfig.decorateSettings(container);
   }
 
   window.applyTheme();

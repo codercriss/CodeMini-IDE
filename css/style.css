@@ -5027,3 +5027,27 @@ html.is-pwa code, html.is-pwa samp {
 .file-item.codemini-config .file-icon {
     opacity: 0.7;
 }
+
+/* A setting the open workspace overrides: its control is locked and a badge leads to the file (UI/UX specs, feature 23). */
+.settings-item.ws-locked .settings-control {
+    opacity: 0.6;
+}
+
+.ws-badge {
+    margin-left: 8px;
+    padding: 1px 7px;
+    border: 1px solid var(--accent-blue);
+    border-radius: 9px;
+    background: transparent;
+    font: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--accent-blue);
+    cursor: pointer;
+    vertical-align: middle;
+}
+
+.ws-badge:hover,
+.ws-badge:focus-visible {
+    background: var(--hover-blue);
+}

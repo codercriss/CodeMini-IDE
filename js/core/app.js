@@ -896,6 +896,8 @@ function loadFilesFromDB() {
     const req = tx.objectStore('filesystem').getAll();
     req.onsuccess = () => {
         const allFiles = req.result;
+        // The workspace's .codemini/settings.json may have changed (entering a workspace and every save end up here): see js/core/codemini-config.js.
+        try { if (window.CodeMiniConfig) window.CodeMiniConfig.noteFiles(allFiles); } catch (e) { /* settings must never stop the file list */ }
 
         // Locks made before items were hashed/encrypted keep their password as plain text; upgrade them now,
         // in the background, in the database they were read from.

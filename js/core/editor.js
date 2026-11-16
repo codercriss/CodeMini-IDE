@@ -1160,6 +1160,7 @@ window.autoSaveFile = function(fileId, newContent, tabEl, encoding, explicitDbNa
                         setTimeout(() => tabEl.classList.remove('saved-pulse'), 1000);
                     }
                     // Local history + hot exit (js/core/file-history.js): this text is now what the file holds.
+                    try { if (window.CodeMiniConfig) window.CodeMiniConfig.noteSaved({ dbName: targetDbName, file }); } catch (e) { /* the workspace settings overlay must never break saving */ }
                     try { if (window.CodeMiniHistory) window.CodeMiniHistory.noteSaved({ tabEl, dbName: targetDbName, file, content: newContent }); } catch (e) { /* history must never break saving */ }
                     isolatedDb.close();
                 };
