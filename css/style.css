@@ -3092,9 +3092,24 @@ mark.help-hl {
 
 .bottom-panel-tabs {
     display: flex;
+    flex-wrap: nowrap;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.bottom-panel-tabs::-webkit-scrollbar {
+    display: none;
 }
 
 .bottom-panel-tab {
+    flex: none;
+    white-space: nowrap;
     padding: 6px 12px;
     font-size: 11px;
     text-transform: uppercase;
@@ -3110,6 +3125,7 @@ mark.help-hl {
 }
 
 .bottom-panel-actions {
+    flex: none;
     padding: 0 15px;
     color: var(--icon-gray);
     font-size: 16px;
@@ -5070,7 +5086,11 @@ html.is-pwa code, html.is-pwa samp {
 .sb-header .sb-tools {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 6px;
+}
+
+.sb-header .sb-tools .sb-icon-btn {
+    padding: 3px;
 }
 
 .sb-icon-btn {

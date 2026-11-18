@@ -805,6 +805,7 @@ require(['vs/editor/editor.main'], function() {
             bpContents.forEach(c => c.style.display = 'none');
 
             tab.classList.add('active');
+            try { tab.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) { /* older browsers */ }
             const targetId = tab.getAttribute('data-target');
             const targetContent = document.getElementById(targetId);
             
@@ -823,6 +824,17 @@ require(['vs/editor/editor.main'], function() {
             if (window.saveCurrentUIState) window.saveCurrentUIState();
         });
     });
+
+    // Tabs scroll sideways instead of wrapping; let a mouse wheel scroll them too.
+    const bpTabsBar = document.querySelector('.bottom-panel-tabs');
+    if (bpTabsBar) {
+        bpTabsBar.addEventListener('wheel', (e) => {
+            if (bpTabsBar.scrollWidth <= bpTabsBar.clientWidth) return;
+            if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+            bpTabsBar.scrollLeft += e.deltaY;
+            e.preventDefault();
+        }, { passive: false });
+    }
 
     function openBottomPanelToTab(tabTargetId) {
         if (panel) {

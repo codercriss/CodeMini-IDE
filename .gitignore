@@ -24,3 +24,6 @@ Thumbs.db
 test-results/
 playwright-report/
 package-lock.json.bak
+
+# CodeMini: private to this machine
+.codemini/local/
