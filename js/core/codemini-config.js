@@ -220,11 +220,12 @@
         const f = filterWorkspaceSettings(p.value, defaults, schema);
         return { exists: true, error: null, accepted: f.accepted, rejected: f.rejected };
     }
-    // The settings file in a list of records: .codemini/settings.json directly inside the top-level config folder.
-    function findSettingsRecord(records) {
+    // A config file in a list of records: `name` (e.g. 'tasks.json') directly inside the top-level config folder.
+    function findConfigRecord(records, name) {
         const ids = configFolderIds(records);
-        return (records || []).find((r) => r.type === 'file' && r.name === 'settings.json' && ids.has(r.parentId)) || null;
+        return (records || []).find((r) => r.type === 'file' && r.name === name && ids.has(r.parentId)) || null;
     }
+    const findSettingsRecord = (records) => findConfigRecord(records, 'settings.json');
     // Changes when the database, or the file's text or lock, changes: nothing else.
     function overlaySignature(dbName, rec) {
         if (!rec) return String(dbName) + '|none';
@@ -329,7 +330,7 @@
     const api = {
         DIR, FILES, rootParentId, configFolderIds, isInConfig, isConfigPath, wantsConfig, withoutConfig, validName,
         stripJsonc, parseJsonc, gitignoreWithLocal, isSecurityKey, isWorkspaceSettable, WORKSPACE_ALLOWED, filterWorkspaceSettings,
-        computeOverlay, findSettingsRecord, overlaySignature, userSettingsView, overlayKeysChanged,
+        computeOverlay, findConfigRecord, findSettingsRecord, overlaySignature, userSettingsView, overlayKeysChanged,
         _store: { readFile, ensureFile, ensureFolder, addLocalToGitignore, locate }
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
@@ -488,8 +489,13 @@
         if (typeof W.saveSetting === 'function' && W.appSettings) keys.forEach((k) => { try { W.saveSetting(k, W.appSettings[k], { transient: true }); } catch (e) { /* one setting must not stop the rest */ } });
     }
 
+    // Features that read their own config file (Tasks) are told whenever the open database's records are loaded, and decide for themselves
+    // whether their file changed. Each gets the records and nothing else.
+    const fileListeners = [];
+    const subscribe = (fn) => { if (typeof fn === 'function') fileListeners.push(fn); };
     // Called with the records of the open database whenever Explorer loads them (so on every entry to a workspace and every save).
     function noteFiles(records) {
+        fileListeners.forEach((fn) => { try { fn(records); } catch (e) { /* one feature must not stop the others */ } });
         const rec = findSettingsRecord(records), sig = overlaySignature(dbNameNow(), rec);
         if (sig === overlay.sig) return;
         const prev = overlay.accepted;
@@ -500,10 +506,10 @@
         if (keys.length) applyChange(keys);
         else if (typeof W.syncUI === 'function') W.syncUI();
     }
-    // The editor saved a file (possibly in a database that is not the open one): if it was a settings.json, look again.
+    // The editor saved a file (possibly in a database that is not the open one): if it was one of the config files, look again.
     async function noteSaved(o) {
         try {
-            if (!o || !o.file || o.file.name !== 'settings.json') return;
+            if (!o || !o.file || !Object.prototype.hasOwnProperty.call(FILES, o.file.name)) return; // one of the known config files: look again
             const s = browserStore(); if (!s) return;
             noteFiles(await s.getAll());
         } catch (e) { /* never in the way of saving */ }
@@ -569,7 +575,7 @@
     Object.assign(api, {
         read, readJson, ensure, open, canRun, isTrusted, registerTemplate, registerSchema, schemaUri, attachEditor,
         explorerHiddenIds, isConfigFolder, initialize, offerGitignore,
-        noteFiles, noteSaved, applyOverlay, isOverridden, userSettingsView: userView, decorateSettings, addWorkspaceMenuEntry, overlay: () => ({ exists: overlay.exists, error: overlay.error, accepted: Object.assign({}, overlay.accepted), rejected: overlay.rejected.slice(), dbName: overlay.dbName }),
+        noteFiles, noteSaved, subscribe, applyOverlay, isOverridden, userSettingsView: userView, decorateSettings, addWorkspaceMenuEntry, overlay: () => ({ exists: overlay.exists, error: overlay.error, accepted: Object.assign({}, overlay.accepted), rejected: overlay.rejected.slice(), dbName: overlay.dbName }),
         templates: () => Object.assign({}, templates), schemaFor: (name) => resolveSchema(name)
     });
     W.CodeMiniConfig = api;

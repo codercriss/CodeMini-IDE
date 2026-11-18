@@ -150,7 +150,7 @@ const NOISE = /monaco|pyodide|loadPyodide|initSqlJs|Failed to fetch|net::|requir
   ok(sch.tasks === true && sch.afterTasks.length === 1 && sch.afterTasks[0].uri === 'codemini://schema/tasks.json' && JSON.stringify(sch.afterTasks[0].match) === '["inmemory://model/7"]', 'tasks.json: the schema is attached to that tab\'s model address', sch.afterTasks);
   ok(sch.ordinary === false && sch.nested === false && sch.noSchema === false && sch.deeper === false && sch.missing === false && sch.noTab === false && sch.noModel === false, 'nothing else gets one: an ordinary file, a nested .codemini, a config file with no schema registered, a file in local/, a missing id, no tab, no model', sch);
   ok(sch.afterRest.length === 0, 'and none of those called the registry', sch.afterRest);
-  ok(await ev(() => window.CodeMiniJsonSchemas.list().some(s => s.uri === 'codemini://schema/tasks.json') === false), 'the stubbed registry did not leak into the real one');
+  ok(await ev(() => { const e = window.CodeMiniJsonSchemas.list().find(s => s.uri === 'codemini://schema/tasks.json'); return !!e && e.schema.title !== 'tasks-schema' && !e.fileMatch.includes('inmemory://model/7'); }), 'the stand-in registry did not leak into the real one: it still holds the real Tasks schema (registered by Tasks), with no model match from this test');
   ok(await ev(() => { window.CodeMiniConfig.registerSchema('tests.json', { title: 'real' }); return window.CodeMiniJsonSchemas.list().some(s => s.uri === 'codemini://schema/tests.json'); }), 'with the real registry it is stored there');
 
   console.log('\n[9] Initialize .codemini');

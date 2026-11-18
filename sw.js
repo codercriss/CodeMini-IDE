@@ -52,6 +52,7 @@ const STATIC_ASSETS = [
     '/js/core/keybindings.js',
     '/js/core/json-schemas.js',
     '/js/core/codemini-config.js',
+    '/js/core/tasks.js',
     '/js/core/snippets.js',
     '/js/core/settings-json.js',
     '/js/core/script.js',

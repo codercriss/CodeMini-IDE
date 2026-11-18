@@ -113,6 +113,7 @@
         { id: 'tab.close', category: 'File Management', name: 'Close Tab', description: 'Close the active tab', defaults: ['Alt+W'], scope: 'global', when: 'Always' },
         { id: 'notebook.runCell', category: 'Execution', name: 'Run Cell', description: 'Run the selected notebook cell', defaults: ['Ctrl+Enter'], scope: 'notebook', when: 'A notebook is open' },
         { id: 'notebook.runAdvance', category: 'Execution', name: 'Run Cell and Move On', description: 'Run the selected cell and select the next one', defaults: ['Shift+Enter'], scope: 'notebook', when: 'A notebook is open' },
+        { id: 'tasks.runBuild', category: 'Execution', name: 'Run Build Task', description: 'Run the default build task from .codemini/tasks.json', defaults: ['Ctrl+Shift+B'], scope: 'global', when: 'Always' },
         { id: 'quickOpen.files', category: 'Navigation & Formatting', name: 'Quick Open', description: 'Find a file by name', defaults: ['Ctrl+P'], scope: 'global', when: 'Always' },
         { id: 'quickOpen.commands', category: 'Navigation & Formatting', name: 'Command Palette', description: 'Run any command by name', defaults: ['F1', 'Ctrl+Shift+P'], scope: 'global', when: 'Always' },
         { id: 'view.toggleSidebar', category: 'Navigation & Formatting', name: 'Toggle Sidebar', description: 'Show or hide the Explorer sidebar', defaults: ['Ctrl+B'], scope: 'global', when: 'Not while typing in a Word document' },
@@ -239,6 +240,7 @@
         'quickOpen.files': () => W.openQuickOpen && W.openQuickOpen(),
         'quickOpen.commands': () => W.openQuickOpen && W.openQuickOpen('>'),
         'view.toggleSidebar': click('folderIconItem'),
+        'tasks.runBuild': () => { if (W.CodeMiniTasks) W.CodeMiniTasks.runDefault('build'); },
         'view.toggleTerminal': click('terminalIconItem'),
         'view.searchFiles': click('searchIconItem'),
         // Monaco files use Monaco's own formatter; notebooks reuse the toolbar's Format button.

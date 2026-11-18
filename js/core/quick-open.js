@@ -204,8 +204,17 @@
     // The key a command is bound to right now ("Alt+N"), so the palette never shows a stale one after a rebind.
     const keyOf = (id) => (W.CodeMiniKeybindings ? W.CodeMiniKeybindings.label(id) : '');
     function activeMonaco() { return typeof W.getActiveMonacoEditor === 'function' ? W.getActiveMonacoEditor() : null; }
+    // Features add their own commands (Tasks adds one "Run Task: <label>" per task, which change with the workspace): a function that returns
+    // [{ name, icon, run, keys? }] each time the list is built. One that throws is skipped, it must never empty the palette.
+    const contributors = [];
+    api.registerCommands = (fn) => { if (typeof fn === 'function') contributors.push(fn); };
+    function contributedCommands() {
+        const out = [];
+        contributors.forEach((fn) => { try { (fn() || []).forEach((c) => { if (c && typeof c.name === 'string' && typeof c.run === 'function') out.push({ name: c.name, icon: c.icon || 'ri-terminal-box-line', keys: c.keys, run: c.run }); }); } catch (e) { /* skipped */ } });
+        return out;
+    }
     function commandList() {
-        return [
+        const base = [
             { name: 'New File', icon: 'ri-file-add-line', keys: keyOf('file.new'), run: click('menuNewFile') },
             { name: 'New Folder', icon: 'ri-folder-add-line', run: click('addFolderBtn') },
             { name: 'Open Terminal', icon: 'ri-terminal-window-line', keys: keyOf('view.toggleTerminal'), run: click('terminalIconItem') },
@@ -252,6 +261,7 @@
                 W.CodeMiniHistory.showForTab(tab);
             } }
         ];
+        return base.concat(contributedCommands());
     }
 
     // ---- reading the file system ----

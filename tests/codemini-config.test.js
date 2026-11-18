@@ -6,6 +6,9 @@ const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
 const C = require('../js/core/codemini-config.js');
 const SJ = require('../js/core/settings-json.js');
 let n = 0; const t = async (name, fn) => { await fn(); n++; console.log('  ok', name); };
+// An async test that waits on a promise which never settles lets Node exit with code 0 and no output. Make that a failure.
+let finished = false;
+process.on('exit', (code) => { if (!finished && code === 0) { console.error('FAIL: the test stopped before it finished (a promise never settled)'); process.exitCode = 1; } });
 
 // An in-memory file store with the same two calls the app's adapter has.
 function memStore(initial) {
@@ -334,5 +337,6 @@ const file = (id, name, parentId, content, extra) => Object.assign({ id, parentI
     assert.ok(qo.includes("name: 'Open Workspace Settings (JSON)'") && qo.includes("name: 'Initialize .codemini'"));
     assert.ok(read('js/core/script.js').includes('window.CodeMiniConfig.addWorkspaceMenuEntry(wsDrop)'));
   });
+  finished = true;
   console.log(n + ' checks passed');
 })().catch((e) => { console.error(e); process.exit(1); });

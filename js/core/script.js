@@ -185,7 +185,8 @@ window.saveCurrentUIState = function() {
                  document.getElementById('searchSidebar')?.classList.contains('open') ? 'search' :
                  document.getElementById('stackSidebar')?.classList.contains('open') ? 'stack' :
                  document.getElementById('sourceControlSidebar')?.classList.contains('open') ? 'source' :
-                 document.getElementById('keysSidebar')?.classList.contains('open') ? 'keys' : null,
+                 document.getElementById('keysSidebar')?.classList.contains('open') ? 'keys' :
+                 document.getElementById('tasksSidebar')?.classList.contains('open') ? 'tasks' : null,
         bottomPanel: document.getElementById('problemsPanel')?.style.display !== 'none',
         bottomActiveTab: document.querySelector('.bottom-panel-tab.active')?.dataset.target || 'problemsPanelContent',
         treeMode: window.isTreeViewMode,
@@ -239,6 +240,10 @@ window.restoreCurrentUIState = function() {
         // Restored locked: my-keys.js renders the password screen and never persists an unlocked state.
         document.getElementById('keysSidebar')?.classList.add('open');
         document.getElementById('menuKeys')?.classList.add('active');
+    }
+    else if (uiState.sidebar === 'tasks') {
+        document.getElementById('tasksSidebar')?.classList.add('open');
+        document.getElementById('menuTasks')?.classList.add('active');
     }
 
     const problemsPanel = document.getElementById('problemsPanel');
@@ -507,6 +512,8 @@ window.closeAllSidebars = function() {
     // My Keys (my-keys.js) locks itself when this sidebar closes, so every path that closes it lands there.
     document.getElementById('keysSidebar')?.classList.remove('open');
     document.getElementById('menuKeys')?.classList.remove('active');
+    document.getElementById('tasksSidebar')?.classList.remove('open');
+    document.getElementById('menuTasks')?.classList.remove('active');
     // Every sidebar open/close path funnels through here, so this guarantees
     // the activity bar's overflow dropdown never stays hanging open across
     // a sidebar switch.
@@ -1400,6 +1407,7 @@ const activityMeta = {
     'menuSvgEditor': { icon: 'ri-pen-nib-line', name: 'SVG Editor' },
     'menuDeploy': { icon: 'ri-rocket-2-line', name: 'Deploy Project' },
     'menuBuild': { icon: 'ri-hammer-line', name: 'Custom Build' },
+    'menuTasks': { icon: 'ri-list-check-2', name: 'Tasks' },
     'menuTests': { icon: 'ri-test-tube-line', name: 'Test Explorer' }
 };
 
@@ -1466,7 +1474,7 @@ window.restoreActivityState = function() {
     });
 
     let topIds = ['folderIconItem', 'searchIconItem', 'stackIconItem', 'playIconItem', 'extensionIconItem', 'terminalIconItem'];
-    let dropIds = ['menuCollab', 'menuDatabase', 'menuSource', 'menuKeys', 'menuSvgEditor', 'menuDeploy', 'menuBuild', 'menuTests'];
+    let dropIds = ['menuCollab', 'menuDatabase', 'menuSource', 'menuKeys', 'menuSvgEditor', 'menuDeploy', 'menuBuild', 'menuTasks', 'menuTests'];
     const defaultTopIds = topIds.slice();
     const defaultDropIds = dropIds.slice();
 

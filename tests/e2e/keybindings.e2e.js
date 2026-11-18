@@ -53,7 +53,7 @@ const URL = 'http://localhost:8765/index.html';
   await key('Escape');
   await key('Control+Shift+p'); ok(await isOpen() && String(await ev(() => document.activeElement.value)).startsWith('>'), 'Ctrl+Shift+P too');
   await key('Escape');
-  ok(await ev(() => !!window.CodeMiniKeybindings && window.CodeMiniKeybindings.registry.commands().length === 12), 'twelve commands are in the registry');
+  ok(await ev(() => !!window.CodeMiniKeybindings && window.CodeMiniKeybindings.registry.commands().length === 13), 'thirteen commands are in the registry');
 
   // ------------------------------------------------------------------------------------------------
   console.log('\n[Settings > Keybindings]');
@@ -72,7 +72,7 @@ const URL = 'http://localhost:8765/index.html';
   const stored = () => ev(() => { const k = window.getPrefixedKey('keybindings'); return localStorage.getItem(k); });
   await openKb();
   const names = await ev(() => [...document.querySelectorAll('#kbRows .kb-row strong')].map(s => s.textContent));
-  ok(names.length === 12 && names[0] === 'Save File' && names.includes('Command Palette') && names.includes('Commit') && names.includes('Run Cell'), 'a row for each of the 12 commands', names);
+  ok(names.length === 13 && names[0] === 'Save File' && names.includes('Command Palette') && names.includes('Commit') && names.includes('Run Cell'), 'a row for each of the 13 commands', names);
   ok(await ev(() => [...document.querySelectorAll('#kbRows h3')].map(h => h.textContent).join('|')) === 'File Management|Execution|Navigation & Formatting|Source Control', 'grouped as before');
   let r = await row('view.toggleSidebar');
   ok(r.isItem && r.keys.join() === 'Ctrl + B' && r.source === 'Default' && r.acts.join() === 'edit,clear', 'a row is a Settings row: the command, Ctrl + B, "Default", a pencil and a remove', r);
@@ -158,7 +158,7 @@ const URL = 'http://localhost:8765/index.html';
   await ev(() => { document.querySelector('#kbResetAll').click(); }); await sleep(400);
   await page.locator('.btn-submit', { hasText: 'Reset all' }).click(); await sleep(500);
   const all = await ev(() => [...document.querySelectorAll('#kbRows .kb-row')].map(r => r.querySelector('.kb-source').textContent));
-  ok(all.length === 12 && all.every(s => s === 'Default') && await stored() === null, 'Reset all puts every shortcut back and clears what was stored', all);
+  ok(all.length === 13 && all.every(s => s === 'Default') && await stored() === null, 'Reset all puts every shortcut back and clears what was stored', all);
   ok(await keyN('Control+b', 'folderIconItem') === 1, 'and the defaults work');
 
   console.log('\n[a reload, and recording never leaves shortcuts off]');

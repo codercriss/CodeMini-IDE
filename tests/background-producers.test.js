@@ -7,6 +7,9 @@ const root = path.join(__dirname, '..');
 const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
 const { createRegistry } = require('../js/core/background-tasks.js');
 let n = 0; const t = async (name, fn) => { await fn(); n++; console.log('  ok', name); };
+// An async test that waits on a promise which never settles lets Node exit with code 0 and no output. Make that a failure.
+let finished = false;
+process.on('exit', (code) => { if (!finished && code === 0) { console.error('FAIL: the test stopped before it finished (a promise never settled)'); process.exitCode = 1; } });
 const tick = () => new Promise((r) => setImmediate(r));
 
 // A registry on a fake clock. hidden=true means "the person cannot see it", so tasks are listed at once (otherwise they appear after 800 ms).
@@ -319,5 +322,6 @@ const zipCode = udSrc.slice(udSrc.indexOf('async function handleDownloadZip()'),
     assert.strictEqual(z.bg.reg.running().length, 0);
   });
 
+  finished = true;
   console.log(n + ' checks passed');
 })().catch((e) => { console.error(e); process.exit(1); });

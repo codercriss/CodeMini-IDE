@@ -177,6 +177,7 @@
                         <div class="dropdown-item" id="menuSvgEditor"><i class="ri-pen-nib-line"></i> SVG Editor</div>
                         <div class="dropdown-item" id="menuDeploy"><i class="ri-rocket-2-line"></i> Deploy Project</div>
                         <div class="dropdown-item" id="menuBuild"><i class="ri-hammer-line"></i> Custom Build</div>
+                        <div class="dropdown-item" id="menuTasks"><i class="ri-list-check-2"></i> Tasks</div>
                         <div class="dropdown-item" id="menuTests"><i class="ri-test-tube-line"></i> Test Explorer</div>
                     </div>
                 </div>
@@ -332,6 +333,7 @@
         <div class="sidebar" id="sourceControlSidebar"></div>
 
         <div class="sidebar" id="keysSidebar"></div>
+        <div class="sidebar" id="tasksSidebar"></div>
 
         <div class="content-area">
             <div class="editor-split-view" id="splitView">
@@ -362,6 +364,7 @@
                         <div class="bottom-panel-tab active" data-target="problemsPanelContent">Problems</div>
                         <div class="bottom-panel-tab" data-target="consolePanelContent">Console</div>
                         <div class="bottom-panel-tab" data-target="debugPanelContent">Debug Console</div>
+                        <div class="bottom-panel-tab" data-target="tasksPanelContent">Tasks</div>
                     </div>
 
                     <div class="bottom-panel-actions">
@@ -410,6 +413,10 @@
                     style="display: none; height: 100%; padding: 0;">
                 </div>
 
+                <div class="bottom-panel-content" id="tasksPanelContent"
+                    style="display: none; height: 100%; padding: 0; flex-direction: column;">
+                </div>
+
             </div>
 
             <div class="modal-backdrop" id="modalBackdrop"></div>
@@ -456,6 +463,8 @@
                     class="ri-terminal-box-line"></i></div>
             <div class="status-item" id="statusDebugToggle" style="cursor: pointer;" title="Debug"><i
                     class="ri-bug-line"></i></div>
+            <div class="status-item" id="statusTasksToggle" style="cursor: pointer; display: none;" title="Tasks"><i
+                    class="ri-list-check-2"></i></div>
             <div class="status-item"><span id="activeFileStatus">Workspace</span></div>
 
         </div>
@@ -513,6 +522,7 @@
     <script src="js/core/keybindings.js"></script>
     <script src="js/core/json-schemas.js"></script>
     <script src="js/core/codemini-config.js"></script>
+    <script src="js/core/tasks.js"></script>
     <script src="js/core/snippets.js"></script>
     <script src="js/core/settings-json.js"></script>
     <script src="js/core/workspace-trust.js"></script>

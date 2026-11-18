@@ -5051,3 +5051,334 @@ html.is-pwa code, html.is-pwa samp {
 .ws-badge:focus-visible {
     background: var(--hover-blue);
 }
+
+/* ---- Shared sidebar header and body (UI/UX specs, "Shared patterns to reuse"); values from Source Control's header ---- */
+.sb-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 13px 15px;
+    flex: none;
+}
+
+.sb-header .sb-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.sb-header .sb-tools {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.sb-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px;
+    border: 0;
+    border-radius: 3px;
+    background: none;
+    font-size: 18px;
+    color: var(--text-main);
+    opacity: 0.7;
+    cursor: pointer;
+}
+
+.sb-icon-btn:hover,
+.sb-icon-btn:focus-visible {
+    background-color: var(--bg-panel);
+    opacity: 1;
+}
+
+.sb-icon-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.sb-body {
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: 20px;
+}
+
+/* ---- Tasks (sidebar, bottom panel tab, status bar item): js/core/tasks.js ---- */
+.tk-root {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+}
+
+.tk-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.tk-row {
+    padding: 10px 15px;
+    background-color: var(--bg-white);
+    border-bottom: 1px dashed var(--border-color);
+    white-space: normal;
+}
+
+.tk-row:hover {
+    background-color: var(--bg-panel);
+}
+
+.tk-row-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tk-lead {
+    flex: none;
+    font-size: 16px;
+    color: var(--icon-gray);
+}
+
+.tk-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.tk-pill {
+    flex: none;
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: var(--bg-panel);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    color: var(--text-muted);
+}
+
+.tk-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex: none;
+}
+
+/* Play and the pin appear on hover or focus; on a touch screen they are always there. */
+.tk-row .tk-play,
+.tk-row .tk-pin:not(.on) {
+    opacity: 0;
+}
+
+.tk-row:hover .tk-play,
+.tk-row:hover .tk-pin,
+.tk-row:focus-within .tk-play,
+.tk-row:focus-within .tk-pin,
+.tk-row .tk-pin.on,
+.tk-row .tk-stop {
+    opacity: 0.8;
+}
+
+.tk-row .tk-pin.on { color: var(--icon-yellow); }
+
+.tk-row .tk-play:disabled { opacity: 0.4; }
+
+@media (hover: none) {
+    .tk-row .tk-play,
+    .tk-row .tk-pin { opacity: 0.8; }
+}
+
+.tk-cmd {
+    margin: 3px 0 0 24px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.tk-row.tk-invalid .tk-cmd {
+    color: var(--color-danger);
+    white-space: normal;
+    font-family: inherit;
+}
+
+.tk-detail {
+    margin: 2px 0 0 24px;
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: normal;
+}
+
+.tk-ok { color: var(--accent-new, #00897b); }
+.tk-bad { color: var(--color-danger); }
+.tk-warn { color: var(--icon-yellow); }
+
+.tk-spin {
+    display: inline-block;
+    color: var(--accent-blue);
+    animation: tkSpin 0.8s linear infinite;
+}
+
+@keyframes tkSpin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+    .tk-spin { animation: none; }
+}
+
+.tk-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 15px;
+    border-bottom: 1px dashed var(--border-color);
+    font-size: 11px;
+    white-space: normal;
+    color: var(--text-main);
+}
+
+.tk-banner i { flex: none; font-size: 15px; }
+.tk-banner span { flex: 1; min-width: 0; }
+.tk-banner-lock i { color: var(--icon-yellow); }
+.tk-banner-bad i { color: var(--color-danger); }
+
+.tk-action {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent-blue);
+    cursor: pointer;
+}
+
+.tk-action:hover,
+.tk-action:focus-visible { text-decoration: underline; }
+
+.tk-btn {
+    padding: 6px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-white);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-main);
+    cursor: pointer;
+}
+
+.tk-btn.primary {
+    border-color: var(--accent-blue);
+    background: var(--accent-blue);
+    color: #fff;
+}
+
+.tk-menu .tk-menu-item {
+    display: block;
+    width: 100%;
+    padding: 8px 15px 8px 24px;
+    border: 0;
+    border-bottom: 1px dashed var(--border-color);
+    background: var(--bg-white);
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+    color: var(--text-main);
+    cursor: pointer;
+}
+
+.tk-menu .tk-menu-item:hover,
+.tk-menu .tk-menu-item:focus-visible { background: var(--bg-panel); }
+
+.tk-emptystate {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 30px 20px;
+    text-align: center;
+    white-space: normal;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.tk-emptystate > i { font-size: 26px; opacity: 0.6; }
+.tk-empty-title { font-size: 13px; font-weight: 600; color: var(--text-main); }
+.tk-emptystate .tk-btn { margin-top: 8px; }
+
+/* The Tasks tab of the bottom panel */
+.tk-out-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    flex: none;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 12px;
+}
+
+.tk-out-title { font-weight: 600; color: var(--text-main); }
+.tk-out-state { color: var(--text-muted); }
+
+.tk-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px;
+    border: 0;
+    border-radius: 3px;
+    background: none;
+    font-size: 15px;
+    color: var(--icon-gray);
+    cursor: pointer;
+}
+
+.tk-icon-btn:hover:not(:disabled),
+.tk-icon-btn:focus-visible { background: var(--bg-panel); color: var(--text-main); }
+.tk-icon-btn:disabled { opacity: 0.35; cursor: default; }
+
+.tk-out-body {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 6px 12px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.5;
+    user-select: text;
+}
+
+.tk-empty { color: var(--text-muted); font-family: var(--font-main); padding: 10px 0; }
+
+.tk-line { display: flex; gap: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tk-time { flex: none; color: var(--text-muted); opacity: 0.8; font-variant-numeric: tabular-nums; }
+.tk-text { flex: 1; min-width: 0; }
+.tk-err .tk-text { color: var(--color-danger); }
+.tk-sys .tk-text { color: var(--text-muted); }
+
+.tk-link {
+    color: var(--accent-blue);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+/* The status bar item after the bug icon: the running task's name, then a check or a cross. */
+#statusTasksToggle .tk-status-name {
+    margin-left: 4px;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    #statusTasksToggle .tk-status-name { display: none; }
+}
