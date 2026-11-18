@@ -2096,6 +2096,39 @@ body {
         gap: 12px;
         padding-bottom: 20px;
     }
+
+    /* Long tab names truncate with an ellipsis instead of pushing the right-hand items off screen:
+       the left group may shrink, the right group and the icon buttons keep their size, and the
+       last item (the active tab name) is the only one that gives way. */
+    .status-bar {
+        gap: 12px;
+    }
+
+    .status-left {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .status-right {
+        flex: none;
+    }
+
+    .status-left > .status-item {
+        flex: none;
+    }
+
+    .status-left > .status-item:last-child {
+        flex: 0 1 auto;
+        min-width: 0;
+    }
+
+    #activeFileStatus {
+        display: block;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
     
     /* Native Android Reset (removes iOS safe area margins) */
     html.is-android .window-bar {

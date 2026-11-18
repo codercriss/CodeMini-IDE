@@ -1314,7 +1314,29 @@ async function transferToExternalDBDeep(targets, targetDbName, action, targetRoo
     // (often still empty, from file-creation time) .content in `targets`, and
     // transferring it as-is clones that stale snapshot instead of what's
     // actually saved, landing an emptied-out copy at the destination.
-    const rootTargets = targets.map(t => allFiles.find(f => f.id === t.id) || t);
+    //
+    // Only the top-most selected items are transferred. In Tree View, ticking a folder also ticks everything inside
+    // it, so `targets` can hold a folder AND its children. Each child is carried along by its folder already (the
+    // descendants below); transferring it again as a root of its own re-parents it straight to the destination,
+    // which pulls it out of its folder and flattens the folder's structure. An item is therefore dropped when one
+    // of its ancestors is also selected (an item is never its own ancestor, so a corrupt parent loop can't drop it).
+    const requestedTargets = [], requestedIds = new Set();
+    targets.forEach(t => {
+        if (!t || requestedIds.has(t.id)) return;
+        requestedIds.add(t.id);
+        requestedTargets.push(allFiles.find(f => f.id === t.id) || t);
+    });
+    const recordById = new Map(allFiles.map(f => [f.id, f]));
+    const hasSelectedAncestor = (item) => {
+        let parent = recordById.get(item.parentId); const guard = new Set();
+        while (parent && !guard.has(parent.id)) {
+            if (parent.id !== item.id && requestedIds.has(parent.id)) return true;
+            guard.add(parent.id);
+            parent = recordById.get(parent.parentId);
+        }
+        return false;
+    };
+    const rootTargets = requestedTargets.filter(r => !hasSelectedAncestor(r));
 
     // What is already at the destination, and what to do about each clash. Nothing is written yet.
     const targetExisting = isSameDb ? allFiles : await readAllFrom(targetDbName);
