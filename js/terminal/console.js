@@ -10,6 +10,12 @@
         }[tag] || tag));
     }
 
+    // Lines from CodeMiniPyPkgs (a !pip install's result, what auto-install did) as Console HTML. The text is escaped here.
+    function pkgLinesHtml(logs) {
+        const color = { ok: 'var(--term-green)', err: 'var(--term-red)', info: 'var(--term-blue)' };
+        return (logs || []).map((l) => (color[l.kind] ? `<span style="color: ${color[l.kind]};">${escapeHTML(l.text)}</span>` : escapeHTML(l.text))).join('\n');
+    }
+
     // Circular-safe JSON stringifier for improved JS Console
     function safeStringify(obj, indent = 2) {
         let cache = [];
@@ -49,8 +55,7 @@
     async function runConsoleViaRunner(a) {
         const red = (t) => `<span style="color: var(--term-red);">${escapeHTML(t)}</span>`;
         const lang = a.language.toLowerCase();
-        let code = a.command, isTimeMagic = false;
-        if (lang === 'python' && code.startsWith('%time ')) { isTimeMagic = true; code = code.substring(6).trim(); }
+        let code = a.command, isTimeMagic = false, pkgHtml = '', runStart = a.startTime;
         if (lang === 'php') {
             code = code.trim();
             if (!code.startsWith('<?php')) code = `<?php\nerror_reporting(E_ALL);\nini_set('display_errors', 1);\n${code}\n?>`;
@@ -59,6 +64,14 @@
         const ask = (text) => (window.inlineInputPrompt ? window.inlineInputPrompt(text) : Promise.resolve(window.prompt(text) || ''));
         let res;
         try {
+            // Python: the !pip / %pip / %time magics and auto-install (js/core/py-packages.js), done on this window's host before the code runs.
+            if (lang === 'python' && window.CodeMiniPyPkgs) {
+                const prep = await window.CodeMiniPyPkgs.prepare(code, {
+                    autoInstall: a.autoInstall, engine: window.CodeMiniPyPkgs.hostEngine(a.activeWinId), onStatus: a.status,
+                    isStopped: () => !!(a.signal && a.signal.interrupted)
+                });
+                code = prep.code; isTimeMagic = prep.timed; pkgHtml = pkgLinesHtml(prep.logs); runStart = performance.now();
+            }
             res = await window.CodeMiniExec.run(a.activeWinId, { lang, code, opts: { trusted: a.isTrusted, autoInstall: a.autoInstall, sep: '\t' } }, (e) => {
                 events.push(e);
                 // Peek in Now Island shows the output as it arrives (text only; rich html output is not shown there).
@@ -89,8 +102,8 @@
             return out.trim() === '' ? '(No output)' : out;
         }
         if (lang === 'python') {
-            if (err) return red(`[Python Error]\n${err.text || err.message}`);
-            let outHtml = '';
+            if (err) return (pkgHtml ? pkgHtml + '\n' : '') + red(`[Python Error]\n${err.text || err.message}`);
+            let outHtml = pkgHtml ? pkgHtml + '\n' : '';
             events.forEach((e) => {
                 if (e.kind === 'stdout') outHtml += escapeHTML(e.text) + '\n';
                 else if (e.kind === 'stderr') outHtml += red(e.text) + '\n';
@@ -105,7 +118,7 @@
                                 </div>`;
                 });
             }
-            if (isTimeMagic) outHtml += `\n<span style="color: var(--term-blue); font-style: italic;">CPU Time: ${(performance.now() - a.startTime).toFixed(3)} ms</span>`;
+            if (isTimeMagic) outHtml += `\n<span style="color: var(--term-blue); font-style: italic;">CPU Time: ${(performance.now() - runStart).toFixed(3)} ms</span>`;
             const out = outHtml.trim();
             return out === '' ? '(No output)' : out;
         }
@@ -709,9 +722,21 @@
             
             let mockResponse = '';
 
+            // "(Installing packages: x...)" next to Out [n] while a !pip install / auto-install is working.
+            let pkgIndicator = null;
+            const pkgStatus = (text) => {
+                if (!pkgIndicator) {
+                    pkgIndicator = document.createElement('span');
+                    pkgIndicator.style.cssText = 'font-style: italic; color: var(--accent-blue); font-size: 12px; margin-left: 8px;';
+                    outputHeader.appendChild(pkgIndicator);
+                }
+                pkgIndicator.textContent = '(' + text + ')';
+            };
+            const pkgStatusDone = () => { if (pkgIndicator) { pkgIndicator.remove(); pkgIndicator = null; } };
+
             if (trimmedCmd === 'help' || trimmedCmd === 'help()') {
                 let helpMsg = `[CodeMini ${language} Console Capabilities]\n - clear(): Wipe the console output entirely.\n - Arrow Up/Down: Seamlessly navigate your execution history.\n - Custom UI settings dynamically available from the IDE settings panel.`;
-                if(language.toLowerCase() === 'python') helpMsg += `\n - %time <cmd>: Magic command to measure execution speed.`;
+                if(language.toLowerCase() === 'python') helpMsg += `\n - %time <cmd>: Magic command to measure execution speed.\n - !pip install <package>: Install a package (also %pip, !pip uninstall/list/freeze/show). Packages your code imports are installed automatically when Auto-Install is on.`;
                 mockResponse = `<span style="color: var(--term-blue); font-weight: bold;">${escapeHTML(helpMsg)}</span>`;
             } else {
                 // Isolated (Settings > Security): run the code on the runner's execution host instead of inside CodeMini.
@@ -729,8 +754,9 @@
                         kind: 'console', title: `Console ${language}: ${snip}`, winId: activeWinId, source: 'Console',
                         onStop: () => { run.interrupted = true; if (window.CodeMiniExec) window.CodeMiniExec.kill(activeWinId); }
                     }) : null;
-                    try { mockResponse = await runConsoleViaRunner({ language, command, activeWinId, isTrusted, autoInstall, startTime, signal: run, task: bgTask }); }
+                    try { mockResponse = await runConsoleViaRunner({ language, command, activeWinId, isTrusted, autoInstall, startTime, signal: run, task: bgTask, status: pkgStatus }); }
                     finally {
+                        pkgStatusDone();
                         inFlightRun = null;
                         if (bgTask) { if (run.interrupted) bgTask.finish('stopped', 'Stopped'); else if (run.errorText) bgTask.fail(run.errorText); else bgTask.finish('success'); }
                     }
@@ -795,6 +821,7 @@
                         mockResponse = `<span style="color: var(--term-red);">[Ruby System Error] ${escapeHTML(e.message)}</span>`;
                     }
                 } else if (language.toLowerCase() === 'python') {
+                    let pkgHtml = '';
                     try {
                         if (typeof window.getPyodideInstance === 'undefined') {
                             throw new Error("Pyodide engine not found.");
@@ -822,23 +849,14 @@ except Exception:
 
                         let execCmd = command;
                         let isTimeMagic = false;
-                        if (execCmd.startsWith('%time ')) {
-                            isTimeMagic = true;
-                            execCmd = execCmd.substring(6).trim();
-                        }
-
-                        if (autoInstall) {
+                        // The !pip / %pip / %time magics and auto-install (js/core/py-packages.js): the same implementation every Python surface uses.
+                        if (window.CodeMiniPyPkgs) {
                             try {
-                                const importStatusIndicator = document.createElement('span');
-                                importStatusIndicator.style.cssText = 'font-style: italic; color: var(--accent-blue); font-size: 12px; margin-left: 8px;';
-                                importStatusIndicator.textContent = "(Resolving dependencies...)";
-                                outputHeader.appendChild(importStatusIndicator);
-                                await py.loadPackagesFromImports(execCmd);
-                                importStatusIndicator.remove();
-                            } catch (err) {
-                                console.warn("Console auto-install failed:", err);
-                            }
+                                const prep = await window.CodeMiniPyPkgs.prepare(command, { autoInstall, engine: window.CodeMiniPyPkgs.appEngine(), onStatus: pkgStatus });
+                                execCmd = prep.code; isTimeMagic = prep.timed; pkgHtml = pkgLinesHtml(prep.logs);
+                            } finally { pkgStatusDone(); }
                         }
+                        const runStart = performance.now();
 
                         const result = await py.runPythonAsync(execCmd);
                         const stdout = py.runPython("_cm_stdout.getvalue()"); 
@@ -868,7 +886,7 @@ _res
                             console.warn("Console plot extraction failed:", plotErr);
                         }
 
-                        let outHtml = "";
+                        let outHtml = pkgHtml ? pkgHtml + "\n" : "";
                         if (stdout) outHtml += escapeHTML(stdout) + "\n";
                         if (stderr) outHtml += `<span style="color: var(--term-red);">${escapeHTML(stderr)}</span>\n`;
                         
@@ -889,7 +907,7 @@ _res
                         }
 
                         if (isTimeMagic) {
-                            const tMeasure = ((performance.now() - startTime)).toFixed(3);
+                            const tMeasure = ((performance.now() - runStart)).toFixed(3);
                             outHtml += `\n<span style="color: var(--term-blue); font-style: italic;">CPU Time: ${tMeasure} ms</span>`;
                         }
 
@@ -900,7 +918,7 @@ _res
                             const py = await window.getPyodideInstance();
                             const stderr = py.runPython("sys.stderr.getvalue()");
                             let errOut = stderr ? stderr : err.toString();
-                            mockResponse = `<span style="color: var(--term-red);">[Python Error]\n${escapeHTML(errOut)}</span>`;
+                            mockResponse = (pkgHtml ? pkgHtml + '\n' : '') + `<span style="color: var(--term-red);">[Python Error]\n${escapeHTML(errOut)}</span>`;
                         } catch (fallbackErr) {
                             mockResponse = `<span style="color: var(--term-red);">[Python System Error] ${escapeHTML(err.message)}</span>`;
                         }

@@ -23,6 +23,7 @@ const SINKS = [
 ];
 const PINNED = {
   'js/core/editor.js': 16,
+  'js/core/py-packages.js': 1,             // appEngine().run: the module's own fixed program, on the Normal/fallback path only; the person's code is DATA in it (parsed with ast, never run) (reviewed 2026-11-19)
   'js/notebook/notebook-kernels.js': 16,   // +1: webr.evalR(list.files(...)) in _rListFiles, a fixed file listing (reviewed 2026-10-27)
   'js/notebook/notebook-ui.js': 5,
   'js/terminal/console.js': 10,

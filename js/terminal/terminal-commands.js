@@ -2,6 +2,48 @@
 // terminal-commands.js
 // ==========================================
 
+// Python packages in the Terminal (js/core/py-packages.js, the one implementation every Python surface shares): the !pip / %pip / %time magics and
+// auto-install of what a script imports (Settings > Terminal > Auto-Install Python Packages), and the `pip` command. It runs on whichever Python this terminal
+// uses: the runner's host in Isolated mode, otherwise the page's own Pyodide. Everything is printed as escaped terminal lines.
+window.makeTerminalPyPackages = function (printTerm, dbGetDirFiles, getCurrentFolderId) {
+    const esc = (t) => window.CodeMiniEscape.html(String(t));
+    const colors = { ok: 'var(--term-green)', err: 'var(--term-red)', info: 'var(--term-blue)' };
+    // One line per entry, spacing kept (pip list is a table).
+    const printLogs = (logs) => logs.forEach((l) => printTerm(
+        `<pre style="margin: 0; font-family: inherit; white-space: pre-wrap; color: ${colors[l.kind] || 'var(--term-output-text)'};">${esc(l.text)}</pre>`, true));
+    const status = (t) => printTerm(`<span style="color:var(--term-blue); font-style:italic;">${esc(t)}</span>`, true);
+    const engine = async () => {
+        const P = window.CodeMiniPyPkgs;
+        const host = window.CodeMiniExec ? await window.CodeMiniExec.use('terminal') : false;
+        return host ? P.hostEngine(undefined) : P.appEngine();
+    };
+    // The names of the person's own Python modules next to the code (files and folders of the current folder): never looked up on PyPI.
+    const localModules = async () => {
+        try { return (await dbGetDirFiles(getCurrentFolderId())).filter((f) => f.type === 'folder' || /\.py$/i.test(f.name)).map((f) => f.name.replace(/\.py$/i, '')); }
+        catch (e) { return []; }
+    };
+    const autoInstall = () => (window.appSettings ? window.appSettings.terminalAutoInstall !== false : true);
+    return {
+        // Before Python code runs -> { code, timed }. A failure here is printed; the code still runs (and Python names what is missing).
+        async prepare(code) {
+            const P = window.CodeMiniPyPkgs;
+            if (!P) return { code, timed: false };
+            const prep = await P.prepare(code, { autoInstall: autoInstall(), engine: await engine(), local: await localModules(), onStatus: status });
+            printLogs(prep.logs);
+            return { code: prep.code, timed: prep.timed };
+        },
+        // `pip ...` / `python -m pip ...`: tokens are what follows the word pip. -> true when it succeeded.
+        async pip(tokens) {
+            const P = window.CodeMiniPyPkgs;
+            if (!P) { printTerm('pip: the package module did not load.'); return false; }
+            const r = await P.pipCommand(tokens, { engine: await engine(), onStatus: status });
+            printLogs(r.logs);
+            return r.ok;
+        },
+        timeLine: (ms) => window.CodeMiniPyPkgs.timeLine(ms)
+    };
+};
+
 window.getTerminalCommands = function(
     printTerm, dbGetDirFiles, getCurrentFolderId, dbGetAll, dbPut, dbDelete,
     updateCWD, getPathString, checkUnlock, blockBinary, executeFile,
@@ -34,6 +76,7 @@ window.getTerminalCommands = function(
             (note) => printTerm(`<span style="color:var(--term-yellow); font-style:italic;">${window.CodeMiniEscape.html(note)}</span>`, true))
         : Promise.resolve(null);
     const isoText = (iso, kind) => iso.events.filter((e) => e.kind === kind).map((e) => e.text).join('');
+    const pyPkgs = window.makeTerminalPyPackages(printTerm, dbGetDirFiles, getCurrentFolderId);
 
     // Helper utility to strictly preserve spacing and ASCII art integrity
     const printPre = (text, color = 'var(--term-output-text)') => {
@@ -97,7 +140,9 @@ window.getTerminalCommands = function(
         'bash': 'Execute a bash script natively',
         'zsh': 'Execute a zsh script natively',
         'js': 'Evaluate a JavaScript expression',
-        'python': 'Execute a Python script (Pyodide)',
+        'python': 'Execute a Python script (Pyodide); python -m pip works too',
+        'pip': 'Install Python packages (pip install, uninstall, list, freeze, show)',
+        'pip3': 'Same as pip',
         'ruby': 'Execute a Ruby script (Opal)',
         'php': 'Execute a PHP script (php-wasm)',
         'git': 'Version control on this workspace: status, add, commit, log, diff, branch, checkout, merge, stash, tag (run "git help")',
@@ -176,7 +221,7 @@ window.getTerminalCommands = function(
                 'File System': ['ls', 'cd', 'mkdir', 'touch', 'rm', 'mv', 'cp', 'pwd', 'chmod', 'tree', 'find', 'tar', 'zip', 'unzip'],
                 'Text & Data': ['cat', 'grep', 'head', 'tail', 'write', 'mini', 'hexdump', 'sort', 'uniq', 'wc', 'diff', 'markdown', 'csv2json', 'json2csv', 'formatjson', 'extracturls', 'minifyjs'],
                 'System & Network': ['clear', 'history', 'whoami', 'hostname', 'uname', 'ping', 'curl', 'wget', 'sysinfo', 'uptime', 'battery', 'storage', 'geolocate', 'weather', 'ssh', 'ps', 'kill', 'jobs', 'fg', 'bg'],
-                'Execution': ['run', 'sh', 'bash', 'zsh', 'js', 'python', 'ruby', 'php', 'npm', 'open', 'tabs', 'closetab'],
+                'Execution': ['run', 'sh', 'bash', 'zsh', 'js', 'python', 'pip', 'pip3', 'ruby', 'php', 'npm', 'open', 'tabs', 'closetab'],
                 'Version Control': ['git'],
                 'Utilities': ['sync', 'help', 'man', 'exit', 'echo', 'date', 'calc', 'timer', 'urlencode', 'urldecode', 'base64', 'uuid', 'roll', 'rot13', 'cowsay', 'qr', 'encrypt', 'decrypt', 'cmatrix', 'alias', 'env', 'restart']
             };
@@ -961,14 +1006,18 @@ window.getTerminalCommands = function(
             catch (e) { printTerm(`<span style="color:#e06c75;">Error: ${window.CodeMiniEscape.html(e.message)}</span>`, true); }
         },
         python: async (args) => {
-            if (args.length === 1) return printTerm('Usage: python <file.py> or python -c "code"');
+            if (args.length === 1) return printTerm('Usage: python <file.py> or python -c "code" or python -m pip install <package>');
+            if (args[1] === '-m' && args[2] === 'pip') { await pyPkgs.pip(args.slice(3)); return; }
             if (args[1] === '-c' && args[2]) {
-                const iso = await isolatedRun('python', args.slice(2).join(' '), {});
+                const prep = await pyPkgs.prepare(args.slice(2).join(' '));
+                const t0 = performance.now();
+                const iso = await isolatedRun('python', prep.code, {});
                 if (iso) {
                     if (iso.res.error) return printTerm(`<span style="color:var(--term-red)">[Python Error] ${window.CodeMiniEscape.html(iso.res.error.message)}</span>`, true);
                     const o = isoText(iso, 'stdout'), er = isoText(iso, 'stderr');
                     if (o) printPre(window.CodeMiniEscape.html(o));
                     if (er) printPre(window.CodeMiniEscape.html(er), 'var(--term-red)');
+                    if (prep.timed) printPre(window.CodeMiniEscape.html(pyPkgs.timeLine(performance.now() - t0)), 'var(--term-blue)');
                     return;
                 }
                 try {
@@ -976,11 +1025,13 @@ window.getTerminalCommands = function(
                     const py = await window.getPyodideInstance();
                     if (!py) throw new Error("Kernel not ready");
                     py.runPython(`import sys, io\nsys.stdout = io.StringIO()\nsys.stderr = io.StringIO()`);
-                    await py.runPythonAsync(args.slice(2).join(' '));
+                    const t1 = performance.now();
+                    await py.runPythonAsync(prep.code);
                     const out = py.runPython("sys.stdout.getvalue()");
                     const err = py.runPython("sys.stderr.getvalue()");
                     if (out) printPre(out.replace(/</g, '&lt;').replace(/>/g, '&gt;'));
                     if (err) printPre(err.replace(/</g, '&lt;').replace(/>/g, '&gt;'), 'var(--term-red)');
+                    if (prep.timed) printPre(window.CodeMiniEscape.html(pyPkgs.timeLine(performance.now() - t1)), 'var(--term-blue)');
                 } catch (e) { printTerm(`<span style="color:var(--term-red)">[Python Error] ${e.message}</span>`, true); }
             } else { await executeFile(args[1], args.slice(2)); }
         },
@@ -1034,6 +1085,12 @@ window.getTerminalCommands = function(
                 } catch(e) { printTerm(`<span style="color:var(--term-red)">[Ruby Error] ${e.message}</span>`, true); }
             } else { await executeFile(args[1], args.slice(2)); }
         },
+        // Python packages (js/core/py-packages.js): the same install / uninstall / list / freeze / show the notebooks' !pip lines have.
+        pip: async (args) => {
+            if (args.length === 1) return printTerm('Usage: pip install <package> | pip uninstall <package> | pip list | pip freeze | pip show <package>');
+            await pyPkgs.pip(args.slice(1));
+        },
+        pip3: async (args) => await commands.pip(args),
         run: async (args) => {
             if (!args[1]) return printTerm('Usage: run <filename>');
             await executeFile(args[1], args.slice(2));

@@ -171,8 +171,8 @@ const NOISE = /monaco|pyodide|loadPyodide|initSqlJs|Failed to fetch|net::|requir
   console.log('\n[10] every setting is decided');
   const dec = await ev(() => { const d = Object.keys(window.getDefaultSettings()), C = window.CodeMiniConfig; return { all: d, allowedMissing: Array.from(C.WORKSPACE_ALLOWED).filter(k => !d.includes(k)), nonScalar: Array.from(C.WORKSPACE_ALLOWED).filter(k => !['boolean', 'number', 'string'].includes(typeof window.getDefaultSettings()[k])), personal: d.filter(k => !C.isSecurityKey(k) && !C.WORKSPACE_ALLOWED.has(k)).sort() }; });
   ok(dec.allowedMissing.length === 0 && dec.nonScalar.length === 0, 'every allowed setting exists and is a plain value', dec);
-  const PERSONAL = ['activityBar', 'autoCheckUpdates', 'clearTrashOnExit', 'confirmBeforeExit', 'consoleAutoClear', 'consoleAutoInstall', 'consoleMaxHistory', 'consoleShowTimestamps', 'enableTrashBin', 'historyMaxDays', 'historyMaxEntries', 'hotExit', 'localHistory', 'maxMemory',
-    'nbAutoInstall', 'nbClearOnRestart', 'nbConfirmDelete', 'performanceMode', 'profileAccentTint', 'restoreSession', 'showWindowBar', 'sidebarPosition', 'termHistorySize', 'windowOpacity'];
+  const PERSONAL = ['activityBar', 'autoCheckUpdates', 'clearTrashOnExit', 'confirmBeforeExit', 'consoleAutoClear', 'consoleAutoInstall', 'consoleMaxHistory', 'consoleShowTimestamps', 'editorAutoInstall', 'enableTrashBin', 'historyMaxDays', 'historyMaxEntries', 'hotExit', 'localHistory', 'maxMemory',
+    'nbAutoInstall', 'nbClearOnRestart', 'nbConfirmDelete', 'performanceMode', 'profileAccentTint', 'restoreSession', 'showWindowBar', 'sidebarPosition', 'termHistorySize', 'terminalAutoInstall', 'windowOpacity'];
   ok(JSON.stringify(dec.personal) === JSON.stringify(PERSONAL), 'each setting is allowed, a security setting, or on the reviewed personal list: a NEW setting fails here until someone decides whether a workspace may set it', { notDecided: dec.personal.filter(k => !PERSONAL.includes(k)), gone: PERSONAL.filter(k => !dec.personal.includes(k)) });
 
   console.log('\n[11] the workspace settings overlay');

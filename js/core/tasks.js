@@ -48,14 +48,22 @@
     }
 
     // -> { ok: true, interpreter, lang, file } or { ok: false, message }
+    // `pip install requests` and `python -m pip install requests` are a command too: -> { ok: true, interpreter: 'pip', lang: 'python', file: '', pip: ['install', 'requests'] }
+    // (no file; the packages are installed into the isolated Python by js/core/py-packages.js, and a later task or script can import them).
     function parseCommand(str) {
         const t = typeof str === 'string' ? tokenize(str) : [];
         if (t === null) return { ok: false, message: 'The command has an unclosed quote.' };
         if (!t.length) return { ok: false, message: 'The command is empty.' };
         const interp = t[0].toLowerCase();
+        const isPip = interp === 'pip' || interp === 'pip3' || (/^(python|python3|py)$/.test(interp) && t[1] === '-m' && String(t[2] || '').toLowerCase() === 'pip');
+        if (isPip) {
+            const args = (interp === 'pip' || interp === 'pip3') ? t.slice(1) : t.slice(3);
+            if (!args.length) return { ok: false, message: 'Say what pip should do, for example: pip install requests.' };
+            return { ok: true, interpreter: 'pip', lang: 'python', file: '', pip: args };
+        }
         if (!Object.prototype.hasOwnProperty.call(INTERPRETERS, interp)) {
             const hint = /^(npm|npx|yarn|pnpm|bash|sh|zsh|make|git|cd|echo|ls|cat)$/.test(interp) ? t[0] + ' is not available here. ' : '';
-            return { ok: false, message: hint + 'A task command is "node", "python", "php", "ruby", "Rscript" or "sql" followed by a file in the workspace (or use "script" with "lang" to run code as it stands).' };
+            return { ok: false, message: hint + 'A task command is "node", "python", "php", "ruby", "Rscript" or "sql" followed by a file in the workspace, or "pip install <package>" (or use "script" with "lang" to run code as it stands).' };
         }
         if (t.length < 2) return { ok: false, message: 'Say which file to run: ' + t[0] + ' path/to/file.' };
         if (t.length > 2) return { ok: false, message: 'Arguments are not supported yet: a command is the interpreter and one file.' };
@@ -103,7 +111,7 @@
             if (!GROUPS[group]) { bad(nameFor, 'has group "' + String(t.group) + '": use "build", "test" or "custom".'); return; }
             seen.add(label);
             Object.keys(t).forEach((k) => { if (!TASK_FIELDS.includes(k)) bad(nameFor, 'has an unknown field "' + k + '", which is ignored.', 'warning'); });
-            const task = { label, group, isDefault: t.default === true, detail: typeof t.detail === 'string' ? t.detail : '', command: '', script: '', lang: '', file: '', display: '', error: '' };
+            const task = { label, group, isDefault: t.default === true, detail: typeof t.detail === 'string' ? t.detail : '', command: '', script: '', lang: '', file: '', pip: null, display: '', error: '' };
             if (t.default !== undefined && typeof t.default !== 'boolean') bad(nameFor, '"default" must be true or false.', 'warning');
             const hasCmd = t.command !== undefined, hasScript = t.script !== undefined;
             if (hasCmd === hasScript) task.error = 'Needs either "command" or "script" (not both).';
@@ -111,7 +119,7 @@
                 task.command = typeof t.command === 'string' ? t.command.trim() : '';
                 task.display = task.command;
                 const c = parseCommand(t.command);
-                if (!c.ok) task.error = c.message; else { task.lang = c.lang; task.file = c.file; }
+                if (!c.ok) task.error = c.message; else { task.lang = c.lang; task.file = c.file; task.pip = c.pip || null; }
             } else {
                 const lang = typeof t.lang === 'string' ? LANG_ALIASES[t.lang.toLowerCase()] : undefined;
                 if (!isText(t.script)) task.error = '"script" must be some code.';
@@ -202,7 +210,7 @@
                     label: { type: 'string', maxLength: LABEL_MAX, description: 'The name shown in the Tasks list. Each label must be different.' },
                     group: { type: 'string', enum: ['build', 'test', 'custom'], description: 'Where it is listed. "build" and "test" tasks can be run from a shortcut. Default: custom.' },
                     default: { type: 'boolean', description: 'The one that runs from Ctrl+Shift+B (build) or its test twin. Only one per group.' },
-                    command: { type: 'string', description: 'An interpreter and a file in the workspace: node, python, python3, php, ruby, Rscript or sql, then a path. Example: python tests/run.py' },
+                    command: { type: 'string', description: 'An interpreter and a file in the workspace: node, python, python3, php, ruby, Rscript or sql, then a path. Example: python tests/run.py. Or install Python packages: pip install requests' },
                     script: { type: 'string', description: 'Code to run as it stands, instead of "command". Needs "lang".' },
                     lang: { type: 'string', enum: ['javascript', 'python', 'php', 'ruby', 'r', 'sql'], description: 'The language of "script".' },
                     detail: { type: 'string', description: 'A note shown under the task.' }
@@ -215,7 +223,9 @@
     // The run core: runs ONE task against an injected environment (so it can be tested without a browser)
     // ---------------------------------------------------------------------------------------------
     // env: { now, trusted(): bool, getRecords(): Promise<records>, rootParent(): string, execUse(): Promise<bool>, execNotice(): string,
-    //        execRun(req, onOut, ask): Promise<{error?}>, kill(), bgStart(opts) -> handle | null, ask(text) }
+    //        execRun(req, onOut, ask): Promise<{error?}>, kill(), bgStart(opts) -> handle | null, ask(text),
+    //        pyPrepare(code, { onLine, isStopped, local }): Promise<{ code, timed, logs: [{ kind, text }] }>   (optional: !pip magics + auto-install for Python code)
+    //        pipRun(tokens, onLine): Promise<{ ok, logs }>                                                    (optional: a `pip install ...` command) }
     // sink: { line(text, stream), state(name) }  stream: 'out' | 'err' | 'sys'
     function createRunner(env) {
         let current = null; // { label, interrupted }
@@ -230,8 +240,8 @@
             let bg = null;
             try {
                 // 1. what to run
-                let code = task.script, lang = task.lang;
-                if (task.command) {
+                let code = task.script, lang = task.lang, local = [];
+                if (task.command && !task.pip) {
                     const rec = resolvePath(await env.getRecords(), env.rootParent(), task.file);
                     if (!rec) { sink.line('File not found: ' + task.file, 'err'); return result('error', 'File not found: ' + task.file); }
                     if (rec.isLocked) { sink.line(task.file + ' is locked, so it cannot be run.', 'err'); return result('error', task.file + ' is locked.'); }
@@ -239,6 +249,9 @@
                     const ext = String(rec.name).split('.').pop().toLowerCase();
                     if (EXT_LANG[ext] && EXT_LANG[ext] !== lang) { sink.line('Note: ' + task.file + ' looks like ' + EXT_LANG[ext] + ' but the command runs it as ' + lang + '.', 'sys'); }
                     code = String(rec.content || '');
+                    // the person's own Python modules next to the file (and at the top of the workspace): never looked up on PyPI
+                    const all = await env.getRecords(), top = env.rootParent() || 'root';
+                    local = (all || []).filter((r) => [rec.parentId || 'root', top].includes(r.parentId || 'root') && (r.type === 'folder' || /\.py$/i.test(r.name))).map((r) => String(r.name).replace(/\.py$/i, ''));
                 }
                 if (lang === 'php' && !code.trim().startsWith('<?php')) code = '<?php\nerror_reporting(E_ALL);\nini_set(\'display_errors\', 1);\n' + code.trim() + '\n?>';
                 // 2. where: the isolated runner only
@@ -254,13 +267,32 @@
                 const t0 = env.now();
                 let failure = '';
                 try {
-                    const res = await env.execRun({ lang, code, opts: { trusted: true, autoInstall: false, sep: ' ' } }, (e) => {
-                        if (!e || e.kind === 'html') return;
-                        const text = String(e.text).replace(/\n$/, ''), err = e.kind === 'error' || e.kind === 'stderr';
-                        sink.line(text, err ? 'err' : (e.kind === 'warn' || e.kind === 'info') ? 'sys' : 'out');
-                        if (bg) bg.log(String(e.text), err ? 'err' : 'out');
-                    }, env.ask);
-                    if (res && res.error) { failure = String(res.error.message || res.error.text || 'The code ended with an error'); sink.line(String(res.error.text || (res.error.name ? res.error.name + ': ' : '') + res.error.message), 'err'); }
+                    // the lines a package step produced (!pip, auto-install, pip): errors are errors, results are output, notes are system lines
+                    const showLogs = (logs) => (logs || []).forEach((l) => { sink.line(l.text, l.kind === 'err' ? 'err' : (l.kind === 'ok' || l.kind === 'out') ? 'out' : 'sys'); if (bg) bg.log(l.text, l.kind === 'err' ? 'err' : 'out'); });
+                    if (task.pip) {
+                        // `pip install x`: no file runs, the packages are installed
+                        if (!env.pipRun) { failure = 'pip is not available here.'; sink.line(failure, 'err'); }
+                        else {
+                            const r = await env.pipRun(task.pip, (t) => sink.line(t, 'sys'));
+                            showLogs(r.logs);
+                            if (!r.ok) failure = String(((r.logs || []).filter((l) => l.kind === 'err').pop() || {}).text || 'pip failed').replace(/^ERROR:\s*/, '');
+                        }
+                    } else {
+                        let timed = false;
+                        if (lang === 'python' && env.pyPrepare) {
+                            const prep = await env.pyPrepare(code, { onLine: (t) => sink.line(t, 'sys'), isStopped: () => me.interrupted, local });
+                            code = prep.code; timed = prep.timed; showLogs(prep.logs);
+                        }
+                        const tRun = env.now();
+                        const res = await env.execRun({ lang, code, opts: { trusted: true, autoInstall: false, sep: ' ' } }, (e) => {
+                            if (!e || e.kind === 'html') return;
+                            const text = String(e.text).replace(/\n$/, ''), err = e.kind === 'error' || e.kind === 'stderr';
+                            sink.line(text, err ? 'err' : (e.kind === 'warn' || e.kind === 'info') ? 'sys' : 'out');
+                            if (bg) bg.log(String(e.text), err ? 'err' : 'out');
+                        }, env.ask);
+                        if (res && res.error) { failure = String(res.error.message || res.error.text || 'The code ended with an error'); sink.line(String(res.error.text || (res.error.name ? res.error.name + ': ' : '') + res.error.message), 'err'); }
+                        else if (timed) sink.line('Wall time: ' + (env.now() - tRun).toFixed(2) + ' ms', 'sys');
+                    }
                 } catch (e) {
                     if (me.interrupted) { sink.line("Stopped: this window's isolated host was shut down, so its variables were reset.", 'sys'); }
                     else { failure = e.message; sink.line('System error: ' + e.message, 'err'); }
@@ -345,6 +377,17 @@
         execNotice: () => (W.CodeMiniExec ? W.CodeMiniExec.fallbackNotice('terminal') : ''),
         execRun: (req, onOut, ask) => W.CodeMiniExec.run(winId(), req, onOut, ask),
         kill: () => { if (W.CodeMiniExec) W.CodeMiniExec.kill(winId()); },
+        // Python packages (js/core/py-packages.js): the !pip / %pip magics and auto-install (Settings > Terminal > Auto-Install Python Packages), on this window's host.
+        pyPrepare: async (code, o) => {
+            const P = W.CodeMiniPyPkgs;
+            if (!P) return { code, timed: false, logs: [] };
+            return P.prepare(code, { autoInstall: !W.appSettings || W.appSettings.terminalAutoInstall !== false, engine: P.hostEngine(winId()), local: o.local, onStatus: o.onLine, isStopped: o.isStopped });
+        },
+        pipRun: async (tokens, onLine) => {
+            const P = W.CodeMiniPyPkgs;
+            if (!P) return { ok: false, logs: [{ kind: 'err', text: 'ERROR: the package module did not load.' }] };
+            return P.pipCommand(tokens, { engine: P.hostEngine(winId()), onStatus: onLine });
+        },
         ask: (text) => (W.inlineInputPrompt ? W.inlineInputPrompt(text) : Promise.resolve(W.prompt(text) || '')),
         bgStart: null // set per run: it needs the task's label
     };

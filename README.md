@@ -64,6 +64,7 @@ It is built to be usable on a phone as well as a laptop.
 - **Code editor** powered by Monaco, with Emmet support
 - **Notebooks** with in-browser kernels for Python (Pyodide), R (WebR), SQL (sql.js) and Ruby
 - **Consoles** for JavaScript, Python, PHP and Ruby, and an **integrated terminal** with a set of shell-style commands, including **`git`** (status, add, commit, log, diff, show, branch, switch/checkout, restore, reset, merge, stash, tag, reflog; run `git help`). It shares commits, branches, stashes and staging with the Source Control panel. Push, pull, fetch, clone, rebase, cherry-pick and revert stay in the panel
+- **Python packages everywhere Python runs.** `!pip install x` (also `%pip`, and `uninstall`, `list`, `freeze`, `show`) works in the Console, the editor's Run, the bottom Console, Debug, the Terminal and Tasks, as it does in notebooks; the Terminal also has a `pip` command, a Task's command can be `pip install x`, and the modules your code imports can be installed automatically (Settings > Editor / Terminal / Console > Auto-Install Python Packages)
 - **PHP and web previews** that run in the browser, with Console, Network and Inspector panels
 
 ### Manage your work
@@ -218,6 +219,8 @@ MONACO_DIR=/tmp/node_modules/monaco-editor/min npm run test:e2e -- diff-editor
 | `runner.test.js` | Preview runner: the shell and client against fake windows (allowlist, handshake, relay, spoofing, fallback) |
 | `runner-version.test.js` | The runner's version handshake: the app never needs more than the runner has, a bump is written down, both pages send the version, hostile values are cut down |
 | `exec-sinks.test.js` | Ratchet on every line in `js/` that can run code (a new one fails until reviewed), plus checks that Settings, My Keys and `SECURITY.md` describe isolation truthfully |
+| `py-packages.test.js` | Python packages for every surface: reading pip lines and the notebook magics, the generated Python run for real by CPython against a stand-in micropip, `prepare` / `pipCommand` against a fake engine, the Terminal's `pip` commands (the real `terminal-commands.js`), and that every surface, setting, script tag and precache entry is in place |
+| `tasks.test.js` | Tasks: what a command may be (including `pip install`), what `tasks.json` may say, finding the file, links in output, the run core against a fake host, and the wiring |
 | `html-sinks.test.js` | Shared escaper, the HTML-sink scanner and its per-file ratchet (new unescaped interpolations fail CI) |
 | `hardening.test.js` | Referrer policy, third-party script rules, noopener, CI permissions, the SRI tool (offline) |
 | `git-token.test.js` | Where the GitHub token lives: device-key encryption, migrations, fallbacks, lost key, reloads |
@@ -275,8 +278,12 @@ MONACO_DIR=/tmp/node_modules/monaco-editor/min npm run test:e2e -- diff-editor
 | `sanitize.e2e.js` | `CodeMiniEscape.sanitize`: 30 hostile payloads, stability on re-sanitizing, ordinary Markdown surviving |
 | `git-token.e2e.js` | GitHub token encrypted with the device key, usable with My Keys locked and after a reload, disconnect, lost key, migration |
 | `launch-actions.e2e.js` | App shortcuts: `/?action=new-file`, `terminal`, `search`, `settings` |
+| `bottom-panel-status-root.e2e.js` | The bottom panel's tabs scrolling sideways instead of wrapping, the phone status bar cutting a long tab name, and Move / Copy to Root keeping a folder's structure when its contents are selected too |
+| `py-packages.e2e.js` | Python packages in the real Console (Isolated and Same origin), Terminal (`pip`, `pip3`, `python -m pip`, scripts) and the editor's bottom Console: the package step goes first, the prepared code runs after it, lines are shown escaped, nothing is sent when there is nothing to do, and the Editor / Terminal / Console Auto-Install settings are honoured (a stand-in engine answers the step) |
 
 `theme-premium-compare.manual.js` is a manual before/after comparison tool and is not part of the automated run.
+
+`tests/real-pyodide.manual.js` is a manual check that runs Python packages on a real Pyodide with the real micropip and real PyPI downloads, then drives the real Terminal commands and the real Tasks runner against it. It needs the network, so it is not part of `npm test`: `npm install --no-save pyodide@0.24.1` then `node tests/real-pyodide.manual.js` (its header explains `PYODIDE_DIR` for a machine that cannot reach Pyodide's CDN).
 
 </details>
 

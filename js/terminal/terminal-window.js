@@ -439,13 +439,18 @@
                                 printTerm(`<span style="color:#e06c75;">Error: ${window.CodeMiniEscape.html(e.message)}</span>`, true);
                             }
                         } else if (ext === 'py') {
-                            const iso = await isolatedRun('python', target.content, { argv: ['python', filename, ...args] });
+                            // The !pip / %pip / %time magics and auto-install (js/core/py-packages.js), before the script runs.
+                            const pyPkgs = window.makeTerminalPyPackages(printTerm, dbGetDirFiles, getCurrentFolderId);
+                            const prep = await pyPkgs.prepare(target.content);
+                            const t0 = performance.now();
+                            const iso = await isolatedRun('python', prep.code, { argv: ['python', filename, ...args] });
                             if (iso) {
                                 if (iso.res.error) printTerm(`<span style="color:#e06c75;">[Python Error] ${window.CodeMiniEscape.html(iso.res.error.message)}</span>`, true);
                                 else {
                                     const o = isoText(iso, 'stdout'), er = isoText(iso, 'stderr');
                                     if (o) printTerm(window.CodeMiniEscape.html(o).replace(/\n/g, '<br>'), true);
                                     if (er) printTerm(`<span style="color:var(--term-red)">${window.CodeMiniEscape.html(er).replace(/\n/g, '<br>')}</span>`, true);
+                                    if (prep.timed) printTerm(`<span style="color:var(--term-blue)">${window.CodeMiniEscape.html(pyPkgs.timeLine(performance.now() - t0))}</span>`, true);
                                 }
                             } else try {
                                 if (typeof window.getPyodideInstance === 'undefined') {
@@ -460,13 +465,15 @@
                                 py.globals.set('sys_argv', ['python', filename, ...args]);
                                 py.runPython(`import sys; sys.argv = sys_argv.to_py()`);
 
-                                await py.runPythonAsync(target.content);
+                                const t1 = performance.now();
+                                await py.runPythonAsync(prep.code);
                                 
                                 const stdout = py.runPython("sys.stdout.getvalue()");
                                 const stderr = py.runPython("sys.stderr.getvalue()");
                                 
                                 if (stdout) printTerm(stdout.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>'), true);
                                 if (stderr) printTerm(`<span style="color:var(--term-red)">${stderr.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</span>`, true);
+                                if (prep.timed) printTerm(`<span style="color:var(--term-blue)">${window.CodeMiniEscape.html(pyPkgs.timeLine(performance.now() - t1))}</span>`, true);
                             } catch (e) {
                                 printTerm(`<span style="color:#e06c75;">[Python Error] ${e.message}</span>`, true);
                             }

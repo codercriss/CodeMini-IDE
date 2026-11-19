@@ -133,7 +133,7 @@ const file = (id, name, parentId, content, extra) => Object.assign({ id, parentI
 
   console.log('only display and editor settings can come from a workspace');
   const dflt = { fontSize: 13, wordWrap: 'off', tabSize: 4, enableTrashBin: true, clearTrashOnExit: false, historyMaxEntries: 50, localHistory: true, hotExit: true, confirmBeforeExit: false,
-    restoreSession: true, autoCheckUpdates: true, maxMemory: 512, nbAutoInstall: true, consoleAutoInstall: true, windowOpacity: 1, sidebarPosition: 'Left', performanceMode: false,
+    restoreSession: true, autoCheckUpdates: true, maxMemory: 512, nbAutoInstall: true, consoleAutoInstall: true, editorAutoInstall: true, terminalAutoInstall: true, windowOpacity: 1, sidebarPosition: 'Left', performanceMode: false,
     nbClearOnRestart: false, nbConfirmDelete: true, consoleAutoClear: false, profileAccentTint: true };
   await t('settings that protect the person\'s data or the app are personal: a workspace cannot set them, and is told why', () => {
     const body = {}; Object.keys(dflt).filter((k) => !['fontSize', 'wordWrap', 'tabSize'].includes(k)).forEach((k) => { body[k] = dflt[k] === true ? false : typeof dflt[k] === 'number' ? 1 : typeof dflt[k] === 'string' ? 'Right' : true; });
@@ -141,7 +141,7 @@ const file = (id, name, parentId, content, extra) => Object.assign({ id, parentI
     assert.deepStrictEqual(r.accepted, {});
     assert.strictEqual(r.rejected.length, Object.keys(body).length);
     assert.ok(r.rejected.every((x) => /personal setting/.test(x.reason)), JSON.stringify(r.rejected.filter((x) => !/personal/.test(x.reason))));
-    ['enableTrashBin', 'clearTrashOnExit', 'historyMaxEntries', 'localHistory', 'hotExit', 'confirmBeforeExit', 'nbAutoInstall', 'consoleAutoInstall', 'autoCheckUpdates'].forEach((k) => assert.strictEqual(C.isWorkspaceSettable(k), false, k));
+    ['enableTrashBin', 'clearTrashOnExit', 'historyMaxEntries', 'localHistory', 'hotExit', 'confirmBeforeExit', 'nbAutoInstall', 'consoleAutoInstall', 'editorAutoInstall', 'terminalAutoInstall', 'autoCheckUpdates'].forEach((k) => assert.strictEqual(C.isWorkspaceSettable(k), false, k));
   });
   await t('display and editor settings are allowed, security ones never (even if someone adds them to the list)', () => {
     ['fontSize', 'wordWrap', 'tabSize', 'colorTheme', 'statusBarBackground', 'hideCodeminiFolder', 'formatOnSave', 'consoleFontSize'].forEach((k) => assert.strictEqual(C.isWorkspaceSettable(k), true, k));

@@ -64,6 +64,7 @@ const STATIC_ASSETS = [
     '/js/core/name-conflicts.js',
     '/js/viewers/runner-client.js',
     '/js/viewers/exec-client.js',
+    '/js/core/py-packages.js',
     '/js/core/my-keys.js',
     '/js/core/file-lock.js',
     '/js/core/settings-profile.js',

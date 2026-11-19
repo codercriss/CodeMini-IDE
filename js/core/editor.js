@@ -259,6 +259,32 @@ async function _debugHostVars(ext, winId) {
 
 // Runs a debug session's code on the host. Resolves true when the host handled it (the log and the Variables panel are updated here), false when the
 // in-app engine must be used (Same origin mode, or the runner is unavailable: a one-time note then explains why).
+// Python packages for the editor's Run, the bottom Console and Debug (js/core/py-packages.js, the one implementation every Python surface shares):
+// the !pip / %pip / %time magics in the code, and auto-install of what it imports when Settings > Editor > Auto-Install Python Packages is on.
+function _editorAutoInstall() { return window.appSettings ? window.appSettings.editorAutoInstall !== false : true; }
+// `winId` set -> this window's runner host (Isolated); null -> the page's own Pyodide. Prints as the bottom Console's own lines.
+// -> { code (what to run), timed }
+async function _preparePython(code, winId, isStopped) {
+    const P = window.CodeMiniPyPkgs;
+    if (!P) return { code, timed: false };
+    const prep = await P.prepare(code, {
+        autoInstall: _editorAutoInstall(), engine: winId ? P.hostEngine(winId) : P.appEngine(), isStopped,
+        onStatus: (t) => window.printToBottomConsole(t, 'system')
+    });
+    const kinds = { ok: 'system', info: 'system', err: 'error', out: 'normal' };
+    prep.logs.forEach((l) => window.printToBottomConsole(l.text, kinds[l.kind] || 'system'));
+    return { code: prep.code, timed: prep.timed };
+}
+// The same for Debug, whose log is HTML in the registry (the text is escaped).
+async function _debugPreparePython(code, winId, host) {
+    const P = window.CodeMiniPyPkgs;
+    if (!P) return code;
+    const prep = await P.prepare(code, { autoInstall: _editorAutoInstall(), engine: host ? P.hostEngine(winId) : P.appEngine() });
+    const color = { ok: 'var(--term-green)', err: 'var(--color-danger)', info: 'var(--term-blue)', out: 'var(--text-main)' };
+    prep.logs.forEach((l) => { window.debugLogRegistry[winId] += `<br><span style="color:${color[l.kind] || 'var(--text-main)'}">${CodeMiniEscape.html(l.text)}</span>`; });
+    return prep.code;
+}
+
 async function _debugOnHost(lang, code, winId) {
     if (!window.CodeMiniExec) return false;
     const esc = (t) => CodeMiniEscape.html(String(t));
@@ -274,6 +300,7 @@ async function _debugOnHost(lang, code, winId) {
     const ask = (text) => (window.inlineInputPrompt ? window.inlineInputPrompt(text) : Promise.resolve(window.prompt(text) || ''));
     try {
         const trusted = !window.WorkspaceTrust || window.WorkspaceTrust.isTrusted();
+        if (lang === 'python') code = await _debugPreparePython(code, winId, true);
         const res = await window.CodeMiniExec.run(winId, { lang, code, opts: { trusted, autoInstall: false, sep: ' ' } },
             (e) => { if (e.kind !== 'html') events.push(e); }, ask);
         if (lang === 'javascript') {
@@ -376,7 +403,7 @@ window._runDebugCore = async function(winId, fileName, ext, code, bpLines) {
             if (py) {
                 try {
                     py.runPython(`import sys, io; sys.stdout = io.StringIO(); sys.stderr = io.StringIO()`);
-                    await py.runPythonAsync(debugCode);
+                    await py.runPythonAsync(await _debugPreparePython(debugCode, winId, false));
                     const out = py.runPython("sys.stdout.getvalue()");
                     const err = py.runPython("sys.stderr.getvalue()");
                     
@@ -1954,6 +1981,9 @@ async function _runOnHost(code, ext, winId) {
     const ask = (text) => (window.inlineInputPrompt ? window.inlineInputPrompt(text) : Promise.resolve(window.prompt(text) || ''));
     try {
         const trusted = !window.WorkspaceTrust || window.WorkspaceTrust.isTrusted();
+        let timed = false;
+        if (lang === 'python') { const prep = await _preparePython(code, winId, () => run.interrupted); code = prep.code; timed = prep.timed; }
+        const t0 = performance.now();
         // html events and plots are not shown by this panel (it never showed them), so they are ignored here.
         const res = await window.CodeMiniExec.run(winId, { lang, code, opts: { trusted, autoInstall: false, sep: ' ' } },
             (e) => {
@@ -1969,6 +1999,7 @@ async function _runOnHost(code, ext, winId) {
         } else if (res.value && res.value.text && !(lang === 'python' && res.value.text === 'None')) {
             window.printToBottomConsole(String(res.value.text), 'normal');
         }
+        if (timed && !err && window.CodeMiniPyPkgs) window.printToBottomConsole(window.CodeMiniPyPkgs.timeLine(performance.now() - t0), 'system');
     } catch (e) {
         // Stop shuts the host down on purpose; that is not a failure.
         if (run.interrupted) window.printToBottomConsole("[Execution Interrupted] Stopped: this window's isolated host was shut down, so its variables were reset.", 'error');
@@ -2105,7 +2136,9 @@ sys.stdout = io.StringIO()
 sys.stderr = io.StringIO()
             `);
             
-            const res = await py.runPythonAsync(code);
+            const prep = await _preparePython(code, null);
+            const t0 = performance.now();
+            const res = await py.runPythonAsync(prep.code);
             
             if(!window._bpConsoleRunningState[winId]) {
                 throw new Error("Interrupted");
@@ -2120,6 +2153,7 @@ sys.stderr = io.StringIO()
             if (res !== undefined && res !== null && res.toString() !== 'None') {
                 window.printToBottomConsole(String(res), 'normal');
             }
+            if (prep.timed && window.CodeMiniPyPkgs) window.printToBottomConsole(window.CodeMiniPyPkgs.timeLine(performance.now() - t0), 'system');
         }
     } catch(e) {
         if (e.message === 'Interrupted') {

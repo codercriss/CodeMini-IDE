@@ -290,6 +290,77 @@ const parse = (v) => T.parseTasks(v);
     assert.strictEqual(T.createRunner(g.env).isRunning(), false);
   });
 
+  console.log('Python packages in tasks (pip as a command; !pip and auto-install for Python code)');
+  await t('"pip install x", "pip3" and "python -m pip" are commands: no file, the arguments are kept for pip', () => {
+    [['pip install requests', ['install', 'requests']], ['pip3 install -q a b==1', ['install', '-q', 'a', 'b==1']], ['PIP list', ['list']],
+      ['python -m pip install x', ['install', 'x']], ['python3 -m pip freeze', ['freeze']], ['py -m pip uninstall -y x', ['uninstall', '-y', 'x']]].forEach(([cmd, args]) => {
+      const r = T.parseCommand(cmd);
+      assert.deepStrictEqual([r.ok, r.interpreter, r.lang, r.file, r.pip], [true, 'pip', 'python', '', args], cmd);
+    });
+    assert.match(T.parseCommand('pip').message, /Say what pip should do/);
+    assert.match(T.parseCommand('python -m pip').message, /Say what pip should do/);
+    assert.match(T.parseCommand('python -m http.server').message, /Arguments are not supported/, 'other -m modules are unchanged');
+    assert.ok(/pip install <package>/.test(T.parseCommand('npm install').message), 'the message that lists what a command can be now mentions pip');
+  });
+  await t('in tasks.json a pip task is a normal task (kept, runnable), a bare "pip" is a visible error, and the schema says so', () => {
+    const r = T.parseTasks({ tasks: [{ label: 'Deps', command: 'pip install requests pandas' }, { label: 'Bad', command: 'pip' }, { label: 'Run', command: 'python a.py' }] });
+    assert.deepStrictEqual([r.tasks[0].error, r.tasks[0].lang, r.tasks[0].pip], ['', 'python', ['install', 'requests', 'pandas']]);
+    assert.match(r.tasks[1].error, /Say what pip should do/); assert.strictEqual(r.tasks[2].pip, null);
+    assert.match(T.SCHEMA.properties.tasks.items.properties.command.description, /pip install requests/);
+  });
+  const pipTask = (cmd) => { const c = T.parseCommand(cmd); return script({ script: '', command: cmd, display: cmd, lang: c.lang, file: c.file, pip: c.pip }); };
+  await t('a pip task installs through the environment and runs no file; the result lines are output, notes are system lines, an error fails the task', async () => {
+    const calls = [];
+    const f = fakeEnv(); f.env.pipRun = async (tokens, onLine) => { calls.push(tokens); onLine('Installing packages: requests...'); return { ok: true, logs: [{ kind: 'ok', text: 'Successfully installed requests' }, { kind: 'info', text: 'a note' }] }; };
+    const s = sinkOf(); const out = await T.createRunner(f.env).run(pipTask('pip install requests'), s);
+    assert.deepStrictEqual(calls, [['install', 'requests']]); assert.strictEqual(f.log.runs.length, 0, 'nothing was executed as code');
+    assert.strictEqual(out.state, 'success');
+    assert.deepStrictEqual(s.lines.map((x) => x[0] + ':' + x[1]).slice(0, 4), ['sys:> pip install requests   (python)', 'sys:Installing packages: requests...', 'out:Successfully installed requests', 'sys:a note']);
+    const g = fakeEnv(); g.env.pipRun = async () => ({ ok: false, logs: [{ kind: 'err', text: 'ERROR: Could not install nope: not found on PyPI' }] });
+    const s2 = sinkOf(); const bad = await T.createRunner(g.env).run(pipTask('pip install nope'), s2);
+    assert.deepStrictEqual([bad.state, bad.text], ['error', 'Could not install nope: not found on PyPI']);
+    assert.ok(s2.lines.some((x) => x[0] === 'err' && /not found on PyPI/.test(x[1])));
+    assert.deepStrictEqual(g.log.bg.map((x) => x[0]), ['fail']);
+    const h = fakeEnv(); const none = await T.createRunner(h.env).run(pipTask('pip install x'), sinkOf());
+    assert.deepStrictEqual([none.state, none.text], ['error', 'pip is not available here.']);
+  });
+  await t('Python code is prepared before it runs: the code that runs is the prepared one, its lines are shown, %time adds the wall time, other languages are left alone', async () => {
+    const seen = [];
+    const f = fakeEnv(); f.env.pyPrepare = async (code, o) => { seen.push([code, Object.keys(o).sort().join(',')]); o.onLine('Resolving Python dependencies...'); return { code: 'PREPARED', timed: true, logs: [{ kind: 'ok', text: 'Successfully installed q' }, { kind: 'info', text: 'Auto-installed: z' }] }; };
+    const s = sinkOf(); await T.createRunner(f.env).run(script({ script: '!pip install q\nimport z' }), s);
+    assert.deepStrictEqual(seen, [['!pip install q\nimport z', 'isStopped,local,onLine']]);
+    assert.strictEqual(f.log.runs[0].code, 'PREPARED'); assert.deepStrictEqual(f.log.runs[0].opts, { trusted: true, autoInstall: false, sep: ' ' });
+    const texts = s.lines.map((x) => x[0] + ':' + x[1]);
+    assert.ok(texts.indexOf('sys:Resolving Python dependencies...') > texts.indexOf('sys:> print(1)   (python)') && texts.indexOf('out:Successfully installed q') < texts.findIndex((x) => /^sys:Wall time: /.test(x)));
+    assert.ok(texts.includes('sys:Auto-installed: z'));
+    const js = fakeEnv(); let called = 0; js.env.pyPrepare = async () => { called++; return { code: 'X', timed: false, logs: [] }; };
+    await T.createRunner(js.env).run(script({ lang: 'javascript', script: 'console.log(1)' }), sinkOf());
+    assert.deepStrictEqual([called, js.log.runs[0].code], [0, 'console.log(1)']);
+  });
+  await t('for a file the task also tells the package step which modules are the person\'s own (that file\'s folder and the top of the workspace), so those are never looked up on PyPI', async () => {
+    const records = [folder('ws-tools', 'tools', 'ws'), file('r1', 'run.py', 'ws-tools', 'import helper\nprint(1)'), file('h', 'helper.py', 'ws-tools', ''), file('t', 'config.py', 'ws', ''), file('n', 'notes.txt', 'ws-tools', ''), folder('dd', 'data', 'ws-tools'), file('o', 'unrelated.py', 'elsewhere', '')];
+    let got;
+    const f = fakeEnv({ records }); f.env.pyPrepare = async (code, o) => { got = o.local; return { code, timed: false, logs: [] }; };
+    await T.createRunner(f.env).run(cmdTask('python tools/run.py'), sinkOf());
+    assert.deepStrictEqual(got.slice().sort(), ['config', 'data', 'helper', 'run', 'tools']);
+  });
+  await t('Stop while the package step is working ends the task as stopped, and the code never runs', async () => {
+    let r;
+    const f = fakeEnv(); f.env.pyPrepare = async (code, o) => { r.stop(); assert.strictEqual(o.isStopped(), true); throw new Error('host shut down'); };
+    r = T.createRunner(f.env); const s = sinkOf();
+    const out = await r.run(script({ script: 'import z' }), s);
+    assert.strictEqual(out.state, 'stopped'); assert.strictEqual(f.log.runs.length, 0); assert.strictEqual(f.log.kills, 1);
+    assert.ok(s.lines.some((x) => /Stopped after/.test(x[1])));
+  });
+  await t('an environment with no package support behaves exactly as before (the existing request is unchanged)', async () => {
+    const f = fakeEnv(); await T.createRunner(f.env).run(script({ script: '!pip install q' }), sinkOf());
+    assert.deepStrictEqual(f.log.runs[0], { lang: 'python', code: '!pip install q', opts: { trusted: true, autoInstall: false, sep: ' ' } });
+  });
+  await t('the browser environment wires both hooks to the package module, on this window\'s host, using the Terminal setting', () => {
+    const tk = read('js/core/tasks.js');
+    assert.ok(/pyPrepare: async/.test(tk) && /pipRun: async/.test(tk) && /P\.hostEngine\(winId\(\)\)/.test(tk) && /terminalAutoInstall !== false/.test(tk));
+  });
+
   console.log('wiring');
   const html = read('index.html'), sw = read('sw.js'), sc = read('js/core/script.js');
   await t('the menu item, the sidebar, the Tasks tab, its panel and the status item are in the page, in the places the spec gives', () => {
