@@ -73,6 +73,7 @@ const STATIC_ASSETS = [
     '/js/terminal/console.js',
     '/js/core/preloader.js',
     '/js/core/pwa.js',
+    '/js/vendor/diff-9.0.0.js',
     '/manifest.json',
     '/icons/icon.png',
     '/icons/icon-192.png',

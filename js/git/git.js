@@ -945,24 +945,20 @@ function gitSavePendingRebase(dbName, state) {
 }
 
 
-// --- Diff engine (loaded on demand, same two-CDN-source pattern used
-// throughout this app for pdf.js/php-wasm/marked) -------------------------
-async function gitGetDiffLib() {
-    if (window._gitDiffLib) return window._gitDiffLib;
-    if (window._gitDiffLibLoading) {
-        while (!window._gitDiffLib && window._gitDiffLibLoading) await new Promise(r => setTimeout(r, 50));
-        return window._gitDiffLib;
+// --- Diff engine ----------------------------------------------------------
+// jsdiff is vendored (js/vendor/diff-9.0.0.js, precached by the service worker), so the diff popup works offline
+// and no third-party code is fetched into the app's origin for it. Loaded on first use.
+const GIT_DIFF_LIB_URL = '/js/vendor/diff-9.0.0.js';
+let _gitDiffLibPromise = null;
+function gitGetDiffLib() {
+    if (!_gitDiffLibPromise) {
+        _gitDiffLibPromise = import(GIT_DIFF_LIB_URL).catch(e => {
+            console.error('Diff library failed to load from ' + GIT_DIFF_LIB_URL, e);
+            _gitDiffLibPromise = null; // let the next diff try again
+            return null;
+        });
     }
-    window._gitDiffLibLoading = true;
-    let mod;
-    try { mod = await import('https://esm.sh/diff@9.0.0'); }
-    catch (e1) {
-        try { mod = await import('https://cdn.jsdelivr.net/npm/diff@9.0.0/+esm'); }
-        catch (e2) { console.error('Diff library failed to load from all sources.', e1, e2); window._gitDiffLibLoading = false; return null; }
-    }
-    window._gitDiffLib = mod;
-    window._gitDiffLibLoading = false;
-    return mod;
+    return _gitDiffLibPromise;
 }
 // Groups a flat diffLines() result into git's own hunk model: contiguous
 // runs of change surrounded by up to `contextLines` of unchanged context,
@@ -1078,7 +1074,7 @@ async function gitRenderDiffHtml(oldContent, newContent, encoding, viewMode) {
     }
     const diffLib = await gitGetDiffLib();
     if (!diffLib) {
-        return `<div class="git-diff-binary"><i class="ri-error-warning-line"></i><br>Diff engine failed to load - check your connection</div>`;
+        return `<div class="git-diff-binary"><i class="ri-error-warning-line"></i><br>Diff engine failed to load - reload the app and try again</div>`;
     }
     const parts = diffLib.diffLines(oldContent || '', newContent || '');
     window._gitDiffParts = parts; // stashed for the expand-gap click handler, keyed by the currently open modal only

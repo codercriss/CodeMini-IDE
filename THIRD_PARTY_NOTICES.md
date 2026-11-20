@@ -1,8 +1,8 @@
 # Third-party notices
 
-CodeMini, Copyright (c) 2026 Christian Forson, is MIT licensed (see `LICENSE`). It does not bundle third-party code in this repository;
+CodeMini, Copyright (c) 2026 Christian Forson, is MIT licensed (see `LICENSE`). Almost all third-party code is not in this repository:
 the libraries below are loaded at runtime from public CDNs and cached by the service worker for offline use.
-Each remains under its own license. Check each project for the exact license of the version you deploy.
+The one exception is `diff`, which is vendored in `js/vendor/` (see the table). Each library remains under its own license. Check each project for the exact license of the version you deploy.
 
 | Library | Used for | Source |
 | --- | --- | --- |
@@ -17,7 +17,7 @@ Each remains under its own license. Check each project for the exact license of 
 | JSZip | Zip creation | https://github.com/Stuk/jszip |
 | fflate | Compression | https://github.com/101arrowz/fflate |
 | marked | Markdown rendering | https://github.com/markedjs/marked |
-| diff | Text diffing | https://github.com/kpdecker/jsdiff |
+| diff (jsdiff 9.0.0, BSD-3-Clause, vendored in `js/vendor/`, license in `js/vendor/diff-LICENSE.txt`) | Text diffing | https://github.com/kpdecker/jsdiff |
 | Babel standalone | JSX/TS transform in previews | https://github.com/babel/babel |
 | github-markdown-css | Markdown styling | https://github.com/sindresorhus/github-markdown-css |
 | Remix Icon | Icons | https://github.com/Remix-Design/RemixIcon |
