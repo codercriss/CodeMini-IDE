@@ -455,7 +455,7 @@
             <div class="lp-status-right">
                 <span id="lpCurrentFileLabel">preview</span>
                 <span id="lpWordCount" style="color: var(--accent-blue); font-weight: bold;"></span>
-                <span id="lpIsolation" style="display:none; cursor: pointer; padding: 6px 8px;"></span>
+                <span id="lpIsolation" style="display:none; cursor: pointer;"></span>
             </div>
         </div>
     `;
