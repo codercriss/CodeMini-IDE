@@ -76,6 +76,16 @@ const esc = require('../js/core/html-escape.js');
     assert.ok(/genModalText\.textContent = text/.test(read('js/core/app.js')), 'dialog text must be a text node');
     assert.ok(!/genModalText\.innerHTML/.test(read('js/core/app.js')));
   });
+  await t('the breadcrumb bar and the Details dialog show names as text, never as an HTML string', () => {
+    const app = read('js/core/app.js');
+    const between = (from, to) => { const a = app.indexOf(from), b = app.indexOf(to, a); assert.ok(a > -1 && b > a, `${from} not found`); return app.slice(a, b); };
+    const crumbs = between('function updateBreadcrumbs()', "const genericModal = document.getElementById('genericModal')");
+    assert.ok(!/innerHTML|insertAdjacentHTML/.test(crumbs), 'updateBreadcrumbs must not build HTML (folder names are untrusted)');
+    assert.ok(crumbs.includes('p.textContent = name'), 'a crumb must be a text node');
+    const details = between("'Details', async", "addOption('ri-");
+    assert.ok(!/innerHTML|insertAdjacentHTML/.test(details), 'the Details dialog must not build HTML (names and perms are untrusted)');
+    assert.ok(details.includes('td.textContent = value'), 'a Details value must be a text node');
+  });
   await t('no inline onclick builds a JS string from page-controlled values with HTML-escaping alone (use JSON.stringify)', () => {
     const src = read('js/viewers/preview.js');
     assert.ok(!/\('\$\{escapeHtml\((e|entry)\.(key|reqId)\)\}'\)/.test(src) && !/, '\$\{escapeHtml\(e\.key\)\}'\)/.test(src));

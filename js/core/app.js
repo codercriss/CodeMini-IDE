@@ -1177,29 +1177,48 @@ function splitNameForTruncation(name) {
 function updateBreadcrumbs() {
     const pathEl = document.getElementById('fileBrowserPath');
     if (!pathEl) return;
-    const rootNode = folderStack[0];
-    const rootName = rootNode.name;
-    let html = `<i class="ri-folder-5-line" style="color: var(--icon-gray)"></i> <p style="font-size: 11px; cursor: pointer; color: var(--accent-blue); font-weight: 700;" id="crumb-root">${rootName}</p>`;
-    
-    for(let i = 1; i < folderStack.length; i++) {
-        html += `<span style="font-size: 11px; margin: 0 2px; color: var(--text-muted);">/</span><p style="font-size: 11px; cursor: pointer; font-weight: 700; color: var(--accent-blue);" class="crumb-link" data-index="${i}">${folderStack[i].name}</p>`;
-    }
-    html += `<span style="font-size: 11px; margin: 0 2px; color: var(--text-muted)">/</span>`;
-    pathEl.innerHTML = html;
+    // Folder names are untrusted (zips, cloned repos, imports), so the bar is built from DOM nodes and textContent,
+    // never from an HTML string.
+    const crumb = (name, css) => {
+        const p = document.createElement('p');
+        p.style.cssText = css;
+        p.textContent = name;
+        return p;
+    };
+    const separator = (css) => {
+        const sep = document.createElement('span');
+        sep.style.cssText = css;
+        sep.textContent = '/';
+        return sep;
+    };
+    const rootIcon = document.createElement('i');
+    rootIcon.className = 'ri-folder-5-line';
+    rootIcon.style.cssText = 'color: var(--icon-gray)';
 
+    const rootCrumb = crumb(folderStack[0].name, 'font-size: 11px; cursor: pointer; color: var(--accent-blue); font-weight: 700;');
+    rootCrumb.id = 'crumb-root';
     // FIX: Only re-render the workspace top node instead of bouncing the user fully out to the main DB
-    document.getElementById('crumb-root').addEventListener('click', () => {
+    rootCrumb.addEventListener('click', () => {
         folderStack = [folderStack[0]];
         loadFilesFromDB();
     });
 
-    pathEl.querySelectorAll('.crumb-link').forEach(el => {
-        el.addEventListener('click', (e) => {
-            const idx = parseInt(e.target.dataset.index);
+    const nodes = [rootIcon, document.createTextNode(' '), rootCrumb];
+    for (let i = 1; i < folderStack.length; i++) {
+        const idx = i;
+        const link = crumb(folderStack[i].name, 'font-size: 11px; cursor: pointer; font-weight: 700; color: var(--accent-blue);');
+        link.className = 'crumb-link';
+        link.dataset.index = String(idx);
+        link.addEventListener('click', () => {
             folderStack = folderStack.slice(0, idx + 1);
             loadFilesFromDB();
         });
-    });
+        nodes.push(separator('font-size: 11px; margin: 0 2px; color: var(--text-muted);'), link);
+    }
+    nodes.push(separator('font-size: 11px; margin: 0 2px; color: var(--text-muted)'));
+
+    pathEl.textContent = '';
+    nodes.forEach(n => pathEl.appendChild(n));
 }
 
 const genericModal = document.getElementById('genericModal');
@@ -1795,12 +1814,12 @@ function showContextMenu(e, file) {
     if (!isMulti) {
         addOption('ri-information-line', 'Details', async () => {
             const dateStr = new Date(file.timestamp).toLocaleString();
-            let detailsHtml = `
-                <table style="width:100%; border-collapse: collapse; font-size: 13px; text-align: left;">
-                    <tr><th style="padding: 8px 0;">Name:</th><td style="padding: 8px 0;">${file.name}</td></tr>
-                    <tr><th style="padding: 8px 0;">Type:</th><td style="padding: 8px 0;">${file.type === 'folder' || file.type === 'workspace' ? 'Folder' : 'File'}</td></tr>
-                    <tr><th style="padding: 8px 0;">Modified:</th><td style="padding: 8px 0;">${dateStr}</td></tr>
-            `;
+            // [label, value] rows. Every value is shown as text: names and permissions come from zips, repos and imports.
+            const rows = [
+                ['Name:', file.name],
+                ['Type:', file.type === 'folder' || file.type === 'workspace' ? 'Folder' : 'File'],
+                ['Modified:', dateStr]
+            ];
 
             if (file.type === 'folder') {
                 const tx = db.transaction('filesystem', 'readonly');
@@ -1817,21 +1836,37 @@ function showContextMenu(e, file) {
                     });
                 };
                 getCounts(file.id);
-                detailsHtml += `<tr><th style="padding: 8px 0;">Contents:</th><td style="padding: 8px 0;">${childCount} Files, ${folderCount} Folders</td></tr>`;
+                rows.push(['Contents:', `${childCount} Files, ${folderCount} Folders`]);
             } else {
                 const size = file.content ? new Blob([file.content]).size : 0;
                 const sizeStr = size > 1024 ? (size/1024).toFixed(2) + ' KB' : size + ' B';
-                detailsHtml += `<tr><th style="padding: 8px 0;">Size:</th><td style="padding: 8px 0;">${sizeStr}</td></tr>`;
+                rows.push(['Size:', sizeStr]);
             }
-            
-            if(file.perms) detailsHtml += `<tr><th style="padding: 8px 0;">Permissions:</th><td style="padding: 8px 0;">${file.perms}</td></tr>`;
-            detailsHtml += `</table>`;
+
+            if (file.perms) rows.push(['Permissions:', String(file.perms)]);
+
+            const table = document.createElement('table');
+            table.style.cssText = 'width:100%; border-collapse: collapse; font-size: 13px; text-align: left;';
+            const tbody = document.createElement('tbody');
+            rows.forEach(([label, value]) => {
+                const tr = document.createElement('tr');
+                const th = document.createElement('th');
+                th.style.cssText = 'padding: 8px 0;';
+                th.textContent = label;
+                const td = document.createElement('td');
+                td.style.cssText = 'padding: 8px 0;';
+                td.textContent = value;
+                tr.append(th, td);
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
 
             if(window.showCustomModal) {
                 window.showCustomModal({ title: 'Details', text: '', submitText: 'Close' }, () => {});
                 const textEl = document.getElementById('genModalText');
                 if (textEl) {
-                    textEl.innerHTML = detailsHtml;
+                    textEl.textContent = '';
+                    textEl.appendChild(table);
                     textEl.style.display = 'block';
                 }
             }
