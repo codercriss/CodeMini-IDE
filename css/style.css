@@ -4851,6 +4851,12 @@ body.compact-explorer .tree-view-item {
 .df-icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; border: none; border-radius: 3px; background: transparent; color: var(--text-main); font-size: 16px; cursor: pointer; }
 .df-icon-btn:hover:not(:disabled) { background: var(--hover-blue); }
 .df-icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.df-revert { display: inline-flex; align-items: center; gap: 4px; align-self: stretch; padding: 0 8px; border: none; border-radius: 0; background: transparent; color: var(--text-main); font: inherit; font-size: 12px; font-weight: 500; white-space: nowrap; cursor: pointer; }
+.df-revert i { font-size: 14px; }
+.df-revert:hover:not(:disabled) { background: var(--hover-blue); }
+.df-revert:disabled { opacity: 0.4; cursor: not-allowed; }
+.df-revert.armed { background: var(--color-danger); color: #fff; font-weight: 600; }
+.df-revert.armed:hover:not(:disabled) { background: var(--color-danger); }
 .df-counter { min-width: 0; color: var(--text-muted); font-size: 11px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .df-ws { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; color: var(--text-muted); font-size: 11px; white-space: nowrap; }
 .df-ws input { width: 12px; height: 12px; margin: 0; accent-color: var(--accent-blue); }

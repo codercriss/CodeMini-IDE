@@ -970,12 +970,13 @@ function gitBuildHunks(parts, contextLines) {
     contextLines = contextLines == null ? 3 : contextLines;
     const rows = [];
     let oldNum = 1, newNum = 1;
-    parts.forEach(part => {
+    parts.forEach((part, pi) => {
         const lines = part.value.replace(/\n$/, '').split('\n');
         lines.forEach(text => {
-            if (part.added) rows.push({ type: 'add', text, newNum: newNum++ });
-            else if (part.removed) rows.push({ type: 'remove', text, oldNum: oldNum++ });
-            else rows.push({ type: 'context', text, oldNum: oldNum++, newNum: newNum++ });
+            // part: which diffLines() part the row came from, so a hunk can be reverted from the parts themselves
+            if (part.added) rows.push({ type: 'add', text, newNum: newNum++, part: pi });
+            else if (part.removed) rows.push({ type: 'remove', text, oldNum: oldNum++, part: pi });
+            else rows.push({ type: 'context', text, oldNum: oldNum++, newNum: newNum++, part: pi });
         });
     });
     const changedIdx = rows.map((r, i) => r.type !== 'context' ? i : -1).filter(i => i !== -1);
@@ -996,7 +997,9 @@ function gitBuildHunks(parts, contextLines) {
         const hunkRows = rows.slice(start, end + 1);
         const oldNums = hunkRows.filter(r => r.oldNum !== undefined).map(r => r.oldNum);
         const newNums = hunkRows.filter(r => r.newNum !== undefined).map(r => r.newNum);
-        return { oldStart: oldNums[0] || 0, oldLines: oldNums.length, newStart: newNums[0] || 0, newLines: newNums.length, rows: hunkRows };
+        // The parts this hunk changes (add/remove, never context): what Revert puts back.
+        const changedParts = Array.from(new Set(hunkRows.filter(r => r.type !== 'context').map(r => r.part)));
+        return { oldStart: oldNums[0] || 0, oldLines: oldNums.length, newStart: newNums[0] || 0, newLines: newNums.length, rows: hunkRows, changedParts };
     });
 
     const gaps = [];
@@ -1010,13 +1013,20 @@ function gitDiffGapHtml(gap) {
     if (gap.count <= 0) return '';
     return `<div class="git-diff-gap" data-git-diff-action="expand-gap" data-from="${gap.fromRow}" data-to="${gap.toRow}"><i class="ri-more-line"></i> ${gap.count} unchanged line${gap.count === 1 ? '' : 's'}</div>`;
 }
-function gitRenderUnifiedHtml(parts, contextLines) {
+// The @@ line above a hunk. With canRevert it also carries the hunk's Revert button (a two-tap button: see gitShowDiff).
+function gitDiffHunkHeaderHtml(hunk, index, canRevert) {
+    const range = `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@`;
+    if (!canRevert) return `<div class="git-diff-hunk-header">${range}</div>`;
+    return `<div class="git-diff-hunk-header"><span>${range}</span>`
+        + `<button type="button" class="git-diff-hunk-revert" data-git-diff-action="revert-hunk" data-hunk="${index}" title="Revert this hunk to the committed text" aria-label="Revert this hunk"><i class="ri-arrow-go-back-line"></i> <span>Revert</span></button></div>`;
+}
+function gitRenderUnifiedHtml(parts, contextLines, canRevert) {
     const { hunks, gaps, allContext } = gitBuildHunks(parts, contextLines);
     if (allContext) return '<div class="git-diff-binary">No differences</div>';
     let html = '';
     hunks.forEach((hunk, i) => {
         html += gitDiffGapHtml(gaps[i]);
-        html += `<div class="git-diff-hunk-header">@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@</div>`;
+        html += gitDiffHunkHeaderHtml(hunk, i, canRevert);
         hunk.rows.forEach(r => {
             const cls = r.type === 'add' ? 'git-diff-added' : r.type === 'remove' ? 'git-diff-removed' : 'git-diff-context';
             const marker = r.type === 'add' ? '+' : r.type === 'remove' ? '-' : ' ';
@@ -1046,13 +1056,13 @@ function gitPairRemoveAdd(hunkRows) {
     }
     return paired;
 }
-function gitRenderSideBySideHtml(parts, contextLines) {
+function gitRenderSideBySideHtml(parts, contextLines, canRevert) {
     const { hunks, gaps, allContext } = gitBuildHunks(parts, contextLines);
     if (allContext) return '<div class="git-diff-binary">No differences</div>';
     let html = '';
     hunks.forEach((hunk, i) => {
         html += gitDiffGapHtml(gaps[i]);
-        html += `<div class="git-diff-hunk-header">@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@</div>`;
+        html += gitDiffHunkHeaderHtml(hunk, i, canRevert);
         gitPairRemoveAdd(hunk.rows).forEach(pair => {
             const leftCls = !pair.left ? 'git-diff-blank' : pair.left.type === 'remove' ? 'git-diff-removed' : 'git-diff-context';
             const rightCls = !pair.right ? 'git-diff-blank' : pair.right.type === 'add' ? 'git-diff-added' : 'git-diff-context';
@@ -1065,7 +1075,7 @@ function gitRenderSideBySideHtml(parts, contextLines) {
     html += gitDiffGapHtml(gaps[gaps.length - 1]);
     return html;
 }
-async function gitRenderDiffHtml(oldContent, newContent, encoding, viewMode) {
+async function gitRenderDiffHtml(oldContent, newContent, encoding, viewMode, canRevert) {
     if (encoding === 'base64') {
         return `<div class="git-diff-binary"><i class="ri-file-forbid-line"></i><br>Binary file - diff not available</div>`;
     }
@@ -1078,13 +1088,13 @@ async function gitRenderDiffHtml(oldContent, newContent, encoding, viewMode) {
     }
     const parts = diffLib.diffLines(oldContent || '', newContent || '');
     window._gitDiffParts = parts; // stashed for the expand-gap click handler, keyed by the currently open modal only
-    return viewMode === 'split' ? gitRenderSideBySideHtml(parts, 3) : gitRenderUnifiedHtml(parts, 3);
+    return viewMode === 'split' ? gitRenderSideBySideHtml(parts, 3, canRevert) : gitRenderUnifiedHtml(parts, 3, canRevert);
 }
 // meta (optional, from the three gitOpen*Diff callers): { name, key, originalLabel, modifiedLabel, load?, openInTab? } -
 // what the diff editor tab (js/core/diff-editor.js) needs. With openInTab the popup is skipped and the tab opens.
 function gitOpenDiffTab(oldContent, newContent, encoding, meta) {
     if (!window.CodeMiniDiff || !meta) return false;
-    if (meta.load) window.CodeMiniDiff.openLoaded({ key: meta.key, name: meta.name, originalLabel: meta.originalLabel, modifiedLabel: meta.modifiedLabel, load: meta.load });
+    if (meta.load) window.CodeMiniDiff.openLoaded({ key: meta.key, name: meta.name, originalLabel: meta.originalLabel, modifiedLabel: meta.modifiedLabel, load: meta.load, revert: meta.revert });
     else window.CodeMiniDiff.openStatic({ key: meta.key, name: meta.name, original: oldContent, modified: newContent, originalLabel: meta.originalLabel, modifiedLabel: meta.modifiedLabel, encoding });
     return true;
 }
@@ -1097,6 +1107,8 @@ window.gitShowDiff = async function(title, oldContent, newContent, encoding, met
     overlay.className = 'git-diff-overlay';
     const viewMode = window._gitDiffViewMode || 'unified';
     const canSplit = encoding !== 'base64' && (oldContent || '') !== (newContent || '');
+    // Revert per hunk: only where the caller can write the modified side back (the working-tree diff).
+    const canRevert = !!(meta && typeof meta.revert === 'function' && meta.load && window.CodeMiniDiff && window.CodeMiniDiff.revertParts && encoding !== 'base64');
     overlay.innerHTML = `
         <div class="git-diff-box ${viewMode === 'split' ? 'git-diff-box-wide' : ''}">
             <div class="git-diff-header">
@@ -1114,11 +1126,34 @@ window.gitShowDiff = async function(title, oldContent, newContent, encoding, met
         </div>
     `;
     document.body.appendChild(overlay);
-    overlay.addEventListener('click', (e) => {
+    overlay.addEventListener('click', async (e) => {
         if (e.target === overlay) { overlay.remove(); return; }
         const viewBtn = e.target.closest('[data-git-diff-action]');
         if (viewBtn) {
             const action = viewBtn.dataset.gitDiffAction;
+            if (action === 'revert-hunk') {
+                if (!canRevert || viewBtn.disabled) return;
+                const label = viewBtn.querySelector('span');
+                if (viewBtn.dataset.armed !== '1') { // the first tap only asks; the second does it
+                    viewBtn.dataset.armed = '1'; viewBtn.classList.add('armed'); if (label) label.textContent = 'Tap again to revert';
+                    setTimeout(() => { if (viewBtn.isConnected) { delete viewBtn.dataset.armed; viewBtn.classList.remove('armed'); if (label) label.textContent = 'Revert'; } }, 4000);
+                    return;
+                }
+                const parts = window._gitDiffParts;
+                const hunk = parts && gitBuildHunks(parts, 3).hunks[parseInt(viewBtn.dataset.hunk, 10)];
+                if (!hunk) return;
+                viewBtn.disabled = true;
+                let result;
+                try { result = await meta.revert({ newText: window.CodeMiniDiff.revertParts(parts, hunk.changedParts), base: newContent }); }
+                catch (err) { result = { ok: false, message: 'The hunk could not be reverted.' }; }
+                if (window.showSuccessToast) window.showSuccessToast(result && result.ok ? 'Hunk reverted.' : ((result && result.message) || 'The hunk could not be reverted.'));
+                // Show the file as it is now, whether or not the revert went through (a refused one means it had changed).
+                let fresh = null; try { fresh = await meta.load(); } catch (err) { fresh = null; }
+                if (document.getElementById('gitDiffOverlay') !== overlay) return; // closed meanwhile
+                if (fresh && !fresh.error) window.gitShowDiff(title, fresh.original.text, fresh.modified.text, encoding, meta);
+                else overlay.remove();
+                return;
+            }
             if (action === 'view-unified' || action === 'view-split') {
                 window._gitDiffViewMode = action === 'view-split' ? 'split' : 'unified';
                 window.gitShowDiff(title, oldContent, newContent, encoding, meta);
@@ -1145,10 +1180,63 @@ window.gitShowDiff = async function(title, oldContent, newContent, encoding, met
         const closeIcon = overlay.querySelector('#gitDiffClose');
         closeIcon.parentNode.insertBefore(openTabBtn, closeIcon);
     }
-    const html = await gitRenderDiffHtml(oldContent, newContent, encoding, viewMode);
+    const html = await gitRenderDiffHtml(oldContent, newContent, encoding, viewMode, canRevert);
     const bodyEl = document.getElementById('gitDiffBody');
     if (bodyEl) bodyEl.innerHTML = html;
 };
+// --- Revert one change (a hunk in the popup, the change picked in the diff tab) --------------------------
+function gitGetFileRecord(database, id) {
+    return new Promise((resolve) => {
+        try {
+            const rq = database.transaction('filesystem', 'readonly').objectStore('filesystem').get(id);
+            rq.onsuccess = () => resolve(rq.result || null);
+            rq.onerror = () => resolve(null);
+        } catch (e) { resolve(null); }
+    });
+}
+function gitFindEditorTab(dbName, fileId) {
+    return Array.from(document.querySelectorAll('.tab')).find(t => t.dataset.type === 'monaco' && t.dataset.fileId === fileId && t.dataset.dbName === dbName) || null;
+}
+const gitFlatEol = (x) => String(x == null ? '' : x).replace(/\r\n?/g, '\n');
+// autoSaveFile (the one place a file is written) has no callback, so wait until the stored text is the new text.
+async function gitWaitForContent(database, fileId, text, ms) {
+    const want = gitFlatEol(text), t0 = Date.now();
+    while (Date.now() - t0 < ms) {
+        const rec = await gitGetFileRecord(database, fileId);
+        if (rec && gitFlatEol(rec.content) === want) return true;
+        await new Promise(r => setTimeout(r, 60));
+    }
+    return false;
+}
+// Writes newText over a working file, but only if the file is still exactly what the diff was computed from
+// (req.base): hunk line numbers mean nothing against any other text, so a file that changed since is refused, not
+// guessed at. A file open in an editor tab is changed through the editor (undoable with Ctrl+Z) and saved the usual way;
+// one with unsaved edits is refused, because overwriting it would lose them.
+async function gitRevertWorkingText(database, path, fileId, req) {
+    const dbName = database.name;
+    const pm = gitGetPendingMerge(dbName), pr = gitGetPendingRebase(dbName);
+    if ((pm && pm.conflictPaths.includes(path)) || (pr && pr.conflictPaths.includes(path))) return { ok: false, message: 'Resolve this file\u2019s conflict first.' };
+    const rec = await gitGetFileRecord(database, fileId);
+    if (!rec || rec.type !== 'file') return { ok: false, message: 'That file no longer exists.' };
+    if (rec.isLocked) return { ok: false, message: 'That file is locked. Unlock it first.' };
+    if (typeof req.newText !== 'string' || typeof req.base !== 'string') return { ok: false, message: 'Nothing to revert.' };
+    if ((rec.content || '') !== req.base) return { ok: false, message: 'The file changed since this diff was loaded, so nothing was reverted. The diff has been reloaded.' };
+    const tab = gitFindEditorTab(dbName, fileId);
+    const ed = tab && tab._cmEditor, model = ed && ed.getModel && ed.getModel();
+    if (model && gitFlatEol(ed.getValue()) !== gitFlatEol(req.base)) return { ok: false, message: 'This file has unsaved edits in its editor tab. Save it first.' };
+    if (model) {
+        ed.pushUndoStop();
+        ed.executeEdits('revert-hunk', [{ range: model.getFullModelRange(), text: req.newText, forceMoveMarkers: true }]);
+        ed.pushUndoStop();
+    }
+    if (typeof window.autoSaveFile !== 'function') return { ok: false, message: 'The file could not be saved.' };
+    window.autoSaveFile(fileId, req.newText, model ? tab : null, undefined, dbName);
+    if (!(await gitWaitForContent(database, fileId, req.newText, 3000))) return { ok: false, message: 'The change could not be saved.' };
+    gitLog('revert-hunk', `Reverted a change in \u201c${path.split('/').pop()}\u201d`, 'info', null, dbName);
+    if (typeof loadFilesFromDB === 'function') loadFilesFromDB();
+    window.renderGitPanel();
+    return { ok: true };
+}
 async function gitLoadChangeDiff(path, database) {
     const dbName = database.name;
     const config = getGitConfig(dbName); const repo = getGitRepo(dbName);
@@ -1156,13 +1244,17 @@ async function gitLoadChangeDiff(path, database) {
     const workingTree = await gitGetWorkingTree(database);
     const hf = headTree.get(path), wf = workingTree.get(path);
     const name = (wf && wf.name) || (hf && hf.name) || path.split('/').pop();
-    return { name, old: hf ? hf.content : '', new: wf ? wf.content : '', encoding: (wf && wf.encoding) || (hf && hf.encoding) };
+    return { name, old: hf ? hf.content : '', new: wf ? wf.content : '', encoding: (wf && wf.encoding) || (hf && hf.encoding), fileId: wf ? wf.id : null, inHead: !!hf };
 }
 async function gitOpenChangeDiff(path, asTab) {
     const database = db; const dbName = database.name;
     const d = await gitLoadChangeDiff(path, database);
+    // Revert only where there is a working file to write to and a committed text to put back (not for new, deleted,
+    // locked or binary files).
+    const canRevert = !!(d.fileId && d.inHead && d.encoding !== 'base64');
     window.gitShowDiff(d.name, d.old, d.new, d.encoding, {
         name: d.name, key: `git:${dbName}:work:${path}`, originalLabel: 'HEAD', modifiedLabel: 'Working tree', openInTab: !!asTab,
+        revert: canRevert ? (req) => gitRevertWorkingText(database, path, d.fileId, req) : undefined,
         load: async () => { const f = await gitLoadChangeDiff(path, database); return { original: { text: f.old, label: 'HEAD' }, modified: { text: f.new, label: 'Working tree' }, binary: f.encoding === 'base64' }; }
     });
 }
@@ -4486,7 +4578,11 @@ function injectGitStyles() {
     .git-diff-view-toggle span.active { background:var(--accent-blue); color:var(--text-on-accent, #fff); }
     .git-diff-view-toggle span:not(.active):hover { background:var(--bg-panel); }
     .git-diff-body { overflow:auto; font-family:var(--font-mono); font-size:12px; padding:4px 0; }
-    .git-diff-hunk-header { padding:3px 12px; color:var(--accent-blue); background:rgba(55,148,255,0.08); font-size:11px; white-space:pre; }
+    .git-diff-hunk-header { padding:3px 12px; color:var(--accent-blue); background:rgba(55,148,255,0.08); font-size:11px; white-space:pre; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .git-diff-hunk-revert { display:inline-flex; align-items:center; gap:3px; flex:none; padding:1px 8px; border:1px solid var(--border-color); border-radius:3px; background:var(--bg-white); color:var(--text-main); font:inherit; font-size:11px; cursor:pointer; white-space:nowrap; }
+    .git-diff-hunk-revert:hover:not(:disabled) { background:var(--hover-blue); }
+    .git-diff-hunk-revert:disabled { opacity:0.45; cursor:not-allowed; }
+    .git-diff-hunk-revert.armed { background:var(--color-danger); border-color:var(--color-danger); color:#fff; font-weight:600; }
     .git-diff-gap { padding:4px 12px; color:var(--text-muted); cursor:pointer; display:flex; align-items:center; gap:5px; font-size:11px; background:var(--bg-panel); user-select:none; }
     .git-diff-gap:hover { color:var(--accent-blue); }
     .git-diff-row { display:flex; padding:0 12px; white-space:pre; }

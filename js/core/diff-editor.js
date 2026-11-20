@@ -13,7 +13,9 @@
 //   Tab menu         right-click an open file's tab > Compare with Saved (the editor's text against what is stored)
 //   Quick Open       "Compare Active File With..." and "Compare Active File with Saved"
 //
-// A diff tab is a read-only view. It is not part of a restored session (it has no file of its own to reopen).
+// A diff tab is a read-only view, with one exception: the Source Control working-tree diff also has Revert, which puts the
+// change picked with the arrows back to its committed text in the file (see revert in js/git/git.js). A diff tab is not
+// part of a restored session (it has no file of its own to reopen).
 // The first half is pure (no DOM) and is tested in Node by tests/diff-editor.test.js.
 (function (root) {
     'use strict';
@@ -78,7 +80,68 @@
         return o;
     }
 
-    const api = { changeTargets, nextIndex, counterLabel, languageForName, labelFor, describeSides, whitespaceOnly, optionsFromSettings };
+    // ---------------------------------------------------------------------------------------------
+    // Reverting a change (the diff tab's Revert button and the Source Control popup's per-hunk Revert)
+    // ---------------------------------------------------------------------------------------------
+    // Text as lines the way Monaco counts them (\r\n, \r or \n ends a line), each with the terminator that followed it
+    // ('' for the last line), so a file's own line endings, mixed or not, survive an edit untouched.
+    function splitKeepingEols(text) {
+        const lines = [], eols = [];
+        const re = /\r\n|\r|\n/g;
+        let last = 0, m;
+        text = String(text == null ? '' : text);
+        while ((m = re.exec(text)) !== null) { lines.push(text.slice(last, m.index)); eols.push(m[0]); last = m.index + m[0].length; }
+        lines.push(text.slice(last)); eols.push('');
+        return { lines, eols };
+    }
+    // One side of a Monaco line change as { at, count }: the 0-based line it starts at and how many lines it spans.
+    // A side with no lines has end 0, and its start is then the line the change happened after, i.e. the insertion point.
+    function lineBlock(startLine, endLine) {
+        if (!endLine || endLine < startLine) return { at: Math.max(0, startLine || 0), count: 0 };
+        return { at: startLine - 1, count: endLine - startLine + 1 };
+    }
+    // The modified text with one Monaco line change put back to what the original has there. Returns null when the change
+    // does not fit the texts (they are not the ones it was computed from).
+    function revertLineChange(modifiedText, originalText, change) {
+        const mod = splitKeepingEols(modifiedText), orig = splitKeepingEols(originalText);
+        const mb = lineBlock(change.modifiedStartLineNumber, change.modifiedEndLineNumber);
+        const ob = lineBlock(change.originalStartLineNumber, change.originalEndLineNumber);
+        if (mb.at + mb.count > mod.lines.length || ob.at + ob.count > orig.lines.length) return null;
+        const firstEol = (list) => { for (const e of list) if (e) return e; return ''; };
+        // The terminator for the lines put back: the one the replaced region ended with, else the one before it, else any
+        // the file uses, else the original's, else \n.
+        const fill = (mb.count > 0 && mod.eols[mb.at + mb.count - 1]) || (mb.at > 0 && mod.eols[mb.at - 1]) || firstEol(mod.eols) || firstEol(orig.eols) || '\n';
+        const lines = mod.lines.slice(0, mb.at).concat(orig.lines.slice(ob.at, ob.at + ob.count), mod.lines.slice(mb.at + mb.count));
+        const eols = mod.eols.slice(0, mb.at).concat(new Array(ob.count).fill(fill), mod.eols.slice(mb.at + mb.count));
+        // Only the last line has no terminator.
+        for (let j = 0; j < lines.length; j++) eols[j] = j === lines.length - 1 ? '' : (eols[j] || fill);
+        let out = '';
+        for (let j = 0; j < lines.length; j++) out += lines[j] + eols[j];
+        return out;
+    }
+    // Several changes at once, from the last to the first so the earlier ones keep their line numbers.
+    function revertLineChanges(modifiedText, originalText, changes) {
+        const order = (changes || []).slice().sort((a, b) => lineBlock(b.modifiedStartLineNumber, b.modifiedEndLineNumber).at - lineBlock(a.modifiedStartLineNumber, a.modifiedEndLineNumber).at);
+        let text = modifiedText;
+        for (const c of order) { text = revertLineChange(text, originalText, c); if (text == null) return null; }
+        return text;
+    }
+    // The same for a jsdiff diffLines() result (what the Source Control popup is drawn from): the changes whose part index
+    // is in `which` go back to the original text, every other change keeps the modified text. The parts carry their own line
+    // endings, so nothing is re-split or re-joined.
+    function revertParts(parts, which) {
+        const set = new Set(which || []);
+        let out = '';
+        (parts || []).forEach((p, i) => {
+            if (!p.added && !p.removed) out += p.value;
+            else if (set.has(i)) { if (p.removed) out += p.value; }
+            else if (p.added) out += p.value;
+        });
+        return out;
+    }
+
+
+    const api = { changeTargets, nextIndex, counterLabel, languageForName, labelFor, describeSides, whitespaceOnly, optionsFromSettings, splitKeepingEols, revertLineChange, revertLineChanges, revertParts };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (typeof document === 'undefined') return; // Node: logic only
 
@@ -123,6 +186,8 @@
         });
         bar.appendChild(nav);
         bar.appendChild(el('span', 'df-counter', ''));
+        const rv = el('button', 'df-revert'); rv.type = 'button'; rv.dataset.df = 'revert'; rv.hidden = true;
+        rv.appendChild(el('i', 'ri-arrow-go-back-line')); rv.appendChild(el('span', '', 'Revert')); bar.appendChild(rv);
         const ws = el('label', 'df-ws'); const box = el('input'); box.type = 'checkbox'; box.dataset.df = 'ws'; ws.appendChild(box); ws.appendChild(el('span', '', 'Ignore whitespace')); bar.appendChild(ws);
         bar.appendChild(el('span', 'df-spacer'));
         const rf = el('button', 'df-icon-btn'); rf.type = 'button'; rf.dataset.df = 'refresh'; rf.title = 'Refresh'; rf.setAttribute('aria-label', 'Refresh'); rf.appendChild(el('i', 'ri-refresh-line')); bar.appendChild(rf);
@@ -158,7 +223,39 @@
             rootEl.querySelectorAll('.df-seg-btn').forEach((b) => { b.classList.toggle('active', b.dataset.df === v); b.setAttribute('aria-pressed', b.dataset.df === v ? 'true' : 'false'); });
             const splitBtn = q('.df-seg-btn[data-df="split"]'); splitBtn.disabled = isPhone(); splitBtn.title = isPhone() ? 'Split view needs a wider screen' : '';
         };
+        // Revert (only where the caller can write the modified side back: the Source Control working-tree diff). It acts on
+        // the change picked with the arrows, and asks twice: the first tap arms it, the second does it.
+        let armTimer = null;
+        const disarm = () => { rec.armed = false; if (armTimer) { clearTimeout(armTimer); armTimer = null; } paintRevert(); };
+        const paintRevert = () => {
+            const b = q('[data-df="revert"]'); if (!b || !opts.revert) return;
+            b.hidden = false;
+            const changes = rec.editor ? rec.editor.getLineChanges() : null;
+            const ready = !!(changes && rec.nav >= 0 && rec.nav < changes.length && rec.data && !rec.data.binary && !rec.busy);
+            if (rec.armed && (!ready || rec.armedFor !== rec.nav)) { rec.armed = false; if (armTimer) { clearTimeout(armTimer); armTimer = null; } }
+            b.disabled = !ready;
+            b.classList.toggle('armed', !!rec.armed);
+            b.querySelector('span').textContent = rec.armed ? 'Tap again to revert' : 'Revert';
+            b.title = !ready ? 'Pick a change with the arrows, then revert it to the committed text' : rec.armed ? 'Tap again to revert change ' + (rec.nav + 1) : 'Revert change ' + (rec.nav + 1) + ' to the committed text';
+        };
+        const revertCurrent = async () => {
+            if (!rec.editor || !opts.revert || rec.busy) return;
+            const changes = rec.editor.getLineChanges();
+            if (!changes || rec.nav < 0 || rec.nav >= changes.length || !rec.data || rec.data.binary) return;
+            if (!rec.armed) { rec.armed = true; rec.armedFor = rec.nav; armTimer = setTimeout(disarm, 4000); paintRevert(); return; }
+            disarm();
+            const data = rec.data;
+            const newText = revertLineChange(data.modified.text, data.original.text, changes[rec.nav]);
+            if (newText == null) { toast('That change could not be reverted. The diff has been reloaded.'); load(); return; }
+            rec.busy = true; paintRevert();
+            let result;
+            try { result = await opts.revert({ newText, base: data.modified.text }); } catch (e) { result = { ok: false, message: 'The change could not be reverted.' }; }
+            rec.busy = false;
+            toast(result && result.ok ? 'Change reverted.' : ((result && result.message) || 'The change could not be reverted.'));
+            load(); // shows the file as it is now, whether or not the revert went through
+        };
         const updateCounter = () => {
+            paintRevert();
             if (!rec.editor) { q('.df-counter').textContent = ''; return; }
             const computed = rec.editor.getLineChanges();
             if (computed === null) { q('.df-counter').textContent = 'Comparing...'; return; } // Monaco has not finished comparing yet: that is not "no differences"
@@ -236,6 +333,7 @@
                 rec.view = k; try { localStorage.setItem(VIEW_KEY, k); } catch (err) { /* a preference only */ }
                 paintToolbar(); if (rec.editor) rec.editor.updateOptions({ renderSideBySide: effectiveView() === 'split' });
             } else if (k === 'next') go(1); else if (k === 'prev') go(-1);
+            else if (k === 'revert') revertCurrent();
             else if (k === 'refresh') load();
         });
         rootEl.addEventListener('change', (e) => {
@@ -268,7 +366,9 @@
         pane._diff = null;
     };
 
-    // opts: { key, name, title, load: async () => ({ original: { text, label }, modified: { text, label }, binary?, error? }), static? }
+    // opts: { key, name, title, load: async () => ({ original: { text, label }, modified: { text, label }, binary?, error? }), static?,
+    //         revert?: async ({ newText, base }) => ({ ok, message? }) } - revert, when given, shows the Revert button: it writes newText
+    //         (the modified side with one change put back) over the file, and must refuse if the file is no longer `base`.
     // A diff with the same key is one tab: opening it again shows that tab, reloaded.
     function open(opts) {
         const existing = Array.from(document.querySelectorAll('.tab[data-type="diff"]')).find((t) => t.dataset.diffKey === opts.key);
@@ -299,7 +399,7 @@
     }
     // Source Control with a loader of its own (the working-tree diff is recomputed on Refresh).
     function openLoaded(o) {
-        return open({ key: o.key, name: o.name, title: describeSides('git', o.name, o.originalLabel, o.modifiedLabel).title, load: o.load });
+        return open({ key: o.key, name: o.name, title: describeSides('git', o.name, o.originalLabel, o.modifiedLabel).title, load: o.load, revert: o.revert });
     }
 
     let compareSource = null; // the file picked with "Select for Compare"
