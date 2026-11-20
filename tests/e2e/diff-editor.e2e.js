@@ -109,7 +109,7 @@ const real = (c, n, x) => { if (REAL) ok(c, n, x); else { skipped++; console.log
   await rightClick('d.js'); await menuItem('Compare with Selected').click(); await waitDiff();
   real((await toolbar()).counter !== 'No changes', 'a whitespace difference is a change by default', (await toolbar()).counter);
   await ev(() => { const b = document.querySelector('.content-pane.active .df-root input[data-df="ws"]'); b.checked = true; b.dispatchEvent(new Event('change', { bubbles: true })); }); await waitDiff(1500);
-  real(/except whitespace/.test((await toolbar()).msg), 'Ignore whitespace leaves nothing and says why', (await toolbar()).msg);
+  real(/except whitespace/.test((await toolbar()).msg), 'Ignore trim whitespace leaves nothing and says why', (await toolbar()).msg);
 
   console.log('\n[identical, binary, locked]');
   await seed();

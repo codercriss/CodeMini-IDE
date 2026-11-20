@@ -75,4 +75,14 @@ t('whitespaceOnly: indentation, spacing inside a line, blank lines and line endi
 });
 
 
+console.log('the whitespace toggle says what it does');
+t('it is called Ignore trim whitespace, with a tooltip that says spacing inside a line still shows', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'js/core/diff-editor.js'), 'utf8');
+  assert.ok(src.includes("'Ignore trim whitespace'"), 'the label');
+  assert.ok(/const WS_TIP = '[^']*start and end of a line[^']*Spaces inside a line are still shown\./.test(src), 'the tooltip');
+  assert.ok(src.includes('ws.title = WS_TIP'), 'the tooltip is on the toggle');
+  assert.ok(!/'Ignore whitespace'/.test(src), 'the old, over-promising label is gone');
+  assert.ok(/ignoreTrimWhitespace: rec\.ignoreWs/.test(src), 'it still drives Monaco\'s own option, which is what the tooltip describes');
+});
+
 console.log(`\n${n} diff-editor checks passed`);

@@ -4,7 +4,7 @@
 // The diff editor: an editor tab (type "diff") that shows two versions of a file with Monaco's own diff editor,
 // which the app already loads for code, so it works offline (the Source Control popup's diff used a library
 // fetched from a CDN at runtime). A slim toolbar sits under the tab bar: Unified / Split, previous / next change with
-// a counter ("3 of 12"), Ignore whitespace, and Refresh.
+// a counter ("3 of 12"), Ignore trim whitespace, and Refresh.
 //
 // Ways in:
 //   Source Control   the diff popup has an "Open in tab" icon, and double-clicking a changed file opens the tab
@@ -173,6 +173,10 @@
         return labelFor(rec.name, parent && parent.type === 'folder' ? parent.name : '');
     }
 
+    // What the toggle does, exactly. It is Monaco's own ignoreTrimWhitespace (the same in every version, 0.39 to 0.57): it
+    // ignores whitespace at the start and end of a line, and spacing inside a line still shows as a change.
+    const WS_TIP = 'Ignores spaces and tabs at the start and end of a line. Spaces inside a line are still shown.';
+
     // ---- building the tab ----
     function buildShell() {
         const rootEl = el('div', 'df-root');
@@ -188,7 +192,7 @@
         bar.appendChild(el('span', 'df-counter', ''));
         const rv = el('button', 'df-revert'); rv.type = 'button'; rv.dataset.df = 'revert'; rv.hidden = true;
         rv.appendChild(el('i', 'ri-arrow-go-back-line')); rv.appendChild(el('span', '', 'Revert')); bar.appendChild(rv);
-        const ws = el('label', 'df-ws'); const box = el('input'); box.type = 'checkbox'; box.dataset.df = 'ws'; ws.appendChild(box); ws.appendChild(el('span', '', 'Ignore whitespace')); bar.appendChild(ws);
+        const ws = el('label', 'df-ws'); const box = el('input'); box.type = 'checkbox'; box.dataset.df = 'ws'; ws.appendChild(box); ws.appendChild(el('span', '', 'Ignore trim whitespace')); ws.title = WS_TIP; bar.appendChild(ws);
         bar.appendChild(el('span', 'df-spacer'));
         const rf = el('button', 'df-icon-btn'); rf.type = 'button'; rf.dataset.df = 'refresh'; rf.title = 'Refresh'; rf.setAttribute('aria-label', 'Refresh'); rf.appendChild(el('i', 'ri-refresh-line')); bar.appendChild(rf);
         rootEl.appendChild(bar);
