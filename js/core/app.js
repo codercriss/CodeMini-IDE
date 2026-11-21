@@ -958,6 +958,7 @@ function loadFilesFromDB() {
                     
                     const originalActiveGroupId = typeof activeGroupId !== 'undefined' ? activeGroupId : 'editorGroup1';
                     
+                    const diffTabsToRestore = []; // diff tabs come back after every file tab exists (Compare with Saved needs its file's tab)
                     tabsToRestore.forEach(t => {
                         // Strict Group Enforcement & Target assignment
                         const targetGroup = document.getElementById(t.groupId || 'editorGroup1');
@@ -1093,9 +1094,18 @@ function loadFilesFromDB() {
                                     if (pane) targetGroup.querySelector('.panes-container').appendChild(pane);
                                 }
                             }
+                        } else if (t.type === 'diff') {
+                            if (t.restore) diffTabsToRestore.push({ groupId: t.groupId, restore: t.restore });
                         }
                     });
                     
+                    // Diff tabs: rebuilt from how they were opened, each into its own group, none taking over the screen.
+                    // Some open asynchronously (Source Control, Local History), so this runs on its own and the saved session
+                    // is updated again as each tab appears.
+                    if (diffTabsToRestore.length && window.CodeMiniDiff && typeof window.CodeMiniDiff.restoreTabs === 'function') {
+                        window.CodeMiniDiff.restoreTabs(diffTabsToRestore).catch(e => console.warn('Diff tab restore error', e));
+                    }
+
                     // Revert to original active group
                     activeGroupId = originalActiveGroupId;
                     window.activeGroupId = activeGroupId;

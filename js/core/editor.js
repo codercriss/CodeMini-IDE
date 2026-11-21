@@ -1359,6 +1359,12 @@ function switchTab(targetId) {
     try { if (window.CodeMiniHistory) window.CodeMiniHistory.noteActiveChanged(); } catch (e) { /* Timeline follows the active file */ }
 }
 
+// A diff tab has no file to reopen, so it saves how it was opened instead (dataset.diffRestore, set by diff-editor.js).
+function diffRestoreOf(tab) {
+    if (tab.dataset.type !== 'diff' || !tab.dataset.diffRestore) return undefined;
+    try { return JSON.parse(tab.dataset.diffRestore); } catch (e) { return undefined; }
+}
+
 function updateOpenedTabsRegistry() {
     window.openedTabs = Array.from(document.querySelectorAll('.tab')).map(t => {
         const iEl = t.querySelector('i:not(.tab-close)');
@@ -1370,6 +1376,7 @@ function updateOpenedTabsRegistry() {
             type: t.dataset.type,
             fileId: t.dataset.fileId,
             virtual: t.dataset.virtual, // a tab with no file behind it (settings.json): restore regenerates it
+            restore: diffRestoreOf(t), // a diff tab: how to rebuild it (see CodeMiniDiff.restoreTabs)
             groupId: t.closest('.editor-group') ? t.closest('.editor-group').id : 'editorGroup1'
         };
     });

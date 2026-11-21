@@ -14,8 +14,10 @@
 //   Quick Open       "Compare Active File With..." and "Compare Active File with Saved"
 //
 // A diff tab is a read-only view, with one exception: the Source Control working-tree diff also has Revert, which puts the
-// change picked with the arrows back to its committed text in the file (see revert in js/git/git.js). A diff tab is not
-// part of a restored session (it has no file of its own to reopen).
+// change picked with the arrows back to its committed text in the file (see revert in js/git/git.js).
+// A diff tab has no file of its own, so Restore Session brings it back from a small descriptor of how it was opened
+// (opts.restore; kinds in validRestore) that is saved with the open tabs. The tab is rebuilt from the same sources, so it
+// shows the files as they are now; a tab whose files or commit are gone is not restored.
 // The first half is pure (no DOM) and is tested in Node by tests/diff-editor.test.js.
 (function (root) {
     'use strict';
@@ -141,7 +143,42 @@
     }
 
 
-    const api = { changeTargets, nextIndex, counterLabel, languageForName, labelFor, describeSides, whitespaceOnly, optionsFromSettings, splitKeepingEols, revertLineChange, revertLineChanges, revertParts };
+    // ---------------------------------------------------------------------------------------------
+    // Restoring a diff tab after a restart
+    // ---------------------------------------------------------------------------------------------
+    // How a diff tab was opened, as plain data saved with the open tabs (see updateOpenedTabsRegistry in editor.js). Kinds:
+    //   cmp          { a: {id,name,dbName}, b: {id,name,dbName} }   two files (Compare with Selected)
+    //   saved        { fileId, name, dbName }                        a file's editor text against what is stored
+    //   git-work     { dbName, path }                                Source Control: HEAD against the working file
+    //   git-commit   { dbName, sha, path }                           Source Control: a commit's change to a file
+    //   git-conflict { dbName, path }                                Source Control: mine against theirs
+    //   hist         { dbName, fileId, name, a, b }                  Local History: entry a against entry b, or against 'current'
+    // It is read back from storage, so validRestore() is the gate: it returns a clean copy of a known kind, or null.
+    const RESTORE_MAX = 600;
+    function validRestore(d) {
+        if (!d || typeof d !== 'object' || Array.isArray(d)) return null;
+        const str = (v) => (typeof v === 'string' && v.length > 0 && v.length <= RESTORE_MAX ? v : null);
+        const dbn = (v) => (v == null || v === '' ? '' : str(v)); // '' = the open workspace
+        const side = (r) => {
+            if (!r || typeof r !== 'object') return null;
+            const id = str(r.id), name = str(r.name), dbName = dbn(r.dbName);
+            return id && name && dbName !== null ? { id, name, dbName } : null;
+        };
+        switch (d.k) {
+            case 'cmp': { const a = side(d.a), b = side(d.b); return a && b ? { k: 'cmp', a, b } : null; }
+            case 'saved': { const fileId = str(d.fileId), name = str(d.name), dbName = dbn(d.dbName); return fileId && name && dbName !== null ? { k: 'saved', fileId, name, dbName } : null; }
+            case 'git-work': case 'git-conflict': { const dbName = str(d.dbName), path = str(d.path); return dbName && path ? { k: d.k, dbName, path } : null; }
+            case 'git-commit': { const dbName = str(d.dbName), sha = str(d.sha), path = str(d.path); return dbName && sha && path ? { k: 'git-commit', dbName, sha, path } : null; }
+            case 'hist': {
+                const dbName = str(d.dbName), fileId = str(d.fileId), name = str(d.name), a = str(d.a), b = str(d.b);
+                return dbName && fileId && name && a && b ? { k: 'hist', dbName, fileId, name, a, b } : null;
+            }
+            default: return null;
+        }
+    }
+
+
+    const api = { changeTargets, nextIndex, counterLabel, languageForName, labelFor, describeSides, whitespaceOnly, optionsFromSettings, splitKeepingEols, revertLineChange, revertLineChanges, revertParts, validRestore };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (typeof document === 'undefined') return; // Node: logic only
 
@@ -371,7 +408,7 @@
     };
 
     // opts: { key, name, title, load: async () => ({ original: { text, label }, modified: { text, label }, binary?, error? }), static?,
-    //         revert?: async ({ newText, base }) => ({ ok, message? }) } - revert, when given, shows the Revert button: it writes newText
+    //         revert?: async ({ newText, base }) => ({ ok, message? }), restore?: descriptor (see validRestore) } - revert, when given, shows the Revert button: it writes newText
     //         (the modified side with one change put back) over the file, and must refuse if the file is no longer `base`.
     // A diff with the same key is one tab: opening it again shows that tab, reloaded.
     function open(opts) {
@@ -387,6 +424,12 @@
         const tab = group.querySelector('.tab.active');
         if (!tab) return null;
         tab.dataset.diffKey = opts.key;
+        const restore = opts.restore ? validRestore(opts.restore) : null;
+        if (restore) {
+            tab.dataset.diffRestore = JSON.stringify(restore);
+            // createNewTab saved the session before the tab had this, so save it again: now it can come back.
+            if (typeof updateOpenedTabsRegistry === 'function') updateOpenedTabsRegistry();
+        }
         const pane = document.getElementById(tab.dataset.target);
         setup(pane, tab, opts);
         return tab;
@@ -396,14 +439,14 @@
     // Two versions already in hand (Source Control).
     function openStatic(o) {
         return open({
-            key: o.key, name: o.name, static: true,
+            key: o.key, name: o.name, static: true, restore: o.restore,
             title: describeSides(o.kind || 'git', o.name, o.originalLabel, o.modifiedLabel).title,
             load: async () => ({ original: { text: o.original || '', label: o.originalLabel }, modified: { text: o.modified || '', label: o.modifiedLabel }, binary: o.encoding === 'base64' })
         });
     }
     // Source Control with a loader of its own (the working-tree diff is recomputed on Refresh).
     function openLoaded(o) {
-        return open({ key: o.key, name: o.name, title: describeSides('git', o.name, o.originalLabel, o.modifiedLabel).title, load: o.load, revert: o.revert });
+        return open({ key: o.key, name: o.name, title: describeSides('git', o.name, o.originalLabel, o.modifiedLabel).title, load: o.load, revert: o.revert, restore: o.restore });
     }
 
     let compareSource = null; // the file picked with "Select for Compare"
@@ -422,6 +465,7 @@
         const key = 'cmp:' + a.dbName + ':' + a.id + ':' + b.dbName + ':' + b.id;
         return open({
             key, name: b.name, title: a.name + ' \u2194 ' + b.name,
+            restore: { k: 'cmp', a: { id: a.id, name: a.name, dbName: a.dbName || '' }, b: { id: b.id, name: b.name, dbName: b.dbName || '' } },
             load: async () => {
                 const [l, r] = await Promise.all([readSide(a), readSide(b)]);
                 if (l.error || r.error) return { error: l.error || r.error };
@@ -444,6 +488,7 @@
         const sides = describeSides('saved', name);
         return open({
             key: 'saved:' + dbName + ':' + fileId, name, title: sides.title,
+            restore: { k: 'saved', fileId, name, dbName: dbName || '' },
             load: async () => {
                 const rec = await getRecord(fileId, dbName);
                 if (!rec) return { error: '\u201c' + name + '\u201d is not stored yet. Save it first.' };
@@ -454,6 +499,62 @@
                 return { original: { text: rec.content || '', label: sides.left }, modified: { text, label: sides.right }, binary: rec.encoding === 'base64' };
             }
         });
+    }
+    // ---- Restore Session ----
+    // Opens the diff tab a descriptor was saved from. Resolves true if a tab was opened, false if it could not be (a file is
+    // deleted, the commit is gone, the history entry was pruned, or what it needs is not there).
+    async function restoreOne(desc) {
+        const d = validRestore(desc);
+        if (!d) return false;
+        switch (d.k) {
+            case 'cmp': {
+                const [l, r] = await Promise.all([getRecord(d.a.id, d.a.dbName), getRecord(d.b.id, d.b.dbName)]);
+                if (!l || !r) return false;
+                return !!compareFiles({ id: l.id, name: l.name, dbName: d.a.dbName }, { id: r.id, name: r.name, dbName: d.b.dbName });
+            }
+            case 'saved': { // needs the file's own editor tab: it is the modified side
+                const tab = Array.from(document.querySelectorAll('.tab[data-type="monaco"]')).find((t) => t.dataset.fileId === d.fileId && (!d.dbName || t.dataset.dbName === d.dbName));
+                return tab ? !!compareWithSaved(tab) : false;
+            }
+            case 'git-work': case 'git-commit': case 'git-conflict':
+                return typeof W.gitRestoreDiffTab === 'function' ? !!(await W.gitRestoreDiffTab(d)) : false;
+            case 'hist':
+                return W.CodeMiniHistory && typeof W.CodeMiniHistory.restoreDiff === 'function' ? !!(await W.CodeMiniHistory.restoreDiff(d)) : false;
+            default: return false;
+        }
+    }
+    function moveTabToGroup(tab, group) {
+        const bar = group.querySelector('.tabs-bar'), panes = group.querySelector('.panes-container'), addBtn = group.querySelector('.add-tab');
+        const pane = document.getElementById(tab.dataset.target);
+        if (bar) bar.insertBefore(tab, addBtn && addBtn.parentNode === bar ? addBtn : null);
+        if (pane && panes) panes.appendChild(pane);
+    }
+    // list: [{ groupId, restore }] in tab order. Each tab goes back into its own editor group, and none of them takes over the
+    // screen: a group keeps showing what it showed. Resolves with how many tabs came back.
+    async function restoreTabs(list) {
+        let opened = 0;
+        const diffTabs = () => Array.from(document.querySelectorAll('.tab[data-type="diff"]'));
+        for (const item of (Array.isArray(list) ? list : [])) {
+            try {
+                const before = new Set(diffTabs());
+                const shown = new Map(Array.from(document.querySelectorAll('.editor-group')).map((g) => [g, g.querySelector('.tab.active')]));
+                const group = document.getElementById(String((item && item.groupId) || 'editorGroup1'));
+                if (!(await restoreOne(item && item.restore))) continue;
+                diffTabs().filter((t) => !before.has(t)).forEach((tab) => {
+                    const from = tab.closest('.editor-group');
+                    if (group && from !== group) moveTabToGroup(tab, group);
+                    const to = tab.closest('.editor-group');
+                    const show = (prev) => { if (prev && prev !== tab && prev.isConnected && typeof W.switchTab === 'function') W.switchTab(prev.dataset.target); };
+                    // Opening the tab took over the group it opened in: if it was then moved out, that group shows its file again.
+                    if (from !== to) show(shown.get(from));
+                    // And in the group it ended up in, it does not take over either.
+                    if (tab.classList.contains('active')) show(shown.get(to));
+                    opened++;
+                });
+            } catch (e) { console.warn('Could not restore a diff tab', e); }
+        }
+        if (opened && typeof updateOpenedTabsRegistry === 'function') updateOpenedTabsRegistry();
+        return opened;
     }
     function activeFileTab() {
         const group = document.getElementById(typeof activeGroupId !== 'undefined' ? activeGroupId : 'editorGroup1') || document.getElementById('editorGroup1');
@@ -506,6 +607,6 @@
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && menuEl) { e.stopPropagation(); closeMenu(); } }, true);
     W.addEventListener('blur', closeMenu); W.addEventListener('resize', closeMenu);
 
-    Object.assign(api, { open, openStatic, openLoaded, compareFiles, compareWithSelected, compareWithSaved, setCompareSource, explorerOptions, activeFileTab, getRecord });
+    Object.assign(api, { open, openStatic, openLoaded, compareFiles, compareWithSelected, compareWithSaved, setCompareSource, explorerOptions, activeFileTab, getRecord, restoreOne, restoreTabs });
     W.CodeMiniDiff = api;
 })(typeof window !== 'undefined' ? window : globalThis);

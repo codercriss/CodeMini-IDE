@@ -216,7 +216,7 @@ const real = (c, n, x) => { if (REAL) ok(c, n, x); else { skipped++; console.log
   ok((await diffTabs()).join() === 'a.js (Saved \u2194 Editor)', 'Compare Active File with Saved works from the palette', await diffTabs());
   await ev(() => { document.querySelector('.tab[data-type="diff"] .tab-close').click(); }); await sleep(300);
 
-  console.log('\n[a diff tab is not part of a restored session]');
+  console.log('\n[a diff tab comes back after a reload (Restore Session)]');
   const ensureExplorer = async () => { if (!(await ev(() => document.getElementById('explorerSidebar').classList.contains('open') || document.getElementById('explorerSidebar').offsetWidth > 100))) { await ev(() => document.getElementById('folderIconItem').click()); await sleep(900); } };
   await ensureExplorer();
   await rightClick('a.js'); await menuItem('Select for Compare').click(); await sleep(250);
@@ -224,7 +224,11 @@ const real = (c, n, x) => { if (REAL) ok(c, n, x); else { skipped++; console.log
   ok((await diffTabs()).length === 1, 'a diff tab is open before the reload');
   await sleep(1200);
   await page.reload(); await sleep(REAL ? 6500 : 5200);
-  ok((await diffTabs()).length === 0, 'after a reload there is no diff tab (nothing to reopen)', await diffTabs());
+  ok((await diffTabs()).join() === 'a.js \u2194 b.js', 'after a reload the compare tab is back', await diffTabs());
+  await ev(() => { document.querySelector('.tab[data-type="diff"]').click(); }); await waitDiff(1500);
+  const back = await toolbar();
+  ok(back && back.labels.every(Boolean) && /change/.test(back.counter), 'and it works: it compares the two files as they are now', back);
+  await ev(() => { document.querySelector('.tab[data-type="diff"] .tab-close').click(); }); await sleep(300);
 
   console.log('\n[phone]');
   await page.setViewportSize({ width: 390, height: 800 }); await sleep(400);

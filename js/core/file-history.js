@@ -626,7 +626,28 @@
         const target = currentTarget(); if (!target || !W.CodeMiniDiff) return;
         const [old, cur] = await Promise.all([history.getContent(m.id), currentText(target)]);
         if (old == null) { toast('That entry is no longer stored.'); return; }
-        W.CodeMiniDiff.openStatic({ key: 'hist:' + m.id + ':' + fnv1a(cur.text), name: target.name, kind: 'history', original: old, modified: cur.text, originalLabel: versionLabel(m), modifiedLabel: cur.live ? 'Editor' : 'Saved' });
+        W.CodeMiniDiff.openStatic({ key: 'hist:' + m.id + ':' + fnv1a(cur.text), name: target.name, kind: 'history', original: old, modified: cur.text, originalLabel: versionLabel(m), modifiedLabel: cur.live ? 'Editor' : 'Saved',
+            restore: { k: 'hist', dbName: target.dbName, fileId: target.fileId, name: target.name, a: m.id, b: 'current' } });
+    }
+    // Restore Session: reopens a Local History diff tab from the descriptor saved with it (validRestore in diff-editor.js).
+    // Resolves false when an entry is no longer kept (history is pruned), so nothing opens.
+    async function restoreDiff(d) {
+        if (!W.CodeMiniDiff || !d) return false;
+        const rows = (await quiet(history.list(d.dbName, d.fileId))) || [];
+        const ma = rows.find((r) => r.id === d.a);
+        if (!ma) return false;
+        if (d.b === 'current') {
+            const [old, cur] = await Promise.all([history.getContent(ma.id), currentText({ dbName: d.dbName, fileId: d.fileId, name: d.name })]);
+            if (old == null) return false;
+            W.CodeMiniDiff.openStatic({ key: 'hist:' + ma.id + ':' + fnv1a(cur.text), name: d.name, kind: 'history', original: old, modified: cur.text, originalLabel: versionLabel(ma), modifiedLabel: cur.live ? 'Editor' : 'Saved', restore: d });
+            return true;
+        }
+        const mb = rows.find((r) => r.id === d.b);
+        if (!mb) return false;
+        const [a, b] = await Promise.all([history.getContent(ma.id), history.getContent(mb.id)]);
+        if (a == null || b == null) return false;
+        W.CodeMiniDiff.openStatic({ key: 'hist:' + ma.id + ':' + mb.id, name: d.name, kind: 'history', original: a, modified: b, originalLabel: versionLabel(ma), modifiedLabel: versionLabel(mb), restore: d });
+        return true;
     }
     async function diffWithPrevious(m) {
         const target = currentTarget(); if (!target || !W.CodeMiniDiff) return;
@@ -634,7 +655,8 @@
         if (!prev) { toast('This is the oldest version kept, so there is nothing before it to compare.'); return; }
         const [a, b] = await Promise.all([history.getContent(prev.id), history.getContent(m.id)]);
         if (a == null || b == null) { toast('That entry is no longer stored.'); return; }
-        W.CodeMiniDiff.openStatic({ key: 'hist:' + prev.id + ':' + m.id, name: target.name, kind: 'history', original: a, modified: b, originalLabel: versionLabel(prev), modifiedLabel: versionLabel(m) });
+        W.CodeMiniDiff.openStatic({ key: 'hist:' + prev.id + ':' + m.id, name: target.name, kind: 'history', original: a, modified: b, originalLabel: versionLabel(prev), modifiedLabel: versionLabel(m),
+            restore: { k: 'hist', dbName: target.dbName, fileId: target.fileId, name: target.name, a: prev.id, b: m.id } });
     }
     async function restore(m) {
         const target = currentTarget(); if (!target) return;
@@ -810,7 +832,7 @@
     Object.assign(api, {
         pageId, noteOpened, noteEdit, noteSaved, tabClosing, noteActiveChanged, markManual, recoverFor, hasReview, reviewRecovered,
         purgeDatabases, onSettingChanged, explorerOptions, showForTab, showForFile, clearAllHistory, refreshTimeline, flushAll,
-        history, store, toggleAutoSave, renderAutoSave, activeTab
+        history, store, toggleAutoSave, renderAutoSave, activeTab, restoreDiff
     });
     W.CodeMiniHistory = api;
 

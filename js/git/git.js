@@ -1090,12 +1090,12 @@ async function gitRenderDiffHtml(oldContent, newContent, encoding, viewMode, can
     window._gitDiffParts = parts; // stashed for the expand-gap click handler, keyed by the currently open modal only
     return viewMode === 'split' ? gitRenderSideBySideHtml(parts, 3, canRevert) : gitRenderUnifiedHtml(parts, 3, canRevert);
 }
-// meta (optional, from the three gitOpen*Diff callers): { name, key, originalLabel, modifiedLabel, load?, openInTab? } -
+// meta (optional, from the three gitOpen*Diff callers): { name, key, originalLabel, modifiedLabel, load?, revert?, restore?, openInTab? } -
 // what the diff editor tab (js/core/diff-editor.js) needs. With openInTab the popup is skipped and the tab opens.
 function gitOpenDiffTab(oldContent, newContent, encoding, meta) {
     if (!window.CodeMiniDiff || !meta) return false;
-    if (meta.load) window.CodeMiniDiff.openLoaded({ key: meta.key, name: meta.name, originalLabel: meta.originalLabel, modifiedLabel: meta.modifiedLabel, load: meta.load, revert: meta.revert });
-    else window.CodeMiniDiff.openStatic({ key: meta.key, name: meta.name, original: oldContent, modified: newContent, originalLabel: meta.originalLabel, modifiedLabel: meta.modifiedLabel, encoding });
+    if (meta.load) window.CodeMiniDiff.openLoaded({ key: meta.key, name: meta.name, originalLabel: meta.originalLabel, modifiedLabel: meta.modifiedLabel, load: meta.load, revert: meta.revert, restore: meta.restore });
+    else window.CodeMiniDiff.openStatic({ key: meta.key, name: meta.name, original: oldContent, modified: newContent, originalLabel: meta.originalLabel, modifiedLabel: meta.modifiedLabel, encoding, restore: meta.restore });
     return true;
 }
 window.gitShowDiff = async function(title, oldContent, newContent, encoding, meta) {
@@ -1254,6 +1254,7 @@ async function gitOpenChangeDiff(path, asTab) {
     const canRevert = !!(d.fileId && d.inHead && d.encoding !== 'base64');
     window.gitShowDiff(d.name, d.old, d.new, d.encoding, {
         name: d.name, key: `git:${dbName}:work:${path}`, originalLabel: 'HEAD', modifiedLabel: 'Working tree', openInTab: !!asTab,
+        restore: { k: 'git-work', dbName, path },
         revert: canRevert ? (req) => gitRevertWorkingText(database, path, d.fileId, req) : undefined,
         load: async () => { const f = await gitLoadChangeDiff(path, database); return { original: { text: f.old, label: 'HEAD' }, modified: { text: f.new, label: 'Working tree' }, binary: f.encoding === 'base64' }; }
     });
@@ -1280,7 +1281,7 @@ async function gitOpenConflictDiff(path, asTab) {
     const mine = targetTree.get(path), theirs = sourceTree.get(path);
     const name = (mine && mine.name) || (theirs && theirs.name) || path.split('/').pop();
     window.gitShowDiff(`${name} (${targetLabel} vs ${sourceLabel})`, mine ? mine.content : '', theirs ? theirs.content : '', (mine && mine.encoding) || (theirs && theirs.encoding),
-        { name, key: `git:${dbName}:conflict:${path}`, originalLabel: targetLabel, modifiedLabel: sourceLabel, openInTab: !!asTab });
+        { name, key: `git:${dbName}:conflict:${path}`, originalLabel: targetLabel, modifiedLabel: sourceLabel, openInTab: !!asTab, restore: { k: 'git-conflict', dbName, path } });
 }
 function gitOpenCommitFileDiff(commitSha, path, asTab) {
     const dbName = db.name;
@@ -1296,8 +1297,34 @@ function gitOpenCommitFileDiff(commitSha, path, asTab) {
     const beforeTree = gitComputeHeadTree(repo, commit.parents[0] || null);
     const before = beforeTree.get(path);
     window.gitShowDiff(fileEntry.name, before ? before.content : '', fileEntry.status === 'deleted' ? '' : fileEntry.content, fileEntry.encoding,
-        { name: fileEntry.name, key: `git:${dbName}:commit:${commitSha}:${path}`, originalLabel: commit.parents[0] ? gitShortSha(commit.parents[0]) : '(none)', modifiedLabel: gitShortSha(commitSha), openInTab: !!asTab });
+        { name: fileEntry.name, key: `git:${dbName}:commit:${commitSha}:${path}`, originalLabel: commit.parents[0] ? gitShortSha(commit.parents[0]) : '(none)', modifiedLabel: gitShortSha(commitSha), openInTab: !!asTab, restore: { k: 'git-commit', dbName, sha: commitSha, path } });
 }
+// Restore Session: reopens a Source Control diff tab from the descriptor saved with it (validRestore in diff-editor.js).
+// Resolves true if a tab was opened. It opens nothing for another workspace, a path that no longer exists, a commit that is
+// gone, or a conflict that has been resolved.
+window.gitRestoreDiffTab = async function (desc) {
+    if (!desc || typeof db === 'undefined' || !db || db.name !== desc.dbName) return false;
+    const dbName = db.name;
+    if (desc.k === 'git-work') {
+        const d = await gitLoadChangeDiff(desc.path, db);
+        if (!d.fileId && !d.inHead) return false; // in neither the working tree nor HEAD any more
+        await gitOpenChangeDiff(desc.path, true);
+        return true;
+    }
+    if (desc.k === 'git-commit') {
+        const commit = getGitRepo(dbName).objects[desc.sha];
+        if (!commit || !commit.files.some(f => f.path === desc.path)) return false;
+        gitOpenCommitFileDiff(desc.sha, desc.path, true);
+        return true;
+    }
+    if (desc.k === 'git-conflict') {
+        const pm = gitGetPendingMerge(dbName), pr = gitGetPendingRebase(dbName);
+        if (!((pm && pm.conflictPaths.includes(desc.path)) || (pr && pr.conflictPaths.includes(desc.path)))) return false;
+        await gitOpenConflictDiff(desc.path, true);
+        return true;
+    }
+    return false;
+};
 
 // --- Staging & committing --------------------------------------------------
 function gitStagePath(path) {
