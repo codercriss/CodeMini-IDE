@@ -583,6 +583,8 @@
 
 /* Pill-shaped: buttons, inputs, search, and compact inline controls */
 [data-theme-pack^="codemini-premium"] .search-bar,
+[data-theme-pack^="codemini-premium"] .te-search,
+[data-theme-pack^="codemini-premium"] .sb-segmented,
 [data-theme-pack^="codemini-premium"] button:not(.tab-close),
 [data-theme-pack^="codemini-premium"] .help-feedback-send-btn,
 [data-theme-pack^="codemini-premium"] .dl-action-btn,
@@ -599,6 +601,9 @@
 /* The diff editor's toolbar stays flat like the editor tabs above it (see the note above: tabs are left square), so its
    buttons opt out of the pill shape. */
 [data-theme-pack^="codemini-premium"] .df-toolbar .df-seg-btn { border-radius: 0 !important; }
+/* Segmented controls (.sb-segmented: Test Explorer's All / Failed / Passed) are ONE pill: the container is rounded and clips its
+   segments, which therefore opt out of the pill shape above (otherwise each segment becomes its own pill inside the box). */
+[data-theme-pack^="codemini-premium"] .sb-segmented .sb-seg { border-radius: 0 !important; }
 [data-theme-pack^="codemini-premium"] .df-toolbar .df-icon-btn { border-radius: 3px !important; }
 
 /* Floating menus, popups, and cards */
@@ -614,6 +619,7 @@
 [data-theme-pack^="codemini-premium"] .launcher-card,
 [data-theme-pack^="codemini-premium"] .custom-toast,
 [data-theme-pack^="codemini-premium"] .nt-toast,
+[data-theme-pack^="codemini-premium"] .ni-pp,
 [data-theme-pack^="codemini-premium"] .help-details,
 [data-theme-pack^="codemini-premium"] .help-feedback-box,
 [data-theme-pack^="codemini-premium"] .git-diff-box {
@@ -717,7 +723,12 @@
 }
 [data-theme-pack^="codemini-premium"] .kernel-usage-count,
 [data-theme-pack^="codemini-premium"] .stack-badge,
-[data-theme-pack^="codemini-premium"] .kernel-badge {
+[data-theme-pack^="codemini-premium"] .kernel-badge,
+[data-theme-pack^="codemini-premium"] .sb-count-badge,
+[data-theme-pack^="codemini-premium"] .tk-pill,
+[data-theme-pack^="codemini-premium"] .te-stale,
+[data-theme-pack^="codemini-premium"] .te-bar,
+[data-theme-pack^="codemini-premium"] .ni-badge {
   border-radius: 999px !important;
 }
 [data-theme-pack^="codemini-premium"] .stack-action-icon {

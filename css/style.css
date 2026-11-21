@@ -5514,7 +5514,8 @@ html.is-pwa code, html.is-pwa samp {
 .te-none { padding: 14px 15px; font-size: 12px; color: var(--text-muted); }
 .te-menu .te-menu-item { display: block; width: 100%; text-align: left; padding: 7px 15px; font-size: 12px; color: var(--text-main); background: var(--bg-white); border: 0; border-bottom: 1px dashed var(--border-color); cursor: pointer; }
 .te-menu .te-menu-item:hover, .te-menu .te-menu-item:focus-visible { background: var(--bg-panel); }
-.te-emptystate { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 28px 20px; text-align: center; color: var(--text-muted); font-size: 12px; }
+.te-emptystate { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 28px 20px; text-align: center; white-space: normal; color: var(--text-muted); font-size: 12px; }
+.te-empty-text { max-width: 100%; overflow-wrap: anywhere; }
 .te-emptystate > i { font-size: 26px; opacity: 0.6; }
 .te-empty-title { font-size: 13px; font-weight: 600; color: var(--text-main); }
 .te-empty-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 8px; }
