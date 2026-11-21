@@ -3967,8 +3967,8 @@ function gitFileRow(change, staged) {
 }
 function renderGitHeader() {
     return `
-        <div class="git-header">
-            <div class="git-header-title">Source Control</div>
+        <div class="sb-header git-header">
+            <div class="sb-title">Source Control</div>
             <div class="git-header-icons">
                 <i class="ri-refresh-line git-action-icon" title="Refresh" data-git-action="refresh"></i>
                 <i class="ri-close-line git-action-icon" title="Close Source Control" data-git-action="close"></i>
@@ -4519,8 +4519,8 @@ function injectGitStyles() {
     const style = document.createElement('style');
     style.id = 'gitOverrides';
     style.textContent = `
-    .git-header { display:flex; justify-content:space-between; align-items:center; padding:13px 15px; background:var(--bg-white); position:sticky; top:0; z-index:2; }
-    .git-header-title { font-weight:700; font-size:15px; color:var(--text-main); letter-spacing:-0.2px; }
+    /* Layout and the title come from the shared .sb-header / .sb-title (css/style.css); only what is Git's own stays here. */
+    .git-header { background:var(--bg-white); position:sticky; top:0; z-index:2; }
     .git-header-icons { display:flex; gap:6px; align-items:center; font-size:18px; }
     .git-header-icons .git-action-icon { padding:3px; }
     .git-action-icon { cursor:pointer; opacity:0.7; padding:4px; border-radius:3px; color:var(--icon-gray); transition:opacity .15s, background-color .15s, color .15s; }

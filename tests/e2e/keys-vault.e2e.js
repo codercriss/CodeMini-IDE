@@ -45,7 +45,7 @@ async function boot(browser, viewport) {
   console.log('\n[first use: setup is a full-sidebar screen, not a modal]');
   await openVault();
   ok(await screen() === 'setup', 'opening My Keys for the first time shows the password setup screen');
-  const lay = await ev(() => { const sb = document.getElementById('keysSidebar').getBoundingClientRect(), sc = document.querySelector('.keys-screen').getBoundingClientRect(); return { sbW: Math.round(sb.width), scW: Math.round(sc.width), sbH: Math.round(sb.height), scH: Math.round(sc.height), tabs: !!document.querySelector('#keysSidebar .keys-tabs'), modal: !!document.querySelector('#islandModal.show, .modal-backdrop.show, #modalBackdrop.show'), title: document.querySelector('.keys-title').textContent, refreshHidden: document.querySelector('[data-k="refresh"]').classList.contains('hidden') }; });
+  const lay = await ev(() => { const sb = document.getElementById('keysSidebar').getBoundingClientRect(), sc = document.querySelector('.keys-screen').getBoundingClientRect(); return { sbW: Math.round(sb.width), scW: Math.round(sc.width), sbH: Math.round(sb.height), scH: Math.round(sc.height), tabs: !!document.querySelector('#keysSidebar .keys-tabs'), modal: !!document.querySelector('#islandModal.show, .modal-backdrop.show, #modalBackdrop.show'), title: document.querySelector('#keysSidebar .sb-title').textContent, refreshHidden: document.querySelector('[data-k="refresh"]').classList.contains('hidden') }; });
   ok(lay.scW >= lay.sbW - 2 && lay.scH >= lay.sbH * 0.8, 'the screen fills the sidebar', lay);
   ok(!lay.tabs && !lay.modal, 'no tabs behind it and no modal');
   ok(lay.title === 'My Keys' && lay.refreshHidden, 'header: title left; refresh is hidden until unlocked, close is available');
@@ -106,7 +106,7 @@ async function boot(browser, viewport) {
   ok(row.actions === 'none', 'row actions are tucked away until hover (until hover)', row.actions);
   await page.hover('.keys-item-main');
   ok(await ev(() => getComputedStyle(document.querySelector('.keys-item-actions')).display) === 'flex', 'and appear on hover');
-  const sizes = await ev(() => { const g = (sel, prop) => getComputedStyle(document.querySelector(sel))[prop]; return { tab: g('.keys-tab', 'fontSize') + '/' + g('.keys-tab', 'paddingTop'), title: g('.keys-title', 'fontSize'), search: g('#kvSearch', 'fontSize') + '/' + g('#kvSearch', 'paddingTop') + '/' + g('#kvSearch', 'borderTopLeftRadius') }; });
+  const sizes = await ev(() => { const g = (sel, prop) => getComputedStyle(document.querySelector(sel))[prop]; return { tab: g('.keys-tab', 'fontSize') + '/' + g('.keys-tab', 'paddingTop'), title: g('#keysSidebar .sb-title', 'fontSize'), search: g('#kvSearch', 'fontSize') + '/' + g('#kvSearch', 'paddingTop') + '/' + g('#kvSearch', 'borderTopLeftRadius') }; });
   ok(sizes.tab === '12px/9px' && sizes.title === '15px' && sizes.search === '12px/7px/4px', 'tabs, title and inputs use the vault sizes', sizes);
 
   console.log('\n[reveal, copy, search]');

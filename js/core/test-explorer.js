@@ -1405,7 +1405,7 @@ finally:
         const keepScroll = root.querySelector('.sb-body') ? root.querySelector('.sb-body').scrollTop : 0;
         root.textContent = '';
         const head = el('div', 'sb-header');
-        head.appendChild(el('div', 'sb-title', 'TEST EXPLORER'));
+        head.appendChild(el('div', 'sb-title', 'Test Explorer'));
         const tools = el('div', 'sb-tools');
         tools.append(iconBtn('ri-play-line', 'Run all tests', runAll, 'te-run-all'), iconBtn('ri-stop-mini-fill', 'Stop', stopRun, 'te-stop'),
             iconBtn('ri-refresh-line', 'Refresh: find tests again', () => { state.sig = ''; env.getRecords().then(noteRecords).catch(() => {}); }),

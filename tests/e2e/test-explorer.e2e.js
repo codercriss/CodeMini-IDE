@@ -47,7 +47,7 @@ const NOISE = /monaco|pyodide|loadPyodide|initSqlJs|Failed to fetch|net::|requir
   ok(await ev(() => !!document.getElementById('menuTests') && /Test/.test(document.getElementById('menuTests').textContent)), 'the Tests menu item is there');
   ok(await ev(() => getComputedStyle(document.getElementById('statusTestsToggle')).display === 'none'), 'the status bar item is hidden while there are no tests');
   await click('#menuTests'); await settle(500);
-  ok(await ev(() => document.getElementById('testSidebar').classList.contains('open') && /TEST EXPLORER/.test(document.querySelector('#testSidebar .sb-title').textContent) && !document.getElementById('mainMenuDropdown').classList.contains('show')), 'it opens the TEST EXPLORER sidebar and closes the menu');
+  ok(await ev(() => document.getElementById('testSidebar').classList.contains('open') && /^Test Explorer$/.test(document.querySelector('#testSidebar .sb-title').textContent) && !document.getElementById('mainMenuDropdown').classList.contains('show')), 'it opens the Test Explorer sidebar and closes the menu');
   ok(await ev(() => /No tests found/.test(document.querySelector('#testSidebar .te-emptystate').textContent) && [...document.querySelectorAll('#testSidebar .te-btn')].map(b => b.textContent).join('|') === 'Create a test file|Configure patterns'), 'the empty state offers to create a test file or configure patterns');
   ok(await ev(() => Object.keys(localStorage).some(k => { try { return JSON.parse(localStorage.getItem(k)).sidebar === 'tests'; } catch (e) { return false; } })), 'the open sidebar is remembered');
 

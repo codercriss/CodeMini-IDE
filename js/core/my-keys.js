@@ -325,8 +325,8 @@
         /* My Keys sidebar styles. Everything is namespaced under .keys-* / #keysSidebar / kv* ids.
            Scale: 15px title, 12px body text, 11px labels, 10px hints, 4px radii, 8px buttons, dashed row dividers. */
         #keysSidebar .keys-root { display:flex; flex-direction:column; flex:1; min-height:0; white-space:normal; position:relative; color:var(--text-main); font-family:var(--font-main); }
-        .keys-header { display:flex; justify-content:space-between; align-items:center; padding:13px 15px; background:var(--bg-white); flex-shrink:0; }
-        .keys-title { font-weight:700; font-size:15px; color:var(--text-main); letter-spacing:-0.2px; }
+        /* Layout and the title come from the shared .sb-header / .sb-title (css/style.css); only what is Keys' own stays here. */
+        .keys-header { background:var(--bg-white); }
         .keys-icons { display:flex; gap:6px; align-items:center; font-size:18px; }
         .keys-icon { cursor:pointer; opacity:0.7; padding:4px; border-radius:3px; color:var(--icon-gray); transition:opacity .15s, background-color .15s, color .15s; }
         .keys-icons .keys-icon { padding:3px; }
@@ -672,7 +672,7 @@
         }
         if (unlocked && st.view === 'forgot') { body = screenErase(false); unlocked = false; tag = 'forgot'; }
         r.innerHTML = `
-            <div class="keys-header"><div class="keys-title">My Keys</div>
+            <div class="sb-header keys-header"><div class="sb-title">My Keys</div>
                 <div class="keys-icons">
                     <i class="ri-refresh-line keys-icon${unlocked ? '' : ' hidden'}" data-k="refresh" title="Refresh"></i>
                     <i class="ri-close-line keys-icon" data-k="close" title="Close My Keys"></i>

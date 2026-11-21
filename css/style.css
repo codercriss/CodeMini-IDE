@@ -5119,6 +5119,7 @@ html.is-pwa code, html.is-pwa samp {
 .sb-header .sb-title {
     font-size: 15px;
     font-weight: 700;
+    letter-spacing: -0.2px;
     color: var(--text-main);
 }
 

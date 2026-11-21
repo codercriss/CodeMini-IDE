@@ -597,7 +597,7 @@
         const root = $('tkRoot'); if (!root) return;
         root.textContent = '';
         const head = el('div', 'sb-header');
-        head.appendChild(el('div', 'sb-title', 'TASKS'));
+        head.appendChild(el('div', 'sb-title', 'Tasks'));
         const tools = el('div', 'sb-tools');
         tools.append(iconBtn('ri-refresh-line', 'Refresh tasks', () => { state.sig = ''; env.getRecords().then(noteRecords).catch(() => {}); }),
             iconBtn('ri-add-line', state.file.exists ? 'Open tasks.json' : 'Create tasks.json', () => { if (state.file.exists) configureTasks(); else { state.menu = !state.menu; renderSidebar(); } }),

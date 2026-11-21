@@ -60,7 +60,7 @@ const NOISE = /monaco|pyodide|loadPyodide|initSqlJs|Failed to fetch|net::|requir
   await ev(() => document.getElementById('menuTasks').click()); await settle(500);
   const open1 = await ev(() => { const s = document.getElementById('tasksSidebar'); return { open: s.classList.contains('open'), w: s.offsetWidth, active: document.getElementById('menuTasks').classList.contains('active'), resizer: !!s.querySelector('.sidebar-resizer'), title: s.querySelector('.sb-title').textContent, menuShown: document.getElementById('mainMenuDropdown').classList.contains('show') }; });
   ok(open1.open && open1.w === 300 && open1.active && !open1.menuShown, 'clicking it opens a 300px sidebar and closes the menu', open1);
-  ok(open1.title === 'TASKS' && open1.resizer, 'titled TASKS, with the usual resize handle', open1);
+  ok(open1.title === 'Tasks' && open1.resizer, 'titled Tasks, with the usual resize handle', open1);
   ok(await ev(() => !!document.querySelector('#tasksSidebar .tk-emptystate') && /No tasks yet/.test(document.querySelector('#tasksSidebar .tk-emptystate').textContent) && document.querySelector('#tasksSidebar .tk-emptystate .tk-btn').textContent === 'Configure Tasks'), 'with no file it says "No tasks yet" and offers Configure Tasks');
   const hdr = await ev(() => [...document.querySelectorAll('#tasksSidebar .sb-header button')].map(b => b.getAttribute('aria-label')));
   ok(JSON.stringify(hdr) === JSON.stringify(['Refresh tasks', 'Create tasks.json', 'Close']), 'the header has refresh, "+" (create) and close', hdr);

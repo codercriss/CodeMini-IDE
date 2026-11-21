@@ -469,8 +469,8 @@ window.renderStacks = function() {
   const binHtml = rootTrashItems.map(t => renderTrashItem(t, 0)).join('');
 
   stackSidebar.innerHTML = `
-  <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 15px 10px; background: var(--bg-white); position: sticky; top: 0;">
-  <div style="font-weight: 700; font-size: 15px; color: var(--text-main); display: flex; align-items: center; gap: 8px; letter-spacing: -0.2px;">My Stacks</div>
+  <div class="sb-header" style="background: var(--bg-white); position: sticky; top: 0;">
+  <div class="sb-title">My Stacks</div>
   <div class="stack-header-icons" style="border: none; padding: 0; display: flex; gap: 4px;">
   <i class="ri-expand-up-down-line stack-action-icon" style="padding: 4px;" title="Toggle All Sections" onclick="window.toggleAllStacks()"></i>
   <i class="ri-refresh-line stack-action-icon" style="padding: 4px;" title="Refresh UI" onclick="if(window.renderStacks) window.renderStacks();"></i>
