@@ -439,7 +439,7 @@
         </div>
 
         <div class="lp-statusbar">
-            <div class="lp-status-left" style="margin-left: 2px;">
+            <div class="lp-status-left">
                 <i class="ri-arrow-left-line disabled" id="lpNavBack" title="Go Back"></i>
                 <i class="ri-arrow-right-line disabled" id="lpNavFwd" title="Go Forward"></i>
                 <div class="hide-on-mobile" style="width: 1px; height: 16px; background: var(--border-color); margin: 0 8px;"></div>
