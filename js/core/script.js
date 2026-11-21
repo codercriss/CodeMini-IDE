@@ -186,7 +186,8 @@ window.saveCurrentUIState = function() {
                  document.getElementById('stackSidebar')?.classList.contains('open') ? 'stack' :
                  document.getElementById('sourceControlSidebar')?.classList.contains('open') ? 'source' :
                  document.getElementById('keysSidebar')?.classList.contains('open') ? 'keys' :
-                 document.getElementById('tasksSidebar')?.classList.contains('open') ? 'tasks' : null,
+                 document.getElementById('tasksSidebar')?.classList.contains('open') ? 'tasks' :
+                 document.getElementById('testSidebar')?.classList.contains('open') ? 'tests' : null,
         bottomPanel: document.getElementById('problemsPanel')?.style.display !== 'none',
         bottomActiveTab: document.querySelector('.bottom-panel-tab.active')?.dataset.target || 'problemsPanelContent',
         treeMode: window.isTreeViewMode,
@@ -244,6 +245,10 @@ window.restoreCurrentUIState = function() {
     else if (uiState.sidebar === 'tasks') {
         document.getElementById('tasksSidebar')?.classList.add('open');
         document.getElementById('menuTasks')?.classList.add('active');
+    }
+    else if (uiState.sidebar === 'tests') {
+        document.getElementById('testSidebar')?.classList.add('open');
+        document.getElementById('menuTests')?.classList.add('active');
     }
 
     const problemsPanel = document.getElementById('problemsPanel');
@@ -514,6 +519,8 @@ window.closeAllSidebars = function() {
     document.getElementById('menuKeys')?.classList.remove('active');
     document.getElementById('tasksSidebar')?.classList.remove('open');
     document.getElementById('menuTasks')?.classList.remove('active');
+    document.getElementById('testSidebar')?.classList.remove('open');
+    document.getElementById('menuTests')?.classList.remove('active');
     // Every sidebar open/close path funnels through here, so this guarantees
     // the activity bar's overflow dropdown never stays hanging open across
     // a sidebar switch.

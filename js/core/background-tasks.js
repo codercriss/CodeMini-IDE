@@ -34,7 +34,8 @@
         install: { icon: 'ri-install-line', label: 'Install' },
         download: { icon: 'ri-download-cloud-2-line', label: 'Download' },
         export: { icon: 'ri-file-zip-line', label: 'Export' },
-        task: { icon: 'ri-list-check-2', label: 'Task' }
+        task: { icon: 'ri-list-check-2', label: 'Task' },
+        tests: { icon: 'ri-test-tube-line', label: 'Tests' }
     };
 
     var SURFACE_MS = 800;        // a task shorter than this is never shown

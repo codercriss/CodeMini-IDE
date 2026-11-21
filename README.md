@@ -12,7 +12,7 @@ No backend. No account. No build step.
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![PWA](https://img.shields.io/badge/PWA-installable-5a0fc8)](https://codemini-ide.vercel.app/)
 
-**[Try it live](https://codemini-ide.vercel.app/)** · [Changelog](CHANGELOG.md) · [Security](SECURITY.md) · [Privacy](PRIVACY.md) · [Contributing](CONTRIBUTING.md)
+**[Try it live](https://codemini-ide.vercel.app/)** · [Changelog](CHANGELOG.md) · [Security](SECURITY.md) · [Privacy](PRIVACY.md) · [Usage rules](USAGE.md) · [Contributing](CONTRIBUTING.md)
 
 <br>
 
@@ -65,6 +65,7 @@ It is built to be usable on a phone as well as a laptop.
 - **Notebooks** with in-browser kernels for Python (Pyodide), R (WebR), SQL (sql.js) and Ruby
 - **Consoles** for JavaScript, Python, PHP and Ruby, and an **integrated terminal** with a set of shell-style commands, including **`git`** (status, add, commit, log, diff, show, branch, switch/checkout, restore, reset, merge, stash, tag, reflog; run `git help`). It shares commits, branches, stashes and staging with the Source Control panel. Push, pull, fetch, clone, rebase, cherry-pick and revert stay in the panel
 - **Python packages everywhere Python runs.** `!pip install x` (also `%pip`, and `uninstall`, `list`, `freeze`, `show`) works in the Console, the editor's Run, the bottom Console, Debug, the Terminal and Tasks, as it does in notebooks; the Terminal also has a `pip` command, a Task's command can be `pip install x`, and the modules your code imports can be installed automatically (Settings > Editor / Terminal / Console > Auto-Install Python Packages)
+- **Test Explorer.** Finds the tests in your workspace (`*.test.js`, `*.spec.js`, `test_*.py`, `*_test.py`, changeable in `.codemini/tests.json`) and runs them in the isolated runner: JavaScript with a built-in `describe` / `it` / `expect` runner, Python with `unittest` or `pytest`. A tree of file > suite > test with a summary bar, All / Failed / Passed, an inline error block with Expected / Actual and **View diff**, a run / pass / fail glyph on each test line in the editor, a status-bar count, and a Test Output tab. Never runs in Restricted Mode. See the [CHANGELOG](CHANGELOG.md) for what it does not do yet.
 - **PHP and web previews** that run in the browser, with Console, Network and Inspector panels
 
 ### Manage your work
@@ -141,6 +142,10 @@ More detail is in [`runner/README.md`](runner/README.md) and [`SECURITY.md`](SEC
 
 Everything runs client-side. Files, settings and tokens stay in your browser storage. Runtime libraries are fetched from public CDNs (listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)) and cached for offline use. See [PRIVACY.md](PRIVACY.md) for details.
 
+## Content and usage rules
+
+[USAGE.md](USAGE.md) says what content CodeMini is meant to host and what it treats as unacceptable when content is imported, shared, installed or run (rules P1 to P6, each with a stable id). It is guidance, not a security boundary: today the limits are Isolation and Workspace Trust ([SECURITY.md](SECURITY.md)). The built-in checker that would screen content against these rules (CodeMini Guard) is planned and not built.
+
 ## Development
 
 New here? Start with [CONTRIBUTING.md](CONTRIBUTING.md). There is no build step and no dependencies to install: edit a file, refresh the page.
@@ -156,7 +161,7 @@ New here? Start with [CONTRIBUTING.md](CONTRIBUTING.md). There is no build step 
 ├── icons/                  App icons: icon.png (512), icon-192, icon-maskable-192/512, apple-touch-icon, favicons
 ├── docs/images/            Screenshots used in this README (repository only, not deployed: listed in .vercelignore)
 ├── runner/                 The preview/execution runner (copy of CodeMini-Runner)
-├── PRIVACY.md, SECURITY.md, LICENSE, THIRD_PARTY_NOTICES.md
+├── PRIVACY.md, SECURITY.md, USAGE.md, LICENSE, THIRD_PARTY_NOTICES.md
 ├── css/
 │   ├── style.css           Layout and components
 │   └── themes.css          Theme variables
@@ -229,6 +234,8 @@ MONACO_DIR=/tmp/node_modules/monaco-editor/min npm run test:e2e -- diff-editor
 | `file-lock.test.js` | Locked files and folders: locks, encrypted text, legacy upgrade, wiring checks |
 | `paths.test.js` | The helper every test uses to find the runner and report a missing hidden file plainly |
 | `app-info.test.js` | Keeps version, links and About page consistent with the repo |
+| `test-explorer.test.js` | Test Explorer: patterns and `tests.json`, finding tests, the tree and filter, the JavaScript runtime run for real (matchers, hooks, timeouts, `require`, frames mapped to file:line), the Python harness, the run core (trust, isolation, stop, timeout, pytest install) and the wiring |
+| `usage-rules.test.js` | Keeps `USAGE.md` well formed (ids P1 to P6 with no gap, a response for each, working links, linked from the README and `SECURITY.md`) and its Status section true |
 | `release-history.test.js` | Keeps the in-app version history in step with `CHANGELOG.md` and the app version |
 | `bin-restore-confirm.test.js` | Stacks > Recycle Bin: Restore and Restore All ask first |
 | `keybindings.test.js` | Shortcut rules: key names and combos (Cmd as Ctrl, AltGr, Mac dead keys), what may be bound, the catalog, the registry with the user's changes, conflicts, the dispatcher (a key you set beats a default, conditions, recording), and the wiring that replaced the old handlers |
@@ -279,7 +286,10 @@ MONACO_DIR=/tmp/node_modules/monaco-editor/min npm run test:e2e -- diff-editor
 | `git-token.e2e.js` | GitHub token encrypted with the device key, usable with My Keys locked and after a reload, disconnect, lost key, migration |
 | `launch-actions.e2e.js` | App shortcuts: `/?action=new-file`, `terminal`, `search`, `settings` |
 | `bottom-panel-status-root.e2e.js` | The bottom panel's tabs scrolling sideways instead of wrapping, the phone status bar cutting a long tab name, and Move / Copy to Root keeping a folder's structure when its contents are selected too |
+| `test-explorer.e2e.js` | Test Explorer in the real app with a stand-in host: the empty state and creating a sample file, a run with pass / fail / skip, the error block with Expected / Actual and View diff, the Test Output tab, the filter, STALE, Run Failed, Stop, Restricted Mode, and `tests.json` patterns |
 | `py-packages.e2e.js` | Python packages in the real Console (Isolated and Same origin), Terminal (`pip`, `pip3`, `python -m pip`, scripts) and the editor's bottom Console: the package step goes first, the prepared code runs after it, lines are shown escaped, nothing is sent when there is nothing to do, and the Editor / Terminal / Console Auto-Install settings are honoured (a stand-in engine answers the step) |
+
+`tests/real-pyodide-tests.manual.js` runs the Test Explorer's Python harness on a real Pyodide (and a real pytest when the wheels are given): `PYODIDE_DIR=/path/to/node_modules/pyodide PYWHEELS=/path/to/wheels node tests/real-pyodide-tests.manual.js`. See the top of the file.
 
 `theme-premium-compare.manual.js` is a manual before/after comparison tool and is not part of the automated run.
 
@@ -340,7 +350,7 @@ Remember the order: deploy the **runner first, then the app** (see [Isolated cod
 
 ## Contributing
 
-Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). For security issues, see [SECURITY.md](SECURITY.md).
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). For security issues, see [SECURITY.md](SECURITY.md). For what content belongs in the app, and in anything you share, see [USAGE.md](USAGE.md).
 
 ## Credits
 

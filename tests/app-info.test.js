@@ -19,7 +19,7 @@ t('repo link matches package.json repository', () => {
 });
 t('live link matches package.json homepage', () => assert.strictEqual(info.links.live, pkg.homepage));
 t('every linked repo file exists in the repository', () => {
-  for (const k of ['license', 'privacy', 'security', 'notices', 'changelog']) {
+  for (const k of ['license', 'privacy', 'usage', 'security', 'notices', 'changelog']) {
     const file = info.links[k].split('/blob/main/')[1];
     assert.ok(fs.existsSync(path.join(root, file)), `${k} -> ${file} is missing`);
   }

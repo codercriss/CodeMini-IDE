@@ -17,6 +17,7 @@
             repo: REPO,
             license: REPO + '/blob/main/LICENSE',
             privacy: REPO + '/blob/main/PRIVACY.md',
+            usage: REPO + '/blob/main/USAGE.md',
             issues: REPO + '/issues',
             security: REPO + '/blob/main/SECURITY.md',
             notices: REPO + '/blob/main/THIRD_PARTY_NOTICES.md',

@@ -1,0 +1,21 @@
+{
+  "$schema": "codemini://schema/tasks.json",
+  "version": 1,
+  "tasks": [
+    {
+      "label": "Build",
+      "group": "build",
+      "default": true,
+      "lang": "javascript",
+      "script": "console.log('Building...');\nconsole.log('Done.');",
+      "detail": "Replace the script with node scripts/build.js once you have one."
+    },
+    {
+      "label": "Test",
+      "group": "test",
+      "default": true,
+      "lang": "javascript",
+      "script": "const assert = (c, m) => { if (!c) throw new Error(m); };\nassert(1 + 1 === 2, 'math works');\nconsole.log('1 test passed');"
+    }
+  ]
+}

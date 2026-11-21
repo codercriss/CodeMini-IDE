@@ -44,6 +44,10 @@ These third parties have their own privacy policies.
 
 CodeMini does not knowingly collect personal information from anyone, including children.
 
+## Content rules
+
+What content CodeMini is meant to host, and what it treats as unacceptable when content is imported, shared or run, is in [USAGE.md](USAGE.md). Those rules do not change what CodeMini collects: it still collects nothing.
+
 ## Changes
 
 Changes to this policy are recorded in the repository history. Questions: open an issue or email codercriss@gmail.com.

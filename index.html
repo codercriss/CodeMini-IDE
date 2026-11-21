@@ -334,6 +334,7 @@
 
         <div class="sidebar" id="keysSidebar"></div>
         <div class="sidebar" id="tasksSidebar"></div>
+        <div class="sidebar" id="testSidebar"></div>
 
         <div class="content-area">
             <div class="editor-split-view" id="splitView">
@@ -365,6 +366,7 @@
                         <div class="bottom-panel-tab" data-target="consolePanelContent">Console</div>
                         <div class="bottom-panel-tab" data-target="debugPanelContent">Debug Console</div>
                         <div class="bottom-panel-tab" data-target="tasksPanelContent">Tasks</div>
+                        <div class="bottom-panel-tab" data-target="testPanelContent">Test Output</div>
                     </div>
 
                     <div class="bottom-panel-actions">
@@ -417,6 +419,10 @@
                     style="display: none; height: 100%; padding: 0; flex-direction: column;">
                 </div>
 
+                <div class="bottom-panel-content" id="testPanelContent"
+                    style="display: none; height: 100%; padding: 0; flex-direction: column;">
+                </div>
+
             </div>
 
             <div class="modal-backdrop" id="modalBackdrop"></div>
@@ -459,6 +465,8 @@
                 <div class="hide-on-mobile" style="width: 1px; height: 16px; background: var(--border-color); margin: 0 8px;"></div>
             <div class="status-item" id="statusProblemsToggle" style="cursor: pointer;" title="Problems"><i
                     class="ri-error-warning-line"></i> 0</div>
+            <div class="status-item" id="statusTestsToggle" style="cursor: pointer; display: none;" title="Test Explorer"><i
+                    class="ri-test-tube-line"></i></div>
             <div class="status-item" id="statusConsoleToggle" style="cursor: pointer;" title="Console"><i
                     class="ri-terminal-box-line"></i></div>
             <div class="status-item" id="statusDebugToggle" style="cursor: pointer;" title="Debug"><i
@@ -523,6 +531,7 @@
     <script src="js/core/json-schemas.js"></script>
     <script src="js/core/codemini-config.js"></script>
     <script src="js/core/tasks.js"></script>
+    <script src="js/core/test-explorer.js"></script>
     <script src="js/core/snippets.js"></script>
     <script src="js/core/settings-json.js"></script>
     <script src="js/core/workspace-trust.js"></script>

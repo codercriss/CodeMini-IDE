@@ -705,6 +705,8 @@ require(['vs/editor/editor.main'], function() {
 
         editorInstance.onMouseDown(function (e) {
             if (e.target.type === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) {
+                // A click on a test glyph runs that test (js/core/test-explorer.js); it is not a breakpoint.
+                if (e.target.element && /\bte-glyph\b/.test(e.target.element.className || '')) return;
                 const lineNumber = e.target.position.lineNumber;
                 window.toggleBreakpoint(editorInstance, lineNumber);
             }
@@ -749,6 +751,9 @@ require(['vs/editor/editor.main'], function() {
             }));
             window.bpDecorationRegistry[winId][fileId] = editorInstance.deltaDecorations([], decorations);
         }
+
+        // Test Explorer puts a run / pass / fail glyph on each test line (guarded: it can never stop an editor from opening).
+        if (window.CodeMiniTests && typeof window.CodeMiniTests.attachEditor === 'function') { try { window.CodeMiniTests.attachEditor(editorInstance); } catch (e) { /* no glyphs */ } }
 
         setTimeout(updateProblemsPanel, 100);
         return editorInstance;

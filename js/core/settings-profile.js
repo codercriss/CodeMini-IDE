@@ -1526,6 +1526,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <div style="display: flex; flex-wrap: wrap; justify-content: center; row-gap: 8px;">
                 <a href="${_L('license')}" target="_blank" rel="noopener noreferrer" style="color: var(--accent-blue); text-decoration: none; margin: 0 10px; white-space: nowrap;">License</a>
                 <a href="${_L('privacy')}" target="_blank" rel="noopener noreferrer" style="color: var(--accent-blue); text-decoration: none; margin: 0 10px; white-space: nowrap;">Privacy Policy</a>
+                <a href="${_L('usage')}" target="_blank" rel="noopener noreferrer" style="color: var(--accent-blue); text-decoration: none; margin: 0 10px; white-space: nowrap;">Usage Rules</a>
                 <a href="${_L('repo')}" target="_blank" rel="noopener noreferrer" style="color: var(--accent-blue); text-decoration: none; margin: 0 10px; white-space: nowrap;">GitHub Repository</a>
                 <a href="${_L('issues')}" target="_blank" rel="noopener noreferrer" style="color: var(--accent-blue); text-decoration: none; margin: 0 10px; white-space: nowrap;">Report an Issue</a>
                 <a href="${_L('notices')}" target="_blank" rel="noopener noreferrer" style="color: var(--accent-blue); text-decoration: none; margin: 0 10px; white-space: nowrap;">Third-Party Notices</a>

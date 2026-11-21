@@ -5441,3 +5441,108 @@ html.is-pwa code, html.is-pwa samp {
 @media (max-width: 768px) {
     #statusTasksToggle .tk-status-name { display: none; }
 }
+
+/* ---- Test Explorer (sidebar, Test Output tab, status bar item, editor glyphs): js/core/test-explorer.js ---- */
+.te-root { display: flex; flex-direction: column; flex: 1; min-height: 0; width: 100%; }
+.te-ok { color: var(--accent-new, #00897b); }
+.te-bad { color: var(--color-danger); }
+.te-skip { color: var(--text-muted); }
+.te-idle { color: var(--text-muted); opacity: 0.7; }
+.te-spin { display: inline-block; animation: te-rot 1s linear infinite; color: var(--accent-blue); }
+@keyframes te-rot { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .te-spin { animation: none; } }
+.sb-header .sb-icon-btn.on { color: var(--accent-blue); opacity: 1; }
+.sb-header .sb-icon-btn:disabled { opacity: 0.3; cursor: default; }
+
+/* the summary bar: three pills and the total time, above a 4px stacked bar */
+.te-summary { padding: 8px 15px 10px; border-bottom: 1px solid var(--border-color); flex: none; }
+.te-pills { display: flex; align-items: center; gap: 12px; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.te-pill { display: inline-flex; align-items: center; gap: 4px; }
+.te-pill i { font-size: 14px; }
+.te-total { margin-left: auto; font-size: 11px; font-weight: 400; color: var(--text-muted); }
+.te-bar { display: flex; height: 4px; margin-top: 8px; border-radius: 2px; overflow: hidden; background: var(--bg-panel); }
+.te-bar-ok { background: var(--accent-new, #00897b); }
+.te-bar-bad { background: var(--color-danger); }
+.te-bar-skip { background: var(--text-muted); opacity: 0.5; }
+
+/* the filter row: a 28px search box and a segmented control */
+.te-filter { display: flex; align-items: center; gap: 8px; padding: 6px 15px; border-bottom: 1px solid var(--border-color); flex: none; }
+.te-search { flex: 1; min-width: 0; height: 28px; box-sizing: border-box; padding: 0 8px; font-size: 12px; color: var(--text-main); background: var(--bg-white); border: 1px solid var(--border-color); border-radius: 3px; }
+.te-search:focus { outline: 1px solid var(--accent-blue); border-color: var(--accent-blue); }
+.sb-segmented { display: inline-flex; flex: none; border: 1px solid var(--border-color); border-radius: 3px; overflow: hidden; }
+.sb-seg { padding: 0 8px; height: 26px; font-size: 11px; font-weight: 600; color: var(--text-muted); background: none; border: 0; cursor: pointer; }
+.sb-seg + .sb-seg { border-left: 1px solid var(--border-color); }
+.sb-seg.active { background: var(--accent-blue); color: #fff; }
+
+/* the tree: file > suite > test, 26px rows */
+.te-list { list-style: none; margin: 0; padding: 0; }
+.te-row { display: flex; align-items: center; gap: 6px; min-height: 26px; padding-right: 10px; background: var(--bg-white); cursor: pointer; font-size: 12px; }
+.te-row:hover, .te-row:focus-within { background: var(--bg-panel); }
+.te-row.te-file { font-weight: 600; border-top: 1px solid var(--border-color); }
+.te-list > .te-row.te-file:first-child { border-top: 0; }
+.te-chev { flex: none; width: 14px; font-size: 14px; color: var(--icon-gray); }
+.te-nochev { display: inline-block; }
+.te-lead { flex: none; font-size: 14px; }
+.te-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.te-ms { flex: none; font-size: 10px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.te-stale { flex: none; font-size: 9px; font-weight: 700; letter-spacing: 0.4px; padding: 0 5px; border-radius: 8px; color: var(--icon-yellow); border: 1px solid var(--icon-yellow); }
+.te-actions { display: none; flex: none; align-items: center; }
+.te-row:hover .te-actions, .te-row:focus-within .te-actions { display: flex; }
+.te-actions .sb-icon-btn { font-size: 14px; padding: 2px; }
+.te-actions .sb-icon-btn:disabled { opacity: 0.3; }
+@media (max-width: 768px) { .te-actions { display: flex; } } /* touch: the actions are always there */
+
+/* a failed test: the message in a mono strip with a 3px danger edge, expected / actual, and clickable frames */
+.te-err { list-style: none; padding: 4px 10px 8px 30px; background: var(--bg-white); border-bottom: 1px dashed var(--border-color); }
+.te-err-msg { font-family: var(--font-mono); font-size: 11px; line-height: 1.5; padding: 5px 8px; background: var(--bg-panel); border-left: 3px solid var(--color-danger); white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.te-cmp { margin-top: 6px; font-family: var(--font-mono); font-size: 11px; }
+.te-cmp-row { display: flex; gap: 8px; padding: 2px 8px; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.te-cmp-label { flex: none; width: 54px; color: var(--text-muted); font-family: var(--font-main); }
+.te-exp .te-cmp-val { color: var(--accent-new, #00897b); }
+.te-act .te-cmp-val { color: var(--color-danger); }
+.te-frames { margin-top: 6px; display: flex; flex-direction: column; gap: 2px; font-family: var(--font-mono); font-size: 11px; }
+.te-link { color: var(--accent-blue); text-decoration: underline; cursor: pointer; }
+.te-action { padding: 0; margin-top: 4px; background: none; border: 0; font-size: 12px; font-weight: 600; color: var(--accent-blue); cursor: pointer; }
+.te-action:hover, .te-action:focus-visible { text-decoration: underline; }
+
+.te-banner { display: flex; align-items: flex-start; gap: 8px; padding: 8px 15px; font-size: 12px; border-bottom: 1px dashed var(--border-color); }
+.te-banner i { flex: none; font-size: 15px; }
+.te-banner span { flex: 1; min-width: 0; }
+.te-banner-lock i { color: var(--icon-yellow); }
+.te-banner-bad i { color: var(--color-danger); }
+.te-none { padding: 14px 15px; font-size: 12px; color: var(--text-muted); }
+.te-menu .te-menu-item { display: block; width: 100%; text-align: left; padding: 7px 15px; font-size: 12px; color: var(--text-main); background: var(--bg-white); border: 0; border-bottom: 1px dashed var(--border-color); cursor: pointer; }
+.te-menu .te-menu-item:hover, .te-menu .te-menu-item:focus-visible { background: var(--bg-panel); }
+.te-emptystate { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 28px 20px; text-align: center; color: var(--text-muted); font-size: 12px; }
+.te-emptystate > i { font-size: 26px; opacity: 0.6; }
+.te-empty-title { font-size: 13px; font-weight: 600; color: var(--text-main); }
+.te-empty-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 8px; }
+.te-btn { padding: 5px 12px; font-size: 12px; font-weight: 600; color: var(--text-main); background: var(--bg-white); border: 1px solid var(--border-color); border-radius: 3px; cursor: pointer; }
+.te-btn.primary { color: #fff; background: var(--accent-blue); border-color: var(--accent-blue); }
+
+/* the Test Output tab */
+.te-out-head { display: flex; align-items: center; gap: 8px; padding: 6px 12px; flex: none; border-bottom: 1px solid var(--border-color); font-size: 12px; }
+.te-out-title { font-weight: 600; color: var(--text-main); }
+.te-out-state { color: var(--text-muted); }
+.te-icon-btn { display: inline-flex; align-items: center; padding: 2px; border: 0; border-radius: 3px; background: none; font-size: 15px; color: var(--icon-gray); cursor: pointer; }
+.te-icon-btn:hover:not(:disabled), .te-icon-btn:focus-visible { background: var(--bg-panel); color: var(--text-main); }
+.te-icon-btn:disabled { opacity: 0.35; cursor: default; }
+.te-out-body { flex: 1; min-height: 0; overflow: auto; padding: 6px 12px; font-family: var(--font-mono); font-size: 12px; line-height: 1.5; user-select: text; }
+.te-empty { color: var(--text-muted); font-family: var(--font-main); padding: 10px 0; }
+.te-line { display: flex; gap: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.te-time { flex: none; color: var(--text-muted); opacity: 0.8; font-variant-numeric: tabular-nums; }
+.te-text { flex: 1; min-width: 0; }
+.te-s-err .te-text { color: var(--color-danger); }
+.te-s-sys .te-text { color: var(--text-muted); }
+
+/* the status bar item after Problems */
+#statusTestsToggle .te-status-n { margin-left: 5px; font-variant-numeric: tabular-nums; }
+
+/* the editor gutter: its own glyph classes, apart from the breakpoint's. Drawn with images so they do not depend on an icon font. */
+.te-glyph { width: 14px !important; height: 14px !important; margin-left: 2px; margin-top: 2px; cursor: pointer; background-repeat: no-repeat; background-position: center; background-size: 12px 12px; opacity: 0.85; }
+.te-glyph:hover { opacity: 1; }
+.te-glyph-idle { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 1.5v9l7.5-4.5z' fill='%231976d2'/%3E%3C/svg%3E"); }
+.te-glyph-pass { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6.5l3 3 5-6' fill='none' stroke='%2300897b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+.te-glyph-fail { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 2.5l7 7m0-7l-7 7' fill='none' stroke='%23d32f2f' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E"); }
+.te-glyph-run { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Ccircle cx='6' cy='6' r='4' fill='none' stroke='%231976d2' stroke-width='2' stroke-dasharray='6 4'/%3E%3C/svg%3E"); }
+.te-glyph-skip { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6h8' stroke='%23888' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E"); }
