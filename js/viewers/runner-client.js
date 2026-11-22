@@ -25,6 +25,7 @@
     var HANDSHAKE_MS = 6000, LOAD_GRACE_MS = 1200, RPC_MS = 30000, RETRY_AFTER_MS = 60000;
     var sessions = new WeakMap();
     var popups = [];                                                // pop-out windows we opened, as frame-like targets
+    var watched = [];                                               // extra frames (the Mini Preview's) whose page messages the app wants, like the preview frame's
     var failedUntil = 0, lastError = '';
     var status = 'unknown';
 
@@ -106,6 +107,7 @@
         if (!s || e.source !== iframe.contentWindow) {
             iframe = null; s = null; isMain = false;
             for (var i = 0; i < popups.length; i++) { if (popups[i].contentWindow === e.source) { iframe = popups[i]; s = sessions.get(iframe); break; } }
+            if (!s) { for (var j = 0; j < watched.length; j++) { if (watched[j].contentWindow === e.source) { iframe = watched[j]; s = sessions.get(iframe); break; } } }
         }
         if (!s || e.origin !== s.cfg.origin) return;
         var d = e.data;
@@ -117,7 +119,7 @@
             return;
         }
         if (d.op === 'page') {
-            if (!isMain) return;                                    // a pop-out's page is not wired to the preview panels
+            if (!isMain && watched.indexOf(iframe) === -1) return;  // a pop-out's page is not wired to the preview panels; a watched frame's is (the Mini Preview)
             // Wrapped page message: hand it to the preview code as if it had come straight from the frame.
             window.dispatchEvent(new MessageEvent('message', { data: d.data, origin: e.origin, source: iframe.contentWindow }));
             return;
@@ -370,6 +372,10 @@
         retryExec: function () { execFailedUntil = 0; execLastError = ''; },
         wipe: wipe,
         popout: popout,
+        // Ask for the page messages of one more frame (the Mini Preview's), the same way the preview frame's arrive: re-dispatched on window with
+        // the frame as their source. Nothing else about the frame changes; control messages still need its nonce.
+        watch: function (iframe) { if (iframe && watched.indexOf(iframe) === -1) watched.push(iframe); },
+        unwatch: function (iframe) { var i = watched.indexOf(iframe); if (i > -1) watched.splice(i, 1); },
         shellUrl: function () { var c = config(); return c.enabled ? c.shell : ''; },
         fail: fail,
         lastError: function () { return lastError; },

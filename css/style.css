@@ -5548,3 +5548,53 @@ html.is-pwa code, html.is-pwa samp {
 .te-glyph-fail { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 2.5l7 7m0-7l-7 7' fill='none' stroke='%23d32f2f' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E"); }
 .te-glyph-run { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Ccircle cx='6' cy='6' r='4' fill='none' stroke='%231976d2' stroke-width='2' stroke-dasharray='6 4'/%3E%3C/svg%3E"); }
 .te-glyph-skip { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6h8' stroke='%23888' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E"); }
+
+/* ===== Mini Preview (UI/UX specs, feature 15): a MINI PREVIEW section in the Now Island's Now pane. Flat rows; the preview area is the one framed element. ===== */
+.mp-sec { padding-bottom: 6px; border-bottom: 1px dashed var(--border-color); }
+.mp-head { min-height: 32px; padding-top: 6px; padding-bottom: 6px; gap: 8px; }
+.mp-head-left { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.mp-head-left > i { font-size: 14px; }
+.mp-title { white-space: nowrap; }
+.mp-src { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 1px 7px; font: inherit; font-size: 10px; font-weight: 500; letter-spacing: 0; color: var(--text-muted); background: var(--bg-panel); border: 0; border-radius: 9px; cursor: pointer; }
+.mp-src:hover, .mp-src:focus-visible { color: var(--accent-blue); }
+.mp-tools { display: flex; align-items: center; gap: 10px; flex: none; }
+.mp-sec .ni-icon-btn[aria-pressed="true"] { color: var(--accent-blue); }
+.mp-viewport { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 15px 6px; }
+.mp-viewport .sb-seg { height: 22px; }
+.mp-note { display: flex; align-items: center; gap: 8px; padding: 2px 15px 6px; font-size: 11px; color: var(--icon-yellow); }
+.mp-stage { margin: 0 15px; background: #fff; border: 1px solid var(--border-color); overflow: hidden; }
+.mp-box { margin: 0 auto; overflow: hidden; }
+.mp-frame { display: block; border: 0; background: #fff; transform-origin: 0 0; }
+.mp-grip { display: flex; align-items: center; justify-content: center; height: 10px; margin: 0 15px; cursor: ns-resize; touch-action: none; }
+.mp-grip-bar { width: 28px; height: 3px; border-radius: 3px; background: var(--border-color); }
+.mp-grip:hover .mp-grip-bar, .mp-grip:focus-visible .mp-grip-bar { background: var(--accent-blue); }
+.mp-grip:focus-visible { outline: none; }
+.mp-status { display: flex; align-items: center; gap: 12px; height: 22px; padding: 0 15px; font-size: 11px; color: var(--text-muted); }
+.mp-iso { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
+.mp-iso.ok { color: var(--color-success, #3fb950); }
+.mp-iso.warn { color: var(--color-warning, #d29922); }
+.mp-errs.has-errors { color: var(--color-danger); font-weight: 600; }
+.mp-error { display: flex; align-items: flex-start; gap: 8px; padding: 8px 15px; font-size: 12px; color: var(--text-main); }
+.mp-error > i { color: var(--color-danger); font-size: 15px; flex: none; margin-top: 1px; }
+.mp-error-text { flex: 1; min-width: 0; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.mp-error .ni-link { flex: none; }
+.mp-console { margin: 4px 0 0; background: var(--bg-panel); }
+.mp-console-head { display: flex; align-items: center; justify-content: space-between; padding: 3px 15px; }
+.mp-console-toggle { display: inline-flex; align-items: center; gap: 2px; padding: 0; border: 0; background: none; font: inherit; font-size: 11px; font-weight: 600; color: var(--text-muted); cursor: pointer; }
+.mp-console-toggle:hover, .mp-console-toggle:focus-visible { color: var(--text-main); }
+.mp-console-count { margin-left: 4px; font-weight: 500; }
+.mp-console-rows { padding: 0 15px 5px; font-family: var(--font-mono); font-size: 11px; line-height: 1.5; }
+.mp-log { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-main); }
+.mp-log.err { color: var(--color-danger); }
+.mp-log.warn { color: var(--icon-yellow); }
+.mp-log.none { color: var(--text-muted); font-family: inherit; }
+.mp-sec .ni-empty.mp-empty { flex: none; min-height: 120px; padding: 10px 24px; text-align: center; }
+.mp-eye { margin-left: 4px; font-size: 11px; color: var(--accent-blue); }
+.mp-eye[hidden] { display: none; }
+/* The touch pill: 6px above the end of a steady selection (positioned by script). */
+.mp-pill { position: fixed; z-index: 10000; padding: 4px 10px; font: inherit; font-size: 11px; font-weight: 600; color: var(--accent-blue); background: var(--bg-white); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 2px 8px var(--shadow-color); cursor: pointer; }
+.mp-pill[hidden] { display: none; }
+@media (max-width: 768px) {
+    .mp-viewport { padding-bottom: 4px; }
+    .mp-error-text { -webkit-line-clamp: 2; }
+}

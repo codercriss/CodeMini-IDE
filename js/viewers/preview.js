@@ -3136,6 +3136,29 @@ $_SERVER['REMOTE_ADDR'] = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
         });
     }
 
+    // The Mini Preview's "Open in Live Preview": show a snippet (a name that says what it is, and its text) in the dock, as if it were a file.
+    // It has no folder, so it links to nothing else in the workspace.
+    window.CodeMiniLivePreview = Object.freeze({
+        openSnippet: function (name, content) {
+            try {
+                const state = getPreviewState();
+                if (!previewContainer.classList.contains('show')) {
+                    state.navHistory = [];
+                    state.currentNavIndex = -1;
+                    lpConsoleContent.textContent = '';
+                    lpNetworkContent.textContent = '';
+                    previewContainer.classList.add('lp-snap');
+                    syncPreviewUI(state);
+                    void previewContainer.offsetWidth;
+                    previewContainer.classList.remove('lp-snap');
+                }
+                previewContainer.classList.add('show');
+                const text = String(content);
+                renderPreviewContent({ id: 'cm-mini-snippet', name: String(name), type: 'file', parentId: null, content: text, absolutePath: '/' + String(name) }, text);
+            } catch (e) { try { console.warn('[CodeMini] Could not open the snippet in the Live Preview: ' + (e && e.message)); } catch (x) { /* no console */ } }
+        }
+    });
+
     lpDockBtn.addEventListener('click', () => {
         const state = getPreviewState();
         state.isDocked = !state.isDocked;

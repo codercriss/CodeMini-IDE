@@ -752,6 +752,9 @@ require(['vs/editor/editor.main'], function() {
             window.bpDecorationRegistry[winId][fileId] = editorInstance.deltaDecorations([], decorations);
         }
 
+        // Mini Preview adds "Preview selected" to the right-click menu and the touch pill (guarded: it can never stop an editor from opening).
+        if (window.CodeMiniMiniPreview && typeof window.CodeMiniMiniPreview.attachEditor === 'function') { try { window.CodeMiniMiniPreview.attachEditor(editorInstance); } catch (e) { /* no preview action */ } }
+
         // Test Explorer puts a run / pass / fail glyph on each test line (guarded: it can never stop an editor from opening).
         if (window.CodeMiniTests && typeof window.CodeMiniTests.attachEditor === 'function') { try { window.CodeMiniTests.attachEditor(editorInstance); } catch (e) { /* no glyphs */ } }
 

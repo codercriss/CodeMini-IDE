@@ -75,6 +75,10 @@
             font-weight: 700;
         }
         
+        #niPin { font-size: 15px; }
+        #niPin[hidden] { display: none; }
+        #niPin.pinned, #niPin.pinned i { color: var(--accent-blue); }
+
         #nowIslandClose {
             cursor: pointer;
             font-size: 16px;
@@ -899,6 +903,7 @@
                     <span class="ni-tab active" data-pane="now">Now</span>
                     <span class="ni-tab" data-pane="notifications">Notifications<span class="ni-badge" id="niUnreadBadge" hidden>0</span></span>
                 </div>
+                <button type="button" class="ni-icon-btn ni-pin" id="niPin" hidden aria-pressed="true" aria-label="Keeping the island open while Mini Preview is open. Click to let it close on outside clicks" title="Keeping open while Mini Preview is open"><i class="ri-pushpin-fill"></i></button>
                 <i class="ri-layout-grid-fill" id=""></i>
                 <i class="ri-close-line" id="nowIslandClose"></i>
             </div>
@@ -1300,6 +1305,7 @@
 
     document.addEventListener('click', (e) => {
         if (panel.classList.contains('show') && !panel.contains(e.target) && (!nowIslandBtn || !nowIslandBtn.contains(e.target))) {
+            if (keepsOpen()) return; // Mini Preview is open and pinned: selecting more code in the editor must not close the island
             setOpen(false);
         }
     });
@@ -1524,7 +1530,7 @@
         const run = bg.running(), fin = bg.finished();
         secRunning.root.hidden = !run.length;
         secFinished.root.hidden = !fin.length;
-        emptyNow.hidden = run.length + fin.length > 0;
+        emptyNow.hidden = run.length + fin.length > 0 || hosted.active.size > 0;
         secRunning.badge.textContent = String(run.length);
         secFinished.badge.textContent = String(fin.length);
         reconcileRows(secRunning.list, run);
@@ -1533,6 +1539,53 @@
         peekOpen.forEach((id) => { if (!live.has(id)) peekOpen.delete(id); });
         if (viewerTask) updateLogViewer();
     }
+
+    // ---- hosting other features' sections in the Now pane (Mini Preview today; Live Collab, Today and Offline later) ----
+    // Order in the pane, top to bottom (UI/UX specs, feature 12): RUNNING > LIVE COLLAB (10) > MINI PREVIEW (20) > TODAY (30) > OFFLINE AND
+    // PACKAGES (40) > RECENTLY FINISHED. A section is built by its own feature; this only places it and tracks whether it is in use.
+    const hosted = { sections: [], active: new Set(), pinned: false, restore: new Set() };
+    const pinBtn = panel.querySelector('#niPin');
+    function keepsOpen() { return hosted.pinned && hosted.active.size > 0; }
+    function syncPin() {
+        if (!pinBtn) return;
+        pinBtn.hidden = hosted.active.size === 0;
+        pinBtn.classList.toggle('pinned', hosted.pinned);
+        pinBtn.setAttribute('aria-pressed', String(hosted.pinned));
+        const icon = pinBtn.querySelector('i'); if (icon) icon.className = hosted.pinned ? 'ri-pushpin-fill' : 'ri-pushpin-line';
+        const text = hosted.pinned ? 'Keeping the island open while a preview is open. Click to let it close on outside clicks' : 'The island closes on outside clicks. Click to keep it open while a preview is open';
+        pinBtn.setAttribute('aria-label', text); pinBtn.title = hosted.pinned ? 'Keeping open while Mini Preview is open' : 'Let it close on outside clicks';
+    }
+    if (pinBtn) pinBtn.addEventListener('click', (e) => { e.stopPropagation(); hosted.pinned = !hosted.pinned; syncPin(); });
+    function mountSection(root, order) {
+        if (!root || !nowPane || hosted.sections.some((m) => m.root === root)) return;
+        hosted.sections.push({ root, order: Number(order) || 100 });
+        hosted.sections.sort((a, b) => a.order - b.order);
+        const next = hosted.sections[hosted.sections.findIndex((m) => m.root === root) + 1];
+        nowPane.insertBefore(root, next ? next.root : secFinished.root);
+    }
+    // A hosted section says whether it is in use: the "Nothing is running" empty state steps aside, and the pin shows. A section that becomes
+    // active pins the island; the person can unpin with the header's pin button.
+    function setSectionActive(key, active) {
+        const was = hosted.active.size;
+        if (active) hosted.active.add(String(key)); else hosted.active.delete(String(key));
+        if (!was && hosted.active.size) hosted.pinned = true;
+        if (!hosted.active.size) hosted.pinned = false;
+        syncPin(); updateNowPane();
+    }
+    // Opens the island on a tab without focusing anything or hiding a task's output that is being read.
+    function openIsland(opts) {
+        const wantNotifs = !!(opts && opts.tab === 'notifications');
+        if (!panel.classList.contains('show')) setOpen(true);
+        const idx = wantNotifs ? 1 : 0;
+        if (!tabs[idx].classList.contains('active')) setActiveTab(idx);
+        if (window.saveCurrentUIState) window.saveCurrentUIState();
+    }
+    window.CodeMiniNowIsland = Object.freeze({
+        mount: mountSection, setSectionActive, open: openIsland,
+        isOpen: () => panel.classList.contains('show'),
+        setPinned: (on) => { hosted.pinned = !!on; syncPin(); }, isPinned: () => keepsOpen(),
+        onRestore: (fn) => { if (typeof fn === 'function') hosted.restore.add(fn); }
+    });
 
     // ---- "View full output": the same slide-over the notifications use (it is not a modal) ----
     function showLogViewer(id) {
@@ -1853,6 +1906,7 @@
                 setActiveTab(activeTabIndex);
                 if (!panel.classList.contains('show')) hideViewer();
                 if (bg) syncAll();
+                hosted.restore.forEach((fn) => { try { fn(); } catch (err) { /* a section's own hook must not break the switch */ } });
             };
         }
 

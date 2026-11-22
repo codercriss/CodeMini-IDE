@@ -585,6 +585,10 @@
 [data-theme-pack^="codemini-premium"] .search-bar,
 [data-theme-pack^="codemini-premium"] .te-search,
 [data-theme-pack^="codemini-premium"] .sb-segmented,
+/* Mini Preview: the source pill, the touch pill and the resize handle (all already pill-shaped or buttons; listed so they stay pills if they grow) */
+[data-theme-pack^="codemini-premium"] .mp-src,
+[data-theme-pack^="codemini-premium"] .mp-pill,
+[data-theme-pack^="codemini-premium"] .mp-grip-bar,
 [data-theme-pack^="codemini-premium"] button:not(.tab-close),
 [data-theme-pack^="codemini-premium"] .help-feedback-send-btn,
 [data-theme-pack^="codemini-premium"] .dl-action-btn,
@@ -678,7 +682,9 @@
 [data-theme-pack^="codemini-premium"] .settings-search-clear {
   border-radius: 8px !important;
 }
-[data-theme-pack^="codemini-premium"] .rel-card {
+[data-theme-pack^="codemini-premium"] .rel-card,
+/* Mini Preview's framed preview area: a card-like block (it clips the page, so the page's corners follow) */
+[data-theme-pack^="codemini-premium"] .mp-stage {
   border-radius: 14px !important;
 }
 /* The card header is a full-width <button>; keep it from picking up the pill shape of the blanket

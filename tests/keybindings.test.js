@@ -102,7 +102,7 @@ t('no two defaults clash where their scopes overlap', () => {
 t('the shortcuts that were fixed before are the defaults now', () => {
   const want = { 'file.save': ['Ctrl+S'], 'file.new': ['Alt+N'], 'tab.close': ['Alt+W'], 'notebook.runCell': ['Ctrl+Enter'], 'notebook.runAdvance': ['Shift+Enter'],
     'quickOpen.files': ['Ctrl+P'], 'quickOpen.commands': ['F1', 'Ctrl+Shift+P'], 'view.toggleSidebar': ['Ctrl+B'], 'view.toggleTerminal': ['Ctrl+`'],
-    'view.searchFiles': ['Ctrl+Shift+F'], 'editor.format': ['Shift+Alt+F'], 'tasks.runBuild': ['Ctrl+Shift+B'], 'scm.commit': ['Ctrl+Enter'] };
+    'view.searchFiles': ['Ctrl+Shift+F'], 'editor.format': ['Shift+Alt+F'], 'tasks.runBuild': ['Ctrl+Shift+B'], 'preview.selected': ['Alt+P'], 'scm.commit': ['Ctrl+Enter'] };
   assert.deepStrictEqual(Object.fromEntries(CATALOG.map((c) => [c.id, c.defaults])), want);
 });
 t('every global command has an action in the browser half, and a scoped one has none to run', () => {
