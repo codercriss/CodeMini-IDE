@@ -8,7 +8,10 @@
     const REPO = 'https://github.com/codercriss/CodeMini-IDE';
     window.APP_INFO = Object.freeze({
         name: 'CodeMini IDE',
-        version: '1.5.0',
+        version: '1.6.0',
+        // The integrated terminal's own version (the one in its banner). Raise it when the terminal gains or changes a capability.
+        // Written here only: the banners read it when they print, so a release is one edit (tests/app-info.test.js checks both).
+        terminalVersion: '1.1.0',
         build: '2026.11',
         copyright: 'Christian Forson',
         license: 'MIT',

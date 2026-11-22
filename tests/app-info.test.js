@@ -80,4 +80,27 @@ t('the other uname flags are unchanged', () => {
 t('terminal-commands.js holds no copy of the version (it would go stale at the next release)', () => {
   assert.ok(!read('js/terminal/terminal-commands.js').includes(pkg.version), 'the version is written into terminal-commands.js: read window.APP_INFO.version instead');
 });
+console.log('terminal version');
+t('APP_INFO carries the terminal\'s own version, a plain x.y.z', () => {
+  assert.ok(/^\d+\.\d+\.\d+$/.test(info.terminalVersion), 'APP_INFO.terminalVersion should look like 1.1.0, got ' + info.terminalVersion);
+});
+t('the banner that restart prints shows it, read when the command runs (a release changes app-info.js only)', () => {
+  for (const v of ['7.8.9', '10.0.0']) {
+    termWin.APP_INFO = { terminalVersion: v }; unameOut.length = 0; termCommands.restart(); // prints before its first await
+    assert.ok(unameOut.join('\n').includes('CodeMini Terminal Environment v' + v + '</div>'), 'restart banner for ' + v + ': ' + unameOut.join('|'));
+  }
+});
+t('without a terminal version the banner says no number instead of a stale one, and a hostile value is cut down', () => {
+  termWin.APP_INFO = undefined; unameOut.length = 0; termCommands.restart();
+  assert.ok(unameOut.join('\n').includes('CodeMini Terminal Environment</div>') && !/Environment v\d/.test(unameOut.join('\n')));
+  termWin.APP_INFO = { terminalVersion: '1.0<img src=x>' }; assert.ok(!/[<>]/.test(termWin.terminalVersionLabel()) && termWin.terminalVersionLabel().startsWith(' v1.0'));
+});
+t('neither banner holds a copy of the number: terminal-window.js (the first one) and terminal-commands.js (restart) both read it', () => {
+  for (const f of ['js/terminal/terminal-window.js', 'js/terminal/terminal-commands.js']) {
+    const s = read(f);
+    assert.ok(!/Terminal Environment v\d/.test(s), f + ' writes a terminal version by hand: use window.terminalVersionLabel()');
+    assert.ok(s.includes('terminalVersionLabel'), f + ' does not read the terminal version');
+  }
+});
+
 console.log(`\n${n} app-info checks passed`);

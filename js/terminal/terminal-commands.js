@@ -44,6 +44,13 @@ window.makeTerminalPyPackages = function (printTerm, dbGetDirFiles, getCurrentFo
     };
 };
 
+// The terminal's own version as " v1.1.0" for a banner, or nothing when APP_INFO does not carry one (better no number than a stale one).
+// APP_INFO.terminalVersion in app-info.js is the only place it is written; this is read each time a banner prints.
+window.terminalVersionLabel = function () {
+    const v = window.APP_INFO && window.APP_INFO.terminalVersion;
+    return v ? ' v' + String(v).replace(/[^0-9A-Za-z.+-]/g, '') : '';
+};
+
 window.getTerminalCommands = function(
     printTerm, dbGetDirFiles, getCurrentFolderId, dbGetAll, dbPut, dbDelete,
     updateCWD, getPathString, checkUnlock, blockBinary, executeFile,
@@ -1506,7 +1513,7 @@ window.getTerminalCommands = function(
             if (typeof clearState === 'function') clearState();
             termState.commandHistory = []; termState.folderStack = [{ id: 'root', name: 'CodeMini' }]; 
             termState.aliases = { 'ted': 'mini', 'nan': 'mini', 'edit': 'mini', 'll': 'ls -l', 'la': 'ls -la', 'cls': 'clear' }; termState.envVars = {};
-            output.innerHTML = ''; printTerm('<div style="color: #4caf50;">CodeMini Terminal Environment v1.0.0</div><div style="margin-bottom: 8px; color: #9e9e9e;">Terminal wiped and restarted.</div>', true); updateCWD();
+            output.innerHTML = ''; printTerm('<div style="color: #4caf50;">CodeMini Terminal Environment' + window.terminalVersionLabel() + '</div><div style="margin-bottom: 8px; color: #9e9e9e;">Terminal wiped and restarted.</div>', true); updateCWD();
         },
         calc: async (args) => {
             if(!args[1]) return printTerm('calc: missing expression');

@@ -1022,6 +1022,23 @@ document.addEventListener('DOMContentLoaded', () => {
   // Text is trusted, static markup (it carries <strong> and entities), so it is not escaped.
   const _RELEASES = [
     {
+      version: '1.6.0', icon: 'ri-flask-line', date: '22 Nov 2026',
+      summary: 'Test Explorer, Tasks, Python packages everywhere, background work in Now Island, and editable shortcuts.',
+      features: [
+        '<strong>Test Explorer:</strong> finds the tests in a workspace and runs them in the isolated runner, as a tree of files, suites and tests, with Run all, Stop, a filter, and counts of passed, failed and skipped. It reads JavaScript and Python tests.',
+        '<strong>Tasks:</strong> named commands to build, test or run, kept in .codemini/tasks.json so they travel with the project. They are grouped as Build, Test and Custom, and a pinned task stays at the top.',
+        '<strong>A workspace can carry its own setup</strong> in a .codemini folder: tasks, test patterns, and a settings.json that overrides your display and editor settings for as long as that workspace is open.',
+        '<strong>Now Island shows background work:</strong> Git, the Console, the Terminal, notebooks and tasks are listed under Running and Recently finished, each with Peek, Go to and Stop where they apply.',
+        '<strong>Python packages everywhere:</strong> !pip install, auto-install and a pip command now work in the Console, editor Run, Debug, Terminal and Tasks, not only in notebooks.',
+        '<strong>Terminal v1.1.0:</strong> new pip, pip3 and python -m pip commands, its runs show in Now Island, and its banner now says its own version. uname still shows the app version.',
+        '<strong>Keyboard shortcut editor, Snippets and Settings (JSON):</strong> change shortcuts in Settings, keep snippets per language, and edit every setting as JSON with live checks.',
+        '<strong>Status bar colors:</strong> choose the status bar background and text colors, with a Reset button.',
+        '<strong>Revert from a diff, and diff tabs come back:</strong> revert a Git change hunk by hunk, and Restore Session reopens diff tabs.',
+        '<strong>Content and usage rules:</strong> USAGE.md says what CodeMini is meant to host and what it treats as unacceptable content.',
+        '<strong>Smaller fixes:</strong> every sidebar title now looks the same, Test Explorer and the pinned-task Peek panel follow the Premium theme packs, and ZIP downloads and Move to Root were fixed.'
+      ]
+    },
+    {
       version: '1.5.0', icon: 'ri-history-line', date: '8 Nov 2026',
       summary: 'Quick Open, a diff editor, Local History with a resizable Timeline, hot exit, and git in the terminal.',
       features: [

@@ -128,9 +128,12 @@
                             }
                         } else {
                             output.innerHTML = `
-                                <div style="margin-bottom: 4px; color: #4caf50;">CodeMini Terminal Environment v1.0.0</div>
+                                <div style="margin-bottom: 4px; color: #4caf50;">CodeMini Terminal Environment<span class="term-version"></span></div>
                                 <div style="margin-bottom: 8px; color: #9e9e9e;">Type <span style="color:#2196f3;">'help'</span> for a categorized list of commands.</div>
                             `;
+                            // The version goes in as text, after the markup above, so nothing is built into that HTML.
+                            const termVer = output.querySelector('.term-version');
+                            if (termVer) termVer.textContent = window.terminalVersionLabel ? window.terminalVersionLabel() : '';
                         }
                     };
 

@@ -8,7 +8,7 @@
 No backend. No account. No build step.
 
 [![Live app](https://img.shields.io/badge/live-codemini--ide.vercel.app-3b82f6)](https://codemini-ide.vercel.app/)
-[![Version](https://img.shields.io/badge/version-1.5.0-informational)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.6.0-informational)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![PWA](https://img.shields.io/badge/PWA-installable-5a0fc8)](https://codemini-ide.vercel.app/)
 
@@ -186,6 +186,8 @@ Scripts are plain `<script>` tags, so **load order in `index.html` matters**. Wh
 1. Update the tag in `index.html`.
 2. Update `STATIC_ASSETS` in `sw.js`.
 3. Bump `CACHE_NAME` in `sw.js` so installed copies refresh. This means bumping `version` in `package.json` and `js/core/app-info.js` too; `npm test` checks they match.
+
+The terminal has its own version (`terminalVersion` in `js/core/app-info.js`, the number in its banner). Raise it when the terminal gains or changes a capability; the banners read it, and `npm test` fails if one holds a number written by hand. The runner has a third one (`version` in `runner/config.js`, with `RUNNER_NEEDS` in `js/viewers/runner-client.js`): raise it only when the app starts to depend on something new in the runner.
 
 CI fails if a precached path does not exist.
 
