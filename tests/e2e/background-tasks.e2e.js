@@ -47,8 +47,8 @@ const NOISE = /monaco|pyodide|loadPyodide|initSqlJs|Failed to fetch|net::|requir
   await openIsland();
   ok(await ev(() => { const e = document.querySelector('.ni-pane[data-pane="now"] .ni-empty'); return !!e && !e.hidden && /Nothing is running/.test(e.textContent); }), 'the Now pane says nothing is running');
   ok(await ev(() => document.querySelector(RUN).hidden && document.querySelector(FIN).hidden), 'and shows no sections');
-  ok(await ev(() => { const r = document.getElementById('nowIslandPanel').getBoundingClientRect(); return Math.round(r.height) >= 290 && Math.round(r.height) <= 292; }), 'the panel is 290px tall when there is little to show', await rect('#nowIslandPanel'));
-  ok(await ev(() => { const e = document.querySelector('.ni-pane[data-pane="now"] .ni-empty').getBoundingClientRect(), p = document.querySelector('.ni-pane[data-pane="now"]').getBoundingClientRect(); return Math.abs((e.top + e.height / 2) - (p.top + p.height / 2)) < 3; }), 'the empty state is centred in it');
+  ok(await ev(() => { const r = document.getElementById('nowIslandPanel').getBoundingClientRect(); return Math.round(r.height) >= 290 && Math.round(r.height) <= 0.72 * 800 + 2; }), 'the panel is at least 290px tall when there is little to show (it grows, to 72vh, with the always-there Offline and Packages section)', await rect('#nowIslandPanel'));
+  ok(await ev(() => { const e = document.querySelector('.ni-pane[data-pane="now"] .ni-empty').getBoundingClientRect(), p = document.querySelector('.ni-pane[data-pane="now"]').getBoundingClientRect(), o = document.querySelector('.off-sec').getBoundingClientRect(); return Math.abs((e.top + e.height / 2) - (o.bottom + p.bottom) / 2) < 3; }), 'the empty state is centred in the space left below the sections');
   await closeIsland();
 
   console.log('\n[2] a quick task leaves no trace, a slow one appears');
@@ -245,7 +245,7 @@ const NOISE = /monaco|pyodide|loadPyodide|initSqlJs|Failed to fetch|net::|requir
   ok(await ev(() => !window.CodeMiniBackground.isPinned(window.__t['Phone1'].id)), 'a swipe to the right dismisses a panel');
   await openIsland();
   const ph = await rect('#nowIslandPanel');
-  ok(ph.h >= 340 && ph.h <= 342 && ph.l === 55 && ph.r === 10, 'the island keeps its phone place and its 340px minimum', ph);
+  ok(ph.h >= 340 && ph.h <= 0.6 * 800 + 2 && ph.l === 55 && ph.r === 10, 'the island keeps its phone place and its 340px minimum (it grows, to at most 60vh, with the always-there Offline and Packages section)', ph);
   await ev(() => { for (let i = 0; i < 30; i++) window.CodeMiniBackground.start({ kind: 'run', title: 'Bulk ' + i, isHidden: () => true }); }); await sleep(300);
   const grown = await ev(() => { const p = document.getElementById('nowIslandPanel'), pane = document.querySelector('.ni-pane[data-pane="now"]'); return { h: Math.round(p.getBoundingClientRect().height), vh: innerHeight, scroll: pane.scrollHeight > pane.clientHeight + 5 }; });
   ok(grown.h <= Math.round(grown.vh * 0.6) + 1 && grown.h > 340 && grown.scroll, 'with 30 tasks it grows to at most 60vh and the list scrolls inside', grown);

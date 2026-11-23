@@ -323,6 +323,17 @@
             color: var(--text-main);
         }
 
+        /* A feature's own view (Offline and Packages): rows run edge to edge and the feature keeps its own toolbar and footer, so the
+           content box has no padding and does not scroll itself. */
+        .ni-viewer-content.ni-viewer-custom {
+            display: flex;
+            flex-direction: column;
+            padding: 0;
+            overflow: hidden;
+        }
+        /* While such a view is open the island is tall enough to browse a list in. */
+        #nowIslandPanel.ni-tall { min-height: min(520px, 72vh); }
+
         .ni-viewer-time {
             margin-bottom: 8px;
             font-size: 11px;
@@ -861,6 +872,7 @@
                 min-height: 340px; /* the app's existing phone height is the minimum; it grows (to 60vh) only when there is content */
                 max-height: 60vh;
             }
+            #nowIslandPanel.ni-tall { min-height: 60vh; }
 
             /* Pinned Peek panels become a strip above the status bar, beside the activity bar, like the island itself. */
             #niPeekDock {
@@ -929,6 +941,7 @@
     const badge = panel.querySelector('#niUnreadBadge');
     const listeners = new Set();
     let openViewerId = null;
+    let customView = null; // a feature's own slide-over view (Offline and Packages' package list): { teardown }
     let viewerTask = null; // id of the background task whose full output the viewer shows (the viewer serves notifications and task output)
 
     function loadNotifications() {
@@ -1251,6 +1264,8 @@
     }
 
     function hideViewer() {
+        if (customView) { const done = customView.teardown; customView = null; try { if (done) done(); } catch (e) { /* a view's own cleanup must not break closing */ } }
+        panel.classList.remove('ni-tall');
         openViewerId = null;
         viewerTask = null;
         viewer._lv = null;
@@ -1261,6 +1276,7 @@
 
     // ---- panel + tabs ----
     function setOpen(open) {
+        if (open && !panel.classList.contains('show')) setTimeout(() => hosted.opened.forEach((fn) => { try { fn(); } catch (err) { /* a section's own hook must not break opening */ } }), 0);
         panel.classList.toggle('show', open);
         if (open) dismissAllToasts();
         if (!open) hideViewer();
@@ -1304,6 +1320,9 @@
     });
 
     document.addEventListener('click', (e) => {
+        // A click on something the panel itself just re-drew (a row that rebuilds its list when tapped) arrives here with a target that is no longer
+        // in the document, so it cannot be told from a click outside: it is not one.
+        if (e.target && e.target.isConnected === false) return;
         if (panel.classList.contains('show') && !panel.contains(e.target) && (!nowIslandBtn || !nowIslandBtn.contains(e.target))) {
             if (keepsOpen()) return; // Mini Preview is open and pinned: selecting more code in the editor must not close the island
             setOpen(false);
@@ -1311,7 +1330,7 @@
     });
 
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && (openViewerId || viewerTask) && panel.classList.contains('show')) hideViewer();
+        if (e.key === 'Escape' && (openViewerId || viewerTask || customView) && panel.classList.contains('show')) hideViewer();
     });
 
     // Another tab of the app added or removed something.
@@ -1543,7 +1562,7 @@
     // ---- hosting other features' sections in the Now pane (Mini Preview today; Live Collab, Today and Offline later) ----
     // Order in the pane, top to bottom (UI/UX specs, feature 12): RUNNING > LIVE COLLAB (10) > MINI PREVIEW (20) > TODAY (30) > OFFLINE AND
     // PACKAGES (40) > RECENTLY FINISHED. A section is built by its own feature; this only places it and tracks whether it is in use.
-    const hosted = { sections: [], active: new Set(), pinned: false, restore: new Set() };
+    const hosted = { sections: [], active: new Set(), pinned: false, restore: new Set(), opened: new Set() };
     const pinBtn = panel.querySelector('#niPin');
     function keepsOpen() { return hosted.pinned && hosted.active.size > 0; }
     function syncPin() {
@@ -1556,6 +1575,8 @@
         pinBtn.setAttribute('aria-label', text); pinBtn.title = hosted.pinned ? 'Keeping open while Mini Preview is open' : 'Let it close on outside clicks';
     }
     if (pinBtn) pinBtn.addEventListener('click', (e) => { e.stopPropagation(); hosted.pinned = !hosted.pinned; syncPin(); });
+    // (A section that is always there, like Offline and Packages, is just mounted: the "Nothing is running" placeholder keeps standing in for
+    // RUNNING and RECENTLY FINISHED, below it. Whether it goes once Today is there is feature 12's decision.)
     function mountSection(root, order) {
         if (!root || !nowPane || hosted.sections.some((m) => m.root === root)) return;
         hosted.sections.push({ root, order: Number(order) || 100 });
@@ -1580,8 +1601,28 @@
         if (!tabs[idx].classList.contains('active')) setActiveTab(idx);
         if (window.saveCurrentUIState) window.saveCurrentUIState();
     }
+    // A feature's own full-island view, in the same slide-over the notifications and task output use (it is not a modal). `build(content, api)`
+    // fills `content` and may return a function that is called when the view closes. Escape and the Back arrow close it.
+    function openCustomView(opts) {
+        hideViewer();
+        customView = { teardown: null };
+        viewer.setAttribute('aria-label', String(opts.label || opts.title || 'Details'));
+        viewer.textContent = '';
+        const header = el('div', 'ni-viewer-header');
+        const left = el('div', 'ni-viewer-left');
+        const title = el('div', 'ni-viewer-title', String(opts.title || ''));
+        left.append(iconButton('ri-arrow-left-line', 'Back', 'ni-viewer-back', hideViewer), title);
+        header.appendChild(left);
+        const content = el('div', 'ni-viewer-content ni-viewer-custom');
+        const done = opts.build(content, { close: hideViewer, setTitle: (t) => { title.textContent = String(t); } });
+        if (customView) customView.teardown = typeof done === 'function' ? done : null;
+        viewer.append(header, content);
+        viewer.classList.add('show');
+        panel.classList.add('ni-tall');
+    }
     window.CodeMiniNowIsland = Object.freeze({
-        mount: mountSection, setSectionActive, open: openIsland,
+        mount: mountSection, setSectionActive, open: openIsland, openView: openCustomView, closeView: () => { if (customView) hideViewer(); }, isViewOpen: () => !!customView,
+        onOpen: (fn) => { if (typeof fn === 'function') hosted.opened.add(fn); },
         isOpen: () => panel.classList.contains('show'),
         setPinned: (on) => { hosted.pinned = !!on; syncPin(); }, isPinned: () => keepsOpen(),
         onRestore: (fn) => { if (typeof fn === 'function') hosted.restore.add(fn); }

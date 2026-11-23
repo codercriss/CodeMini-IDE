@@ -5598,3 +5598,65 @@ html.is-pwa code, html.is-pwa samp {
     .mp-viewport { padding-bottom: 4px; }
     .mp-error-text { -webkit-line-clamp: 2; }
 }
+
+/* ===== Offline and Packages (UI/UX specs, feature 13): a section in the Now Island's Now pane and a full-island drill-in. Flat rows, 2px lines. ===== */
+@keyframes off-spin { to { transform: rotate(360deg); } }
+.off-sec { padding-bottom: 4px; }
+.off-head { padding-top: 10px; }
+.off-body[hidden] { display: none; }
+.off-toggle { display: inline-flex; align-items: center; gap: 2px; padding: 0; border: 0; background: none; font: inherit; letter-spacing: inherit; color: inherit; cursor: pointer; }
+.off-toggle:hover, .off-toggle:focus-visible { color: var(--text-main); }
+.off-word { font-size: 10px; font-weight: 700; letter-spacing: 0.3px; white-space: nowrap; }
+.off-word.ok { color: var(--accent-new); } .off-word.warn { color: var(--icon-yellow); } .off-word.bad { color: var(--color-danger); }
+.off-row { position: relative; min-height: 36px; padding: 6px 15px; border-bottom: 1px dashed var(--border-color); background: var(--bg-white); }
+.off-row-main { display: flex; align-items: center; gap: 8px; min-height: 24px; }
+.off-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.off-main-text { font-size: 12px; color: var(--text-main); }
+.off-sub { font-size: 11px; color: var(--text-muted); }
+.off-row.warn .off-main-text { color: var(--icon-yellow); }
+.off-line { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: transparent; }
+.off-line-fill { height: 100%; background: var(--accent-new); transition: width 0.3s ease; }
+.off-line-fill.blue { background: var(--accent-blue); } .off-line-fill.yellow { background: var(--icon-yellow); } .off-line-fill.danger { background: var(--color-danger); }
+.off-pkg .off-line-fill { background: var(--accent-blue); }
+.off-ico { font-size: 16px; flex: none; }
+.off-ico.off-new { color: var(--accent-new); } .off-ico.off-blue { color: var(--accent-blue); } .off-ico.off-yellow { color: var(--icon-yellow); } .off-ico.off-muted { color: var(--text-muted); } .off-ico.off-danger { color: var(--color-danger); }
+.ri-loader-4-line.off-ico { animation: off-spin 1s linear infinite; }
+.off-sec .ni-link:disabled, .off-foot .ni-link:disabled, .off-actions .ni-link:disabled { opacity: 0.45; cursor: default; }
+.off-sec .ni-link.danger:hover, .off-actions .ni-link.danger:hover, .off-foot .ni-link.danger:hover { color: var(--color-danger); }
+/* the drill-in */
+.off-toolbar { flex: none; display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 4px 15px; border-bottom: 1px solid var(--border-color); }
+.off-toolbar .sb-seg { height: 22px; white-space: nowrap; }
+.off-search { flex: 1; min-width: 0; height: 28px; padding: 0 4px; font: inherit; font-size: 12px; color: var(--text-main); background: transparent; border: 0; border-bottom: 1px solid var(--border-color); border-radius: 0; outline: none; }
+.off-search:focus { border-bottom-color: var(--accent-blue); }
+.off-scroll { flex: 1; min-height: 0; overflow-y: auto; }
+.off-group { padding-top: 12px; }
+.off-kv { display: flex; align-items: center; gap: 8px; padding: 5px 15px; font-size: 12px; border-bottom: 1px dashed var(--border-color); }
+.off-k { flex: none; width: 92px; color: var(--text-muted); } .off-v { flex: 1; min-width: 0; overflow-wrap: anywhere; color: var(--text-main); }
+.off-pkg { border-bottom: 1px dashed var(--border-color); position: relative; }
+.off-pkg:hover { background: var(--bg-panel); }
+.off-pkg-main { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 5px 15px; font: inherit; text-align: left; color: inherit; background: none; border: 0; cursor: pointer; }
+.off-pkg-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.off-pkg-l1 { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.off-pkg-name { font-size: 12px; font-weight: 600; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.off-pill { flex: none; padding: 0 6px; font-size: 10px; line-height: 16px; color: var(--text-muted); background: var(--bg-panel); border-radius: 8px; }
+.off-pkg-l2 { font-size: 10px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.off-pkg-size { flex: none; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.off-chev { flex: none; font-size: 16px; color: var(--text-muted); }
+.off-detail { padding: 2px 15px 10px 41px; font-size: 11px; color: var(--text-main); }
+.off-note { margin: 0 0 6px; line-height: 1.5; color: var(--text-muted); } .off-note.danger { color: var(--color-danger); }
+.off-rels { margin: 4px 0 6px; }
+.off-rel { position: relative; margin-left: 4px; padding: 2px 0 4px 14px; border-left: 1px dashed var(--border-color); }
+.off-rel::before { content: ''; position: absolute; left: 0; top: 11px; width: 10px; border-top: 1px dashed var(--border-color); }
+.off-rel-title { font-size: 10px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; color: var(--text-muted); }
+.off-rel-list { margin: 2px 0 0; padding: 0; list-style: none; } .off-rel-list li { padding: 1px 0; }
+.off-files { margin: 2px 0 6px; } .off-files summary { cursor: pointer; color: var(--text-muted); }
+.off-file-list { margin: 4px 0 0; padding: 0; list-style: none; font-family: var(--font-mono); font-size: 10px; }
+.off-file-list li { display: flex; gap: 6px; align-items: baseline; padding: 1px 0; overflow-wrap: anywhere; } .off-file-list i { flex: none; font-size: 12px; }
+.off-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin-top: 4px; }
+.off-confirm-text { font-size: 11px; color: var(--text-main); }
+.off-empty { padding: 24px 15px; text-align: center; font-size: 12px; color: var(--text-muted); }
+.off-foot { flex: none; padding: 8px 15px 10px; border-top: 1px solid var(--border-color); background: var(--bg-white); }
+.off-foot-msg { margin-bottom: 6px; font-size: 11px; color: var(--text-muted); } .off-foot-msg.danger { color: var(--color-danger); }
+.off-foot-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; }
+.off-foot .ni-btn:disabled { opacity: 0.5; cursor: default; }
+@media (max-width: 768px) { .off-detail { padding-left: 15px; } .off-k { width: 80px; } }
