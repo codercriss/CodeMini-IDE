@@ -236,7 +236,7 @@ const action = (page) => page.evaluate(() => window.__ed.__actions.find((a) => a
   ok(await page.evaluate(() => document.querySelector('.mp-sec').hidden && !document.querySelector('.mp-frame')), 'Close removes the section and the frame');
   ok(await page.evaluate(() => document.getElementById('niPin').hidden && document.getElementById('nowIsland').querySelector('.mp-eye').hidden), 'the pin and the eye go');
   await page.evaluate(() => document.getElementById('nowIsland').click()); await sleep(300);
-  ok(await page.evaluate(() => !document.querySelector('.ni-empty:not(.mp-empty)').hidden), '"Nothing is running" comes back');
+  ok(await page.evaluate(() => !document.querySelector('.mp-sec') || document.querySelector('.mp-sec').hidden), 'with the Mini Preview closed, its section is gone from the pane (Today and Offline stay)');
   ok(errors.length === 0, 'no page errors', errors);
   await ctx.close();
 

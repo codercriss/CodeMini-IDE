@@ -42,6 +42,8 @@ const STATIC_ASSETS = [
     '/js/core/now-island.js',
     '/js/core/mini-preview.js',
     '/js/core/offline.js',
+    '/js/data/quotes.js',
+    '/js/core/today.js',
     '/js/core/app-alerts.js',
     '/js/notebook/notebook-kernels.js',
     '/js/notebook/notebook-ui.js',

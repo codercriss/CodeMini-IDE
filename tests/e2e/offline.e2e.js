@@ -69,7 +69,7 @@ const openView = async (page) => { await page.evaluate(() => CodeMiniOffline.ope
   ok(await page.evaluate(() => document.querySelectorAll('.off-sec .off-row').length === 3), 'three summary rows: Packages, Storage, App');
   ok(/ of .* used/.test((await page.evaluate(() => document.querySelectorAll('.off-sec .off-main-text')[1].textContent))), 'the Storage row says how much is used');
   ok(/Not installed as an app/.test(await page.evaluate(() => document.querySelectorAll('.off-sec .off-main-text')[2].textContent)), 'the App row says it is not installed');
-  ok(await page.evaluate(() => { const e = document.querySelector('.ni-empty'), o = document.querySelector('.off-sec'); return /Nothing is running/.test(e.textContent) && !e.hidden && !!(o.compareDocumentPosition(e) & Node.DOCUMENT_POSITION_FOLLOWING); }), '"Nothing is running" still stands in for RUNNING, below the section (it is not this feature\'s to change)');
+  ok(await page.evaluate(() => document.querySelector('.ni-empty').hidden && !!document.querySelector('.off-sec')), 'the "Nothing is running" placeholder is retired once an always-there section is in the pane');
   ok(await page.evaluate(() => { const rows = [...document.querySelectorAll('.off-sec .off-row')]; return rows.every((r) => getComputedStyle(r).borderBottomStyle === 'dashed') && rows.every((r) => r.getBoundingClientRect().height >= 35); }), 'flat rows: dashed dividers, at least 36px');
   ok(await page.evaluate(() => { const l = document.querySelector('.off-sec .off-line'); return !!l && l.getBoundingClientRect().height === 2; }), 'with a 2px progress line');
 

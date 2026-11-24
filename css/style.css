@@ -5660,3 +5660,31 @@ html.is-pwa code, html.is-pwa samp {
 .off-foot-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; }
 .off-foot .ni-btn:disabled { opacity: 0.5; cursor: default; }
 @media (max-width: 768px) { .off-detail { padding-left: 15px; } .off-k { width: 80px; } }
+
+/* ===== Today in the Now Island (UI/UX specs, feature 12): the time, the day and date, and a quote. No box, no bar: flat text under a section header. ===== */
+.today-sec { padding-bottom: 6px; border-bottom: 1px dashed var(--border-color); }
+.today-toggle { display: inline-flex; align-items: center; gap: 2px; padding: 0; border: 0; background: none; font: inherit; letter-spacing: inherit; color: inherit; cursor: pointer; }
+.today-toggle:hover, .today-toggle:focus-visible { color: var(--text-main); }
+.today-body[hidden] { display: none; }
+.today-clock { display: flex; align-items: flex-end; gap: 14px; padding: 0 15px 4px; }
+@supports (align-items: last baseline) { .today-clock { align-items: last baseline; } .today-dates { padding-bottom: 0; } }
+.today-time { font-size: 28px; font-weight: 600; line-height: 1.15; font-variant-numeric: tabular-nums; color: var(--text-main); white-space: nowrap; }
+.today-period { font-size: 13px; font-weight: 600; color: var(--text-muted); }
+.today-dates { display: flex; flex-direction: column; min-width: 0; padding-bottom: 4px; }
+.today-day { font-size: 13px; font-weight: 600; line-height: 1.3; color: var(--text-main); }
+.today-date { font-size: 11px; line-height: 1.3; color: var(--text-muted); }
+.today-quote { padding: 4px 15px 0; }
+.today-quote[hidden] { display: none; }
+.today-quote-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; font-size: 12px; font-style: italic; line-height: 1.5; color: var(--text-main); cursor: pointer; overflow-wrap: anywhere; }
+.today-quote-text.open { display: block; -webkit-line-clamp: unset; overflow: visible; }
+.today-quote-text:focus-visible { outline: 1px solid var(--accent-blue); outline-offset: 2px; }
+.today-quote-foot { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-top: 3px; min-height: 22px; }
+.today-attr { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--text-muted); text-align: right; }
+.today-tools { display: inline-flex; align-items: center; gap: 4px; flex: none; opacity: 0; transition: opacity 0.15s ease; }
+.today-tools .ni-icon-btn { font-size: 14px; }
+.today-tools .ni-icon-btn[aria-pressed="true"] { color: var(--accent-blue); }
+.today-quote:hover .today-tools, .today-quote:focus-within .today-tools { opacity: 1; }
+@media (hover: none) { .today-tools { opacity: 1; } }
+.today-note { padding: 2px 15px 0; font-size: 11px; line-height: 1.4; color: var(--text-muted); }
+.today-note[hidden] { display: none; }
+@media (max-width: 768px) { .today-quote-text { -webkit-line-clamp: 2; } }

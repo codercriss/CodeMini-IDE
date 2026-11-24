@@ -1549,7 +1549,7 @@
         const run = bg.running(), fin = bg.finished();
         secRunning.root.hidden = !run.length;
         secFinished.root.hidden = !fin.length;
-        emptyNow.hidden = run.length + fin.length > 0 || hosted.active.size > 0;
+        emptyNow.hidden = run.length + fin.length > 0 || hosted.active.size > 0 || hosted.always.size > 0;
         secRunning.badge.textContent = String(run.length);
         secFinished.badge.textContent = String(fin.length);
         reconcileRows(secRunning.list, run);
@@ -1562,7 +1562,7 @@
     // ---- hosting other features' sections in the Now pane (Mini Preview today; Live Collab, Today and Offline later) ----
     // Order in the pane, top to bottom (UI/UX specs, feature 12): RUNNING > LIVE COLLAB (10) > MINI PREVIEW (20) > TODAY (30) > OFFLINE AND
     // PACKAGES (40) > RECENTLY FINISHED. A section is built by its own feature; this only places it and tracks whether it is in use.
-    const hosted = { sections: [], active: new Set(), pinned: false, restore: new Set(), opened: new Set() };
+    const hosted = { sections: [], active: new Set(), always: new Set(), pinned: false, restore: new Set(), opened: new Set() };
     const pinBtn = panel.querySelector('#niPin');
     function keepsOpen() { return hosted.pinned && hosted.active.size > 0; }
     function syncPin() {
@@ -1575,10 +1575,11 @@
         pinBtn.setAttribute('aria-label', text); pinBtn.title = hosted.pinned ? 'Keeping open while Mini Preview is open' : 'Let it close on outside clicks';
     }
     if (pinBtn) pinBtn.addEventListener('click', (e) => { e.stopPropagation(); hosted.pinned = !hosted.pinned; syncPin(); });
-    // (A section that is always there, like Offline and Packages, is just mounted: the "Nothing is running" placeholder keeps standing in for
-    // RUNNING and RECENTLY FINISHED, below it. Whether it goes once Today is there is feature 12's decision.)
-    function mountSection(root, order) {
+    // opts.always: a section that is always there (Today, Offline and Packages). Once one is, the Now pane is never empty, so its "Nothing is
+    // running" placeholder (which only stood in for an empty pane) is not needed: no RUNNING section already says nothing is running.
+    function mountSection(root, order, opts) {
         if (!root || !nowPane || hosted.sections.some((m) => m.root === root)) return;
+        if (opts && opts.always) { hosted.always.add(root); updateNowPane(); }
         hosted.sections.push({ root, order: Number(order) || 100 });
         hosted.sections.sort((a, b) => a.order - b.order);
         const next = hosted.sections[hosted.sections.findIndex((m) => m.root === root) + 1];

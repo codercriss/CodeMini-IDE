@@ -754,7 +754,7 @@
     function init() {
         const n = NI(); if (!n) return;
         buildSection();
-        n.mount(ui.root, 40);
+        n.mount(ui.root, 40, { always: true });
         n.onOpen(() => refresh());
         W.addEventListener('online', draw); W.addEventListener('offline', draw);
         refresh();

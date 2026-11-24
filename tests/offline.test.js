@@ -222,9 +222,9 @@ await t('the script loads after the Now Island, is precached, and is in npm test
   assert.ok(read('sw.js').includes("'/js/core/offline.js'"));
   assert.ok(JSON.parse(read('package.json')).scripts.test.includes('tests/offline.test.js'));
 });
-await t('it mounts at order 40, and uses the island\'s own slide-over (not a modal)', () => {
+await t('it mounts at order 40 as an always-there section, and uses the island\'s own slide-over (not a modal)', () => {
   const src = read('js/core/offline.js'), ni = read('js/core/now-island.js');
-  assert.ok(/n\.mount\(ui\.root, 40\)/.test(src) && /n\.openView\(\{/.test(src));
+  assert.ok(/n\.mount\(ui\.root, 40, \{ always: true \}\)/.test(src) && /n\.openView\(\{/.test(src));
   assert.ok(/openView: openCustomView/.test(ni) && /ni-viewer-custom/.test(ni));
   assert.ok(/onOpen:/.test(ni), 'the section re-reads the caches whenever the island opens');
   assert.ok(/e\.target\.isConnected === false\) return;/.test(ni), 'a click on a row the panel re-drew is not an outside click');
