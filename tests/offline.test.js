@@ -13,17 +13,20 @@ const flat = (items) => items.flatMap((i) => (i.u ? [i.u] : i.any.flat().flatMap
 
 (async () => {
 console.log('the catalogue');
-await t('ids are unique, groups are known, and every package says what needs it', () => {
+await t('ids are unique, sections are known, and every package says what needs it', () => {
   const ids = O.PACKAGES.map((p) => p.id);
   assert.strictEqual(new Set(ids).size, ids.length);
   O.PACKAGES.forEach((p) => {
-    assert.ok(O.GROUPS.includes(p.group), p.id + ' group ' + p.group);
+    assert.ok(O.SECTIONS.includes(p.section), p.id + ' section ' + p.section);
+    assert.strictEqual(!!p.required, p.section === 'CORE', p.id + ': exactly the CORE components are required');
     assert.ok(['full', 'core', 'entry'].includes(p.coverage), p.id + ' coverage');
     assert.ok(p.neededBy.length > 0 && p.name && p.version, p.id + ' text');
     p.dependsOn.forEach((d) => assert.ok(O.byId(d), p.id + ' depends on a package that exists: ' + d));
     (p.surfaces || []).forEach((s) => assert.ok(['preview', 'notebooks', 'console', 'terminal'].includes(s), p.id + ' surface ' + s));
   });
-  O.GROUPS.forEach((g) => assert.ok(O.PACKAGES.some((p) => p.group === g), 'group ' + g + ' has a package'));
+  O.SECTIONS.forEach((g) => assert.ok(O.PACKAGES.some((p) => p.section === g), 'section ' + g + ' has a package'));
+  assert.deepStrictEqual(O.SECTIONS, ['LANGUAGES AND RUNTIMES', 'EDITING', 'VIEWERS', 'CORE'], 'the Components tab\'s four groups, in the spec\'s order');
+  assert.deepStrictEqual(O.SECTIONS.map((x) => O.PACKAGES.filter((p) => p.section === x).map((p) => p.id).sort().join()), ['opal,php,pyodide,sqljs,webr', 'babel,emmet', 'archive-wasm,fflate,ghmd,marked,pdfjs', 'diff,fontawesome,jszip,monaco,remixicon']);
 });
 await t('"loaded" is told by a global the library defines, and every such name is a plain identifier', () => {
   const withGlobal = O.PACKAGES.filter((p) => p.global).map((p) => p.id);
@@ -197,9 +200,9 @@ await t('filters and search, and the groups come out in the spec\'s order with e
   assert.deepStrictEqual(O.filterRows(rs, 'none', '').map((r) => r.pkg.id), ['pyodide', 'opal']);
   assert.deepStrictEqual(O.filterRows(rs, 'issues', '').map((r) => r.pkg.id), ['webr', 'sqljs']);
   assert.deepStrictEqual(O.filterRows(rs, 'all', ' PYO ').map((r) => r.pkg.id), ['pyodide'], 'by name, any case');
-  assert.deepStrictEqual(O.filterRows(rs, 'all', 'r notebooks').map((r) => r.pkg.id), ['webr'], 'by group');
+  assert.deepStrictEqual(O.filterRows(rs, 'all', 'languages and').map((r) => r.pkg.id), ['pyodide', 'webr', 'sqljs', 'opal', 'php'], 'by section');
   assert.deepStrictEqual(O.filterRows(rs, 'all', 'cdn.opalrb').map((r) => r.pkg.id), ['opal'], 'by host');
-  assert.deepStrictEqual(O.groupRows(rs).map((g) => g.group), ['EDITOR', 'PYTHON NOTEBOOKS', 'R NOTEBOOKS', 'SQL', 'PHP', 'RUBY']);
+  assert.deepStrictEqual(O.groupRows(rs).map((g) => g.section), ['LANGUAGES AND RUNTIMES', 'CORE']);
   assert.strictEqual(O.hostOf(O.byId('diff')), 'This app'); assert.strictEqual(O.hostOf(O.byId('php')), 'unpkg.com');
 });
 await t('labels: sizes, cache versions, slow connections, the download button', () => {
@@ -215,6 +218,27 @@ await t('labels: sizes, cache versions, slow connections, the download button', 
   assert.strictEqual(O.STATE_ICON.failed.icon, 'ri-error-warning-line'); assert.strictEqual(O.STATE_ICON.loading.icon, 'ri-loader-4-line');
 });
 
+console.log('Keep offline, Re-verify, and the words for removing');
+await t('Keep offline: a list of ids, kept clean; CORE and bundled packages are never in it (they are always kept)', () => {
+  assert.deepStrictEqual(O.parseKeep('["pyodide","monaco","nope","pyodide","diff","webr",5]'), ['pyodide', 'webr']);
+  assert.deepStrictEqual(O.parseKeep('not json'), []); assert.deepStrictEqual(O.parseKeep(null), []); assert.deepStrictEqual(O.parseKeep('{"a":1}'), []);
+  assert.ok(O.isKept(O.byId('monaco'), []) && O.isKept(O.byId('pyodide'), ['pyodide']) && !O.isKept(O.byId('pyodide'), []) && !O.isKept(O.byId('webr'), ['pyodide']));
+});
+await t('Re-verify: every saved file must be readable, a real answer, not empty, and (when the host did not compress it) the length it said', () => {
+  const info = { a: { ok: true, bytes: 10, length: 10 }, b: { ok: true, bytes: 5, length: 9 }, c: null, d: { ok: false, bytes: 3, length: 0 }, e: { ok: true, bytes: 0, length: 0 }, f: { ok: true, bytes: 7, length: 0 } };
+  const r = O.verifyFiles(['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((u, i) => ({ url: u, cached: u !== 'g' })), (u) => info[u] || null);
+  assert.deepStrictEqual([r.checked, r.problems.length, r.ok, r.bytes], [6, 4, false, 17]);
+  assert.ok(/cut short/.test(r.problems[0].why) && /could not be read/.test(r.problems[1].why) && /error answer/.test(r.problems[2].why) && /empty/.test(r.problems[3].why));
+  const good = O.verifyFiles([{ url: 'a', cached: true }, { url: 'f', cached: true }], (u) => info[u]);
+  assert.deepStrictEqual([good.ok, good.checked, good.bytes], [true, 2, 17], 'a file with no stated length is only checked for being readable and not empty');
+  assert.strictEqual(O.verifyFiles([{ url: 'x', cached: false }], () => null).checked, 0, 'a file that is not saved is not "verified"');
+});
+await t('what Remove says, and "Needed by"', () => {
+  assert.strictEqual(O.removeMessage('Python (Pyodide)', 48 * 1048576), 'Removes 48 MB. Python downloads again the next time it is used.');
+  assert.strictEqual(O.removeMessage('Emmet', 0), 'Removes the saved files. Emmet downloads again the next time it is used.');
+  assert.strictEqual(O.neededByText({ neededBy: ['A', 'B'] }), 'A, B'); assert.strictEqual(O.neededByText({ neededBy: ['A', 'B', 'C'] }, 2), 'A, B and more');
+});
+
 console.log('wiring');
 await t('the script loads after the Now Island, is precached, and is in npm test', () => {
   const html = read('index.html');
@@ -222,10 +246,10 @@ await t('the script loads after the Now Island, is precached, and is in npm test
   assert.ok(read('sw.js').includes("'/js/core/offline.js'"));
   assert.ok(JSON.parse(read('package.json')).scripts.test.includes('tests/offline.test.js'));
 });
-await t('it mounts at order 40 as an always-there section, and uses the island\'s own slide-over (not a modal)', () => {
+await t('it mounts at order 40 as an always-there section; Manage opens the Extensions sidebar\'s Components tab, and the island has no slide-over view of its own any more', () => {
   const src = read('js/core/offline.js'), ni = read('js/core/now-island.js');
-  assert.ok(/n\.mount\(ui\.root, 40, \{ always: true \}\)/.test(src) && /n\.openView\(\{/.test(src));
-  assert.ok(/openView: openCustomView/.test(ni) && /ni-viewer-custom/.test(ni));
+  assert.ok(/n\.mount\(ui\.root, 40, \{ always: true \}\)/.test(src) && /CodeMiniExtensionsUI\.open\('components'\)/.test(src) && /openComponents\(\)\)/.test(src));
+  assert.ok(!/\bopenView\b|openCustomView|ni-viewer-custom|ni-tall/.test(ni), 'the generic island view was only for this list; the list now lives in the Extensions sidebar');
   assert.ok(/onOpen:/.test(ni), 'the section re-reads the caches whenever the island opens');
   assert.ok(/e\.target\.isConnected === false\) return;/.test(ni), 'a click on a row the panel re-drew is not an outside click');
 });
@@ -235,10 +259,11 @@ await t('it never builds markup from text, and only ever deletes from the dynami
   assert.ok(!/caches\.delete\(/.test(src), 'no whole-cache deletion: the app shell cache is never touched');
   assert.strictEqual((src.match(/cache\.delete\(/g) || []).length, 1, 'one place removes entries');
   assert.ok(/names = \(await cacheNames\(\)\)\.filter\(\(k\) => k\.indexOf\(DYNAMIC_PREFIX\) === 0\)/.test(src) && /ownedBy\(pkg, req\.url, result\)/.test(src), 'and only dynamic-cache entries a package owns');
-  assert.ok(/if \(!pkg \|\| pkg\.bundled\) return 0/.test(src), 'the bundled package cannot be removed');
+  assert.ok(/if \(!pkg \|\| pkg\.bundled \|\| pkg\.required\) return 0/.test(src), 'a bundled or CORE (required) package cannot be removed');
+  assert.ok(!/clearAll/.test(src), 'no clear-everything action: CORE is required and the spec has no such button');
 });
 await t('every class the module uses has a rule in style.css, and the theme packs know the new pills', () => {
-  const src = read('js/core/offline.js'), css = read('css/style.css'), ni = read('js/core/now-island.js');
+  const src = read('js/core/offline.js') + read('js/core/extensions-ui.js'), css = read('css/style.css'), ni = read('js/core/now-island.js');
   const used = new Set(); (src.match(/['"`](off-[a-z0-9-]+)/g) || []).forEach((m) => used.add(m.slice(1)));
   (src.match(/el\('[a-z0-9]+', '([^']+)'/g) || []).forEach((m) => m.split("'")[3].split(' ').filter((c) => c.indexOf('off-') === 0).forEach((c) => used.add(c)));
   const free = new Set(['off-new', 'off-blue', 'off-yellow', 'off-muted', 'off-danger', 'off-tone']);   // colour classes, written as .off-ico.off-new

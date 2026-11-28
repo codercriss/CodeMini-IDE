@@ -179,7 +179,7 @@ t('saving cleans the value first (settings.json can send anything) and re-applie
 });
 t('applyTheme applies the colors, and the early-paint cache remembers both variables so the next load has no flash', () => {
   assert.ok(/window\.applyStatusBarColors\(document\.documentElement\)/.test(sp));
-  assert.ok(/\['--accent-blue', '--bg-tabs-bar', '--bg-tab-inactive', '--status-bar-bg', '--status-bar-fg'\]\.forEach/.test(sp));
+  assert.ok(/\['--accent-blue', '--bg-tabs-bar', '--bg-tab-inactive', '--status-bar-bg', '--status-bar-fg'\](\.concat\([^;]*\))?\.forEach/.test(sp));
   assert.ok(/for \(var name in \(c\.vars \|\| \{\}\)\) root\.style\.setProperty\(name, c\.vars\[name\]\)/.test(read('index.html')), 'index.html puts every cached variable back before the first paint');
 });
 t('Settings > Theme has one Status Bar row: both swatches and Reset, wired and lockable', () => {

@@ -110,7 +110,7 @@ window.getPrefixedKey = function(baseKey, winId = null, isProfile = null) {
 window.getDefaultSettings = function() {
   return {
       explorerDefaultView: 'List View', treeViewIndent: 15, profileAccentTint: true, syncProfileSettings: false, confirmBeforeExit: false, showBreadcrumbs: true, compactExplorer: false, hideCodeminiFolder: false, performanceMode: false, clearTrashOnExit: false,
-      autoSave: 'After Delay', autoSaveDelay: 1000, hotExit: 'On', localHistory: 'On', historyMaxEntries: 50, historyMaxDays: 14, formatOnSave: false, miniPreviewFollow: 'Auto', miniPreviewOpenIsland: true, miniPreviewConsole: true, todayQuote: 'Daily', todayQuoteSet: 'Developer', todayMyQuotes: '', todayShowSeconds: false, todayClock24: 'Auto', restoreSession: true, enableTrashBin: true, autoCheckUpdates: true, maxMemory: 1024, fontSize: 13, fontFamily: "'Fira Code', monospace", fontWeight: 'normal', lineHeight: 21, letterSpacing: 0.3, fontLigatures: true, tabSize: 4, insertSpaces: true, wordWrap: 'off', minimap: false, lineNumbers: 'on', renderWhitespace: 'none', bracketPairs: true, smoothScrolling: true, cursorStyle: 'line', cursorBlinking: 'blink', mouseWheelZoom: false, editorFolding: true, renderLineHighlight: 'line', matchBrackets: 'always', cursorWidth: 2, colorTheme: 'CodeMini Light', iconTheme: 'Remix Icons', accentColor: '#3794ff', statusBarBackground: '', statusBarForeground: '', sidebarPosition: 'Left', activityBar: true, showWindowBar: true, windowOpacity: 100, nbAutoInstall: true, nbClearOnRestart: false, nbConfirmDelete: true, nbPlotBackground: 'White', nbCellFontSize: 13, nbCellFontFamily: "'Fira Code', monospace", nbCellLineHeight: 21, nbCellLetterSpacing: 0.3, nbCellLineNumbers: 'off', nbCellWordWrap: 'on', nbCellFolding: false, nbCellMinimap: false, nbCellRenderWhitespace: 'none', nbCellBracketPairs: true, nbCellCursorStyle: 'line', nbCellCursorBlinking: 'expand', nbCellSmoothScrolling: true, consoleAutoClear: false, consoleShowTimestamps: false, consoleAutoInstall: true, editorAutoInstall: true, terminalAutoInstall: true, consoleMaxHistory: 50, consoleFontSize: 14, consoleFontFamily: "var(--font-mono)", consoleLineHeight: 21, consoleWordWrap: 'on', termFontSize: 13, termFontFamily: "'Fira Code', Consolas, monospace", termTextColor: "#d4d4d4", termPromptColor: "#4caf50", termCmdColor: "#ffffff", termHistorySize: 100,
+      autoSave: 'After Delay', autoSaveDelay: 1000, hotExit: 'On', localHistory: 'On', historyMaxEntries: 50, historyMaxDays: 14, formatOnSave: false, miniPreviewFollow: 'Auto', miniPreviewOpenIsland: true, miniPreviewConsole: true, extTheme: '', todayQuote: 'Daily', todayQuoteSet: 'Developer', todayMyQuotes: '', todayShowSeconds: false, todayClock24: 'Auto', restoreSession: true, enableTrashBin: true, autoCheckUpdates: true, maxMemory: 1024, fontSize: 13, fontFamily: "'Fira Code', monospace", fontWeight: 'normal', lineHeight: 21, letterSpacing: 0.3, fontLigatures: true, tabSize: 4, insertSpaces: true, wordWrap: 'off', minimap: false, lineNumbers: 'on', renderWhitespace: 'none', bracketPairs: true, smoothScrolling: true, cursorStyle: 'line', cursorBlinking: 'blink', mouseWheelZoom: false, editorFolding: true, renderLineHighlight: 'line', matchBrackets: 'always', cursorWidth: 2, colorTheme: 'CodeMini Light', iconTheme: 'Remix Icons', accentColor: '#3794ff', statusBarBackground: '', statusBarForeground: '', sidebarPosition: 'Left', activityBar: true, showWindowBar: true, windowOpacity: 100, nbAutoInstall: true, nbClearOnRestart: false, nbConfirmDelete: true, nbPlotBackground: 'White', nbCellFontSize: 13, nbCellFontFamily: "'Fira Code', monospace", nbCellLineHeight: 21, nbCellLetterSpacing: 0.3, nbCellLineNumbers: 'off', nbCellWordWrap: 'on', nbCellFolding: false, nbCellMinimap: false, nbCellRenderWhitespace: 'none', nbCellBracketPairs: true, nbCellCursorStyle: 'line', nbCellCursorBlinking: 'expand', nbCellSmoothScrolling: true, consoleAutoClear: false, consoleShowTimestamps: false, consoleAutoInstall: true, editorAutoInstall: true, terminalAutoInstall: true, consoleMaxHistory: 50, consoleFontSize: 14, consoleFontFamily: "var(--font-mono)", consoleLineHeight: 21, consoleWordWrap: 'on', termFontSize: 13, termFontFamily: "'Fira Code', Consolas, monospace", termTextColor: "#d4d4d4", termPromptColor: "#4caf50", termCmdColor: "#ffffff", termHistorySize: 100,
       workspaceTrustEnabled: true, workspaceTrustUntrustedFiles: 'Prompt', workspaceTrustEmptyWindow: true, workspaceTrustStartupPrompt: 'Once', workspaceTrustBanner: 'Until Dismissed',
       isolationMode: 'Isolated', isolationPreview: 'Use global', isolationConsole: 'Use global', isolationTerminal: 'Use global', isolationNotebooks: 'Use global'
     };
@@ -181,6 +181,8 @@ window.reloadSettings = function(winId = null, isProfile = false) {
     miniPreviewFollow: pickOption('miniPreviewFollow', ['Auto', 'On', 'Off'], 'Auto'),
     miniPreviewOpenIsland: localStorage.getItem(getPrefixedKey('miniPreviewOpenIsland')) !== 'false',
     miniPreviewConsole: localStorage.getItem(getPrefixedKey('miniPreviewConsole')) !== 'false',
+    // The installed theme in use (js/core/extensions.js); empty means one of the built-in themes.
+    extTheme: localStorage.getItem(getPrefixedKey('extTheme')) || '',
     // Today in the Now Island (js/core/today.js).
     todayQuote: pickOption('todayQuote', ['Daily', 'Each open', 'Off'], 'Daily'),
     todayQuoteSet: pickOption('todayQuoteSet', ['Developer', 'Motivational', 'Mine'], 'Developer'),
@@ -272,6 +274,7 @@ window.reloadSettings = function(winId = null, isProfile = false) {
   if (window.CodeMiniConfig) window.CodeMiniConfig.applyOverlay(window.appSettings);
 
   if (typeof applyTheme === 'function') applyTheme();
+  if (window.CodeMiniExtensions) window.CodeMiniExtensions.reload();   // installed items are per window / profile too: load this window's, and re-apply the theme with them
   if (typeof syncUI === 'function') syncUI();
   // Shortcuts and snippets are per window / profile too: a window switch reloads them with the settings.
   if (window.CodeMiniKeybindings) window.CodeMiniKeybindings.reloadFor(winId, isProfile);
@@ -348,6 +351,9 @@ window.saveSetting = function(key, value, opts) {
   if (key.startsWith('nbCell') || key === 'colorTheme' || key === 'themePack') if (typeof window.updateNotebookMonacoSettings === 'function') window.updateNotebookMonacoSettings();
   if (key.startsWith('console')) if (typeof window.updateConsoleLiveSettings === 'function') window.updateConsoleLiveSettings();
   if (key.startsWith('today') && window.CodeMiniToday) window.CodeMiniToday.settingsChanged();
+  // Choosing a Colour Theme or Theme Pack in Settings leaves the installed theme (Extensions applies one through a flag that skips this).
+  if ((key === 'colorTheme' || key === 'themePack') && !window.__extApplying && window.appSettings.extTheme) window.saveSetting('extTheme', '');
+  if (key === 'colorTheme' || key === 'themePack' || key === 'extTheme') window.dispatchEvent(new CustomEvent('codemini:theme-settings'));
   if (key.startsWith('term')) if (typeof window.updateTerminalLiveSettings === 'function') window.updateTerminalLiveSettings();
   if (key.startsWith('isolation')) {
     // The runner client, the Live Preview and its indicator all derive from these: apply now, not on the next reload.
@@ -400,6 +406,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
     document.documentElement.setAttribute('data-theme-variant', window.getThemeVariant());
     document.documentElement.setAttribute('data-theme-pack', packSlug);
+    if (window.CodeMiniExtensions) window.CodeMiniExtensions.clearOverlay(document.documentElement);   // an installed theme's colours go on at the end
     // Theme Packs own their full identity (including accent color) - don't let
     // the separate, independently-saved Accent Color setting override it.
     if (packActive) {
@@ -437,6 +444,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.documentElement.style.removeProperty('--bg-tab-inactive');
     }
 
+    if (window.CodeMiniExtensions) window.CodeMiniExtensions.applyOverlay(document.documentElement);
+
     // Remember what was just applied to <html> for this window, so the next page load can restore it from an
     // inline script in <head> (index.html) before anything paints. Written here, by the one function that decides
     // the theme, so there's no second copy of the theme registry to keep in sync.
@@ -449,7 +458,7 @@ document.addEventListener('DOMContentLoaded', () => {
       try { themeCache = JSON.parse(localStorage.getItem('codemini_theme_cache')); } catch (e) { /* start fresh */ }
       if (!themeCache || typeof themeCache !== 'object' || Array.isArray(themeCache)) themeCache = {};
       const vars = {};
-      ['--accent-blue', '--bg-tabs-bar', '--bg-tab-inactive', '--status-bar-bg', '--status-bar-fg'].forEach(name => {
+      ['--accent-blue', '--bg-tabs-bar', '--bg-tab-inactive', '--status-bar-bg', '--status-bar-fg'].concat(window.CodeMiniExtensions ? window.CodeMiniExtensions.appliedVars() : []).forEach(name => {
         const v = root.style.getPropertyValue(name);
         if (v) vars[name] = v;
       });

@@ -323,17 +323,6 @@
             color: var(--text-main);
         }
 
-        /* A feature's own view (Offline and Packages): rows run edge to edge and the feature keeps its own toolbar and footer, so the
-           content box has no padding and does not scroll itself. */
-        .ni-viewer-content.ni-viewer-custom {
-            display: flex;
-            flex-direction: column;
-            padding: 0;
-            overflow: hidden;
-        }
-        /* While such a view is open the island is tall enough to browse a list in. */
-        #nowIslandPanel.ni-tall { min-height: min(520px, 72vh); }
-
         .ni-viewer-time {
             margin-bottom: 8px;
             font-size: 11px;
@@ -872,7 +861,6 @@
                 min-height: 340px; /* the app's existing phone height is the minimum; it grows (to 60vh) only when there is content */
                 max-height: 60vh;
             }
-            #nowIslandPanel.ni-tall { min-height: 60vh; }
 
             /* Pinned Peek panels become a strip above the status bar, beside the activity bar, like the island itself. */
             #niPeekDock {
@@ -941,7 +929,6 @@
     const badge = panel.querySelector('#niUnreadBadge');
     const listeners = new Set();
     let openViewerId = null;
-    let customView = null; // a feature's own slide-over view (Offline and Packages' package list): { teardown }
     let viewerTask = null; // id of the background task whose full output the viewer shows (the viewer serves notifications and task output)
 
     function loadNotifications() {
@@ -1264,8 +1251,6 @@
     }
 
     function hideViewer() {
-        if (customView) { const done = customView.teardown; customView = null; try { if (done) done(); } catch (e) { /* a view's own cleanup must not break closing */ } }
-        panel.classList.remove('ni-tall');
         openViewerId = null;
         viewerTask = null;
         viewer._lv = null;
@@ -1330,7 +1315,7 @@
     });
 
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && (openViewerId || viewerTask || customView) && panel.classList.contains('show')) hideViewer();
+        if (e.key === 'Escape' && (openViewerId || viewerTask) && panel.classList.contains('show')) hideViewer();
     });
 
     // Another tab of the app added or removed something.
@@ -1602,27 +1587,8 @@
         if (!tabs[idx].classList.contains('active')) setActiveTab(idx);
         if (window.saveCurrentUIState) window.saveCurrentUIState();
     }
-    // A feature's own full-island view, in the same slide-over the notifications and task output use (it is not a modal). `build(content, api)`
-    // fills `content` and may return a function that is called when the view closes. Escape and the Back arrow close it.
-    function openCustomView(opts) {
-        hideViewer();
-        customView = { teardown: null };
-        viewer.setAttribute('aria-label', String(opts.label || opts.title || 'Details'));
-        viewer.textContent = '';
-        const header = el('div', 'ni-viewer-header');
-        const left = el('div', 'ni-viewer-left');
-        const title = el('div', 'ni-viewer-title', String(opts.title || ''));
-        left.append(iconButton('ri-arrow-left-line', 'Back', 'ni-viewer-back', hideViewer), title);
-        header.appendChild(left);
-        const content = el('div', 'ni-viewer-content ni-viewer-custom');
-        const done = opts.build(content, { close: hideViewer, setTitle: (t) => { title.textContent = String(t); } });
-        if (customView) customView.teardown = typeof done === 'function' ? done : null;
-        viewer.append(header, content);
-        viewer.classList.add('show');
-        panel.classList.add('ni-tall');
-    }
     window.CodeMiniNowIsland = Object.freeze({
-        mount: mountSection, setSectionActive, open: openIsland, openView: openCustomView, closeView: () => { if (customView) hideViewer(); }, isViewOpen: () => !!customView,
+        mount: mountSection, setSectionActive, open: openIsland,
         onOpen: (fn) => { if (typeof fn === 'function') hosted.opened.add(fn); },
         isOpen: () => panel.classList.contains('show'),
         setPinned: (on) => { hosted.pinned = !!on; syncPin(); }, isPinned: () => keepsOpen(),

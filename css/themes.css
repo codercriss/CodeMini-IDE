@@ -587,6 +587,10 @@
 [data-theme-pack^="codemini-premium"] .sb-segmented,
 /* Mini Preview: the source pill, the touch pill and the resize handle (all already pill-shaped or buttons; listed so they stay pills if they grow) */
 /* Offline and Packages: the version pill and the 2px lines are pills; the drill-in's search is a bottom line, not a box, so it keeps square ends */
+/* Extensions sidebar: the kind pill, the switch and its knob are pills; the search is a flat underline; the Install menu is a card */
+[data-theme-pack^="codemini-premium"] .ext-pill,
+[data-theme-pack^="codemini-premium"] .ext-switch,
+[data-theme-pack^="codemini-premium"] .ext-switch-knob,
 [data-theme-pack^="codemini-premium"] .off-pill,
 [data-theme-pack^="codemini-premium"] .off-line,
 [data-theme-pack^="codemini-premium"] .off-line-fill,
@@ -1436,4 +1440,12 @@
 /* Offline and Packages: the search is a flat underline (the pack's text-input pill would curl its ends) */
 [data-theme-pack^="codemini-premium"] input.off-search[type="text"] {
   border-radius: 0 !important;
+}
+
+[data-theme-pack^="codemini-premium"] input.ext-search[type="search"] {
+  border-radius: 0 !important;
+}
+[data-theme-pack^="codemini-premium"] .ext-menu,
+[data-theme-pack^="codemini-premium"] .ext-error {
+  border-radius: 14px !important;
 }

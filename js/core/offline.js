@@ -1,8 +1,9 @@
 // ==========================================
 // offline.js: Offline and Packages, UI/UX specs feature 13
 // ==========================================
-// An OFFLINE AND PACKAGES section at the bottom of the Now Island's Now pane (order 40) and a full-island drill-in view that lists every
-// library the app loads from a CDN, whether each one is saved on this device, and lets the person download, re-download or remove them.
+// The engine behind two surfaces: the OFFLINE AND PACKAGES section at the bottom of the Now Island's Now pane (order 40: three summary rows, and
+// Manage), and the Components tab of the Extensions sidebar (js/core/extensions-ui.js, feature 26), which lists every library the app loads from a
+// CDN, whether each one is saved on this device, and lets the person download, keep offline, verify or remove them. The list is built once, there.
 //
 // What "saved" means here, and the limits that follow from it (they are said in the app, not hidden):
 //   - The app's service worker keeps CDN responses in the codemini-dynamic-* cache (sw.js, cache first). A library is "Ready offline" only when
@@ -43,88 +44,90 @@
     const SQLJS = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/';
     const OPAL = 'https://cdn.opalrb.com/opal/1.8.3/';
     const PDFJS = '3.11.174';
-    const GROUPS = ['EDITOR', 'PYTHON NOTEBOOKS', 'R NOTEBOOKS', 'SQL', 'PHP', 'RUBY', 'DOCUMENTS AND PDF', 'ARCHIVES', 'GIT', 'ICONS AND FONTS'];
+    // The Components tab of the Extensions sidebar (feature 26) shows the packages in these four groups. CORE is what the app needs to work at all:
+    // those rows are locked (no Remove) and always kept.
+    const SECTIONS = ['LANGUAGES AND RUNTIMES', 'EDITING', 'VIEWERS', 'CORE'];
 
     const PACKAGES = [
-        { id: 'monaco', name: 'Monaco Editor', group: 'EDITOR', version: '0.39.0', coverage: 'core', global: 'monaco',
+        { id: 'monaco', name: 'Code editor (Monaco)', section: 'CORE', required: true, version: '0.39.0', coverage: 'core', global: 'monaco',
           source: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/', prefixes: ['https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/'],
           files: [{ u: MONACO + 'loader.min.js', kind: 'js' }, { u: MONACO + 'editor/editor.main.js', kind: 'js' }, { u: MONACO + 'editor/editor.main.nls.js', kind: 'js' },
               { u: MONACO + 'editor/editor.main.css', kind: 'css' }, { u: MONACO + 'base/worker/workerMain.js', kind: 'js' }],
           neededBy: ['Every editor tab', 'The diff editor'], dependsOn: [],
           note: 'Language modules (HTML, CSS, TypeScript and others) download the first time a file of that language is opened.' },
-        { id: 'emmet', name: 'Emmet for Monaco', group: 'EDITOR', version: '5.3.0', coverage: 'full',
+        { id: 'emmet', name: 'Emmet', section: 'EDITING', version: '5.3.0', coverage: 'full',
           source: 'https://unpkg.com/emmet-monaco-es@5.3.0/', prefixes: ['https://unpkg.com/emmet-monaco-es@5.3.0/'],
           files: [{ u: 'https://unpkg.com/emmet-monaco-es@5.3.0/dist/emmet-monaco.min.js', kind: 'js' }],
           neededBy: ['HTML and CSS abbreviations in the editor'], dependsOn: ['monaco'] },
-        { id: 'babel', name: 'Babel Standalone', group: 'EDITOR', version: '7.29.9', coverage: 'full',
+        { id: 'babel', name: 'JSX and TypeScript (Babel)', section: 'EDITING', version: '7.29.9', coverage: 'full',
           source: 'https://esm.sh/@babel/standalone@7.29.9', prefixes: ['https://esm.sh/@babel/standalone@7.29.9'],
           files: [{ u: 'https://esm.sh/@babel/standalone@7.29.9', kind: 'esm' }],
           neededBy: ['Live Preview of JSX and TypeScript'], dependsOn: [] },
 
-        { id: 'pyodide', name: 'Pyodide', group: 'PYTHON NOTEBOOKS', version: '0.24.1', coverage: 'core', global: 'loadPyodide', surfaces: ['notebooks', 'console', 'terminal'],
+        { id: 'pyodide', name: 'Python (Pyodide)', section: 'LANGUAGES AND RUNTIMES', version: '0.24.1', coverage: 'core', global: 'loadPyodide', surfaces: ['notebooks', 'console', 'terminal'],
           source: PYO, prefixes: ['https://cdn.jsdelivr.net/pyodide/v0.24.1/'],
           files: [{ u: PYO + 'pyodide.js', kind: 'js' }, { u: PYO + 'pyodide.asm.js', kind: 'js' }, { u: PYO + 'pyodide.asm.wasm', kind: 'wasm' }, { u: PYO + 'python_stdlib.zip', kind: 'bin' },
               { u: PYO + 'pyodide-lock.json', kind: 'bin', optional: true }, { u: PYO + 'repodata.json', kind: 'bin', optional: true }],
           neededBy: ['Python notebooks', 'The Console and Terminal (python)', 'Tasks and Test Explorer (python, pytest)', 'Run on a .py file'], dependsOn: [],
           note: 'Python packages you install (numpy, pandas and so on) are saved when they are first used and count as extra files.' },
-        { id: 'webr', name: 'WebR', group: 'R NOTEBOOKS', version: '0.6.0', coverage: 'entry', surfaces: ['notebooks'],
+        { id: 'webr', name: 'R (WebR)', section: 'LANGUAGES AND RUNTIMES', version: '0.6.0', coverage: 'entry', surfaces: ['notebooks'],
           source: 'https://webr.r-wasm.org/v0.6.0/', prefixes: ['https://webr.r-wasm.org/v0.6.0/'],
           files: [{ u: 'https://webr.r-wasm.org/v0.6.0/webr.mjs', kind: 'esm' }],
           neededBy: ['R notebooks'], dependsOn: [],
           note: 'The R runtime (several large files) downloads the first time you run R. Run one R cell while online to save it.' },
-        { id: 'sqljs', name: 'sql.js', group: 'SQL', version: '1.8.0', coverage: 'full', global: 'initSqlJs', surfaces: ['notebooks'],
+        { id: 'sqljs', name: 'SQL (sql.js)', section: 'LANGUAGES AND RUNTIMES', version: '1.8.0', coverage: 'full', global: 'initSqlJs', surfaces: ['notebooks'],
           source: SQLJS, prefixes: [SQLJS],
           files: [{ u: SQLJS + 'sql-wasm.js', kind: 'js' }, { u: SQLJS + 'sql-wasm.wasm', kind: 'wasm' }],
           neededBy: ['SQL notebooks and the SQL scratchpad'], dependsOn: [] },
-        { id: 'php', name: 'php-wasm', group: 'PHP', version: '0.1.0', coverage: 'entry', surfaces: ['preview', 'console', 'terminal'],
+        { id: 'php', name: 'PHP (php-wasm)', section: 'LANGUAGES AND RUNTIMES', version: '0.1.0', coverage: 'entry', surfaces: ['preview', 'console', 'terminal'],
           source: 'https://www.npmjs.com/package/php-wasm/v/0.1.0', prefixes: ['https://unpkg.com/php-wasm@0.1.0/', 'https://cdn.jsdelivr.net/npm/php-wasm@0.1.0/'],
           files: [{ any: [[{ u: 'https://unpkg.com/php-wasm@0.1.0/PhpWeb.mjs', kind: 'esm' }], [{ u: 'https://cdn.jsdelivr.net/npm/php-wasm@0.1.0/PhpWeb.mjs', kind: 'esm' }]] }],
           neededBy: ['Run on a .php file', 'PHP in the Live Preview, Console and Terminal'], dependsOn: [],
           note: 'The PHP engine downloads the first time PHP runs. Run one PHP file while online to save it.' },
-        { id: 'opal', name: 'Opal (Ruby)', group: 'RUBY', version: '1.8.3', coverage: 'full', global: 'Opal', surfaces: ['console', 'terminal'],
+        { id: 'opal', name: 'Ruby (Opal)', section: 'LANGUAGES AND RUNTIMES', version: '1.8.3', coverage: 'full', global: 'Opal', surfaces: ['console', 'terminal'],
           source: OPAL, prefixes: [OPAL],
           files: ['opal.min.js', 'opal-parser.min.js', 'math.min.js', 'json.min.js', 'base64.min.js'].map((f) => ({ u: OPAL + f, kind: 'js' })),
           neededBy: ['Run on a .rb file', 'Ruby in the Console and Terminal'], dependsOn: [] },
 
-        { id: 'marked', name: 'marked', group: 'DOCUMENTS AND PDF', version: '18.0.14', coverage: 'full', surfaces: ['preview', 'notebooks'],
+        { id: 'marked', name: 'Markdown (marked)', section: 'VIEWERS', version: '18.0.14', coverage: 'full', surfaces: ['preview', 'notebooks'],
           source: 'https://www.npmjs.com/package/marked/v/18.0.14', prefixes: ['https://cdn.jsdelivr.net/npm/marked@18.0.14/', 'https://esm.sh/marked@18.0.14'],
           files: [{ u: 'https://cdn.jsdelivr.net/npm/marked@18.0.14/lib/marked.umd.js', kind: 'js' },
               { any: [[{ u: 'https://esm.sh/marked@18.0.14', kind: 'esm' }], [{ u: 'https://cdn.jsdelivr.net/npm/marked@18.0.14/+esm', kind: 'esm' }]] }],
           neededBy: ['Markdown in the Live Preview and Mini Preview', 'Markdown cells in notebooks'], dependsOn: [] },
-        { id: 'ghmd', name: 'GitHub Markdown CSS', group: 'DOCUMENTS AND PDF', version: '5.2.0', coverage: 'full', surfaces: ['preview'],
+        { id: 'ghmd', name: 'GitHub Markdown style', section: 'VIEWERS', version: '5.2.0', coverage: 'full', surfaces: ['preview'],
           source: 'https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/', prefixes: ['https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/'],
           files: [{ u: 'https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown.min.css', kind: 'css' }],
           neededBy: ['The look of Markdown in the Live Preview and Mini Preview'], dependsOn: ['marked'] },
-        { id: 'pdfjs', name: 'pdf.js', group: 'DOCUMENTS AND PDF', version: PDFJS, coverage: 'full',
+        { id: 'pdfjs', name: 'PDF viewer (pdf.js)', section: 'VIEWERS', version: PDFJS, coverage: 'full',
           source: 'https://www.npmjs.com/package/pdfjs-dist/v/' + PDFJS, prefixes: ['https://esm.sh/pdfjs-dist@' + PDFJS, 'https://cdn.jsdelivr.net/npm/pdfjs-dist@' + PDFJS + '/'],
           files: [{ any: [
               [{ u: 'https://esm.sh/pdfjs-dist@' + PDFJS, kind: 'esm' }, { u: 'https://esm.sh/pdfjs-dist@' + PDFJS + '/build/pdf.worker.min.js', kind: 'js' }],
               [{ u: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@' + PDFJS + '/+esm', kind: 'esm' }, { u: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@' + PDFJS + '/build/pdf.worker.min.js', kind: 'js' }]] }],
           neededBy: ['The PDF viewer'], dependsOn: [] },
 
-        { id: 'jszip', name: 'JSZip', group: 'ARCHIVES', version: '3.10.1', coverage: 'full', global: 'JSZip',
+        { id: 'jszip', name: 'ZIP support (JSZip)', section: 'CORE', required: true, version: '3.10.1', coverage: 'full', global: 'JSZip',
           source: 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/', prefixes: ['https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/'],
           files: [{ u: 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js', kind: 'js' }],
           neededBy: ['Uploading and downloading zip files'], dependsOn: [] },
-        { id: 'fflate', name: 'fflate', group: 'ARCHIVES', version: '0.8.2', coverage: 'full',
+        { id: 'fflate', name: 'Word, Excel and PowerPoint viewer (fflate)', section: 'VIEWERS', version: '0.8.2', coverage: 'full',
           source: 'https://esm.sh/fflate@0.8.2', prefixes: ['https://esm.sh/fflate@0.8.2'],
           files: [{ u: 'https://esm.sh/fflate@0.8.2', kind: 'esm' }],
           neededBy: ['The Word, Excel and PowerPoint viewer'], dependsOn: [] },
-        { id: 'archive-wasm', name: 'archive-wasm', group: 'ARCHIVES', version: '2.1.0', coverage: 'entry',
+        { id: 'archive-wasm', name: 'Archive viewer (archive-wasm)', section: 'VIEWERS', version: '2.1.0', coverage: 'entry',
           source: 'https://esm.sh/archive-wasm@2.1.0', prefixes: ['https://esm.sh/archive-wasm@2.1.0'],
           files: [{ u: 'https://esm.sh/archive-wasm@2.1.0', kind: 'esm' }],
           neededBy: ['The archive viewer (7z, rar and other formats)'], dependsOn: [],
           note: 'The decoder (a WebAssembly file) downloads the first time an archive is opened. Open one while online to save it.' },
 
-        { id: 'diff', name: 'jsdiff', group: 'GIT', version: '9.0.0', coverage: 'full', bundled: true,
+        { id: 'diff', name: 'Diff (jsdiff)', section: 'CORE', required: true, version: '9.0.0', coverage: 'full', bundled: true,
           source: '', prefixes: [], files: [{ u: '/js/vendor/diff-9.0.0.js', kind: 'js' }],
           neededBy: ['The diff editor and Source Control'], dependsOn: [] },
 
-        { id: 'remixicon', name: 'Remix Icon', group: 'ICONS AND FONTS', version: '3.5.0', coverage: 'full',
+        { id: 'remixicon', name: 'Icons (Remix Icon)', section: 'CORE', required: true, version: '3.5.0', coverage: 'full',
           source: 'https://cdn.jsdelivr.net/npm/remixicon@3.5.0/', prefixes: ['https://cdn.jsdelivr.net/npm/remixicon@3.5.0/'],
           files: [{ u: 'https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css', kind: 'css' }],
           neededBy: ['Almost every icon in the app'], dependsOn: [] },
-        { id: 'fontawesome', name: 'Font Awesome', group: 'ICONS AND FONTS', version: '6.4.0', coverage: 'full',
+        { id: 'fontawesome', name: 'Icons (Font Awesome)', section: 'CORE', required: true, version: '6.4.0', coverage: 'full',
           source: 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/', prefixes: ['https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/'],
           files: [{ u: 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css', kind: 'css' }],
           neededBy: ['Some icons in the app'], dependsOn: [] }
@@ -277,12 +280,12 @@
             if (filter === 'ready' && r.state !== 'ready') return false;
             if (filter === 'none' && !(r.state === 'none' || r.state === 'session')) return false;
             if (filter === 'issues' && !(r.state === 'partial' || r.state === 'failed')) return false;
-            if (q && (r.pkg.name + ' ' + r.pkg.group + ' ' + r.pkg.version + ' ' + hostOf(r.pkg)).toLowerCase().indexOf(q) === -1) return false;
+            if (q && (r.pkg.name + ' ' + r.pkg.section + ' ' + r.pkg.version + ' ' + hostOf(r.pkg)).toLowerCase().indexOf(q) === -1) return false;
             return true;
         });
     }
     function groupRows(rows) {
-        return GROUPS.map((g) => ({ group: g, rows: rows.filter((r) => r.pkg.group === g) })).filter((g) => g.rows.length);
+        return SECTIONS.map((g) => ({ section: g, rows: rows.filter((r) => r.pkg.section === g) })).filter((g) => g.rows.length);
     }
     function hostOf(pkg) {
         if (pkg.bundled) return 'This app';
@@ -327,10 +330,37 @@
         return missingPackages === 0 ? 'Everything is downloaded' : 'Download all for offline, ' + missingPackages + ' left';
     }
 
+    // ---------------------------------------------------------------------------------------------
+    // Pure: Keep offline, Re-verify, and the words for removing
+    // ---------------------------------------------------------------------------------------------
+    // The ids the person chose to keep offline, kept as JSON text. Unknown ids and non-strings are dropped; a CORE package is always kept, so it is
+    // never in the list.
+    function parseKeep(text) {
+        let a; try { a = JSON.parse(text || '[]'); } catch (e) { a = []; }
+        return (Array.isArray(a) ? a : []).filter((id, i, all) => typeof id === 'string' && all.indexOf(id) === i && byId(id) && !byId(id).required && !byId(id).bundled);
+    }
+    const isKept = (pkg, keep) => !!pkg.required || (keep || []).indexOf(pkg.id) > -1;
+    // "Re-verify": every saved file must answer, be a real response, and be the length the host said. info(url) -> { ok, bytes, length } (length is
+    // the content-length the host sent, 0 if it did not say) or null if it is not saved.
+    function verifyFiles(files, info) {
+        const problems = []; let checked = 0, bytes = 0;
+        files.filter((f) => f.cached).forEach((f) => {
+            const i = info(f.url); checked++;
+            if (!i) problems.push({ url: f.url, why: 'It is listed as saved but could not be read.' });
+            else if (!i.ok) problems.push({ url: f.url, why: 'The saved copy is an error answer, not the file.' });
+            else if (i.length > 0 && i.bytes !== i.length) problems.push({ url: f.url, why: 'It is ' + i.bytes + ' bytes; the host said ' + i.length + '. The download was cut short.' });
+            else if (i.bytes === 0) problems.push({ url: f.url, why: 'The saved copy is empty.' });
+            else bytes += i.bytes;
+        });
+        return { checked, problems, bytes, ok: problems.length === 0 };
+    }
+    const removeMessage = (name, bytes) => 'Removes ' + (bytes > 0 ? fmtBytes(bytes) : 'the saved files') + '. ' + name.replace(/ \(.*\)$/, '') + ' downloads again the next time it is used.';
+    const neededByText = (pkg, max) => (pkg.neededBy || []).slice(0, max || 2).join(', ') + ((pkg.neededBy || []).length > (max || 2) ? ' and more' : '');
+
     const api = {
-        DYNAMIC_CACHE, DYNAMIC_PREFIX, STATIC_PREFIX, PACKAGES, GROUPS, FILTERS, STATE_ICON, CRAWL_MAX_FILES,
+        DYNAMIC_CACHE, DYNAMIC_PREFIX, STATIC_PREFIX, PACKAGES, SECTIONS, FILTERS, STATE_ICON, CRAWL_MAX_FILES,
         byId, cssDeps, esmDeps, resolvePackage, downloadList, ownedBy, isRunnerOnly, effectiveState, summarize, filterRows, groupRows, hostOf,
-        fmtBytes, cacheVersion, slowConnection, summaryText, leftLabel
+        fmtBytes, cacheVersion, slowConnection, summaryText, leftLabel, parseKeep, isKept, verifyFiles, removeMessage, neededByText
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (typeof document === 'undefined') return; // Node: the rules only
@@ -359,7 +389,7 @@
         sizes: new Map(),          // url -> bytes
         skip: new Set(),           // optional files the host does not have (404)
         avoid: new Set(),          // addresses that failed to download in this attempt: the app's other CDN is tried instead
-        filter: 'all', query: '', expanded: new Set(), confirm: null,
+        wantSizes: false, taskUpdate: null,
         controller: null, running: false, lastError: '', token: 0, storage: null, persisted: null, names: [], checkedMsg: ''
     };
 
@@ -395,7 +425,7 @@
         S.results = results; S.extras = extras;
         await readStorage();
         draw();
-        if (viewOpen) measureAll();            // sizes of what is saved, a few at a time, while the list is on screen
+        if (S.wantSizes) measureAll();         // sizes of what is saved, a few at a time, while the list is on screen
     }
 
     async function readStorage() {
@@ -424,7 +454,7 @@
             const urls = r.result.files.filter((l) => l.cached).map((l) => l.url).concat(r.extras);
             let changed = false;
             for (const u of urls) { if (!S.sizes.has(u)) { await sizeOfUrl(u); changed = true; } }
-            if (changed && viewOpen) drawView();
+            if (changed) notify();
         }
     }
     const packageBytes = (r) => r.result ? r.result.files.filter((l) => l.cached).map((l) => l.url).concat(r.extras).reduce((n, u) => n + (S.sizes.get(u) || 0), 0) : 0;
@@ -464,7 +494,9 @@
                     if (again.missing.includes(u)) { failed = friendly(e); break; }
                     break;                                                       // the other way is chosen on the next round
                 }
-                S.busy.set(pkg.id, { state: 'loading', pct: Math.min(95, Math.round(100 * done / (done + Math.max(0, list.length - done)))) });
+                const pct = Math.min(95, Math.round(100 * done / (done + Math.max(0, list.length - done))));
+                S.busy.set(pkg.id, { state: 'loading', pct });
+                if (S.taskUpdate) S.taskUpdate(pct);
                 scheduleDraw();
             }
         }
@@ -474,21 +506,29 @@
     async function downloadPackages(ids, opts) {
         if (S.running) return;
         if (typeof fetch !== 'function' || !hasCaches()) { S.lastError = 'This browser cannot save files for offline use.'; draw(); return; }
+        const list = ids.map(byId).filter((p) => p && !p.bundled);
+        if (!list.length) return;
         S.running = true; S.controller = new AbortController(); S.lastError = ''; S.avoid.clear();
-        let ok = 0, bad = 0;
+        // A download is a background task: it is listed in the Now Island's RUNNING section with a progress line and a Stop (and says nothing
+        // if it ends within a second). Keep offline's top-up runs the same way, without announcing itself when it succeeds.
+        const task = W.CodeMiniBackground ? W.CodeMiniBackground.start({ kind: 'download', title: list.length === 1 ? 'Download ' + list[0].name : 'Download ' + list.length + ' components', detail: list[0].name, source: 'Extensions', onStop: stopDownloads, onGoto: openComponents, notify: false }) : null;
+        let ok = 0, bad = 0, stopped = false;
         try {
             try {
-                for (const id of ids) {
-                    const pkg = byId(id); if (!pkg || pkg.bundled) continue;
+                for (let i = 0; i < list.length; i++) {
+                    const pkg = list[i];
+                    if (task) task.update({ detail: pkg.name + ' (' + (i + 1) + ' of ' + list.length + ')', progress: i / list.length });
+                    S.taskUpdate = (pct) => { if (task) task.update({ progress: (i + pct / 100) / list.length }); };
                     if (opts && opts.redo) await removeOwned(pkg);
                     if (await downloadOne(pkg, S.controller.signal)) ok++; else bad++;
-                    if (S.controller.signal.aborted) break;
+                    if (S.controller.signal.aborted) { stopped = true; break; }
                 }
-            } finally { S.controller = null; }
+            } finally { S.controller = null; S.taskUpdate = null; }
             await refresh();                      // the run is over only once the list shows what is really saved (no stale "Downloading")
         } finally { S.running = false; }
-        if (bad === 0 && ok > 0 && typeof W.showSuccessToast === 'function') W.showSuccessToast(ok === 1 ? 'Saved for offline use' : ok + ' packages saved for offline use');
-        if (bad) S.lastError = bad + (bad === 1 ? ' package' : ' packages') + ' could not be saved. Open one to see why.';
+        if (task) task.finish(stopped ? 'stopped' : bad ? 'error' : 'success', stopped ? 'Stopped' : bad ? bad + (bad === 1 ? ' component' : ' components') + ' could not be saved' : ok === 1 ? 'Saved ' + list[0].name : ok + ' components saved');
+        if (bad === 0 && ok > 0 && !(opts && opts.quiet) && typeof W.showSuccessToast === 'function') W.showSuccessToast(ok === 1 ? 'Saved for offline use' : ok + ' components saved for offline use');
+        if (bad) S.lastError = bad + (bad === 1 ? ' component' : ' components') + ' could not be saved. Open one to see why.';
         draw();
     }
     function stopDownloads() { if (S.controller) S.controller.abort(); }
@@ -505,12 +545,55 @@
         S.busy.delete(pkg.id);
         return n;
     }
-    async function removePackage(id) { const pkg = byId(id); if (!pkg || pkg.bundled) return 0; const n = await removeOwned(pkg); S.sizes.clear(); await refresh(); return n; }
-    async function clearAll() {
-        let n = 0;
-        for (const pkg of PACKAGES) { if (!pkg.bundled) n += await removeOwned(pkg); }
-        S.sizes.clear(); S.confirm = null; await refresh();
-        return n;
+    async function removePackage(id) {
+        const pkg = byId(id); if (!pkg || pkg.bundled || pkg.required) return 0;   // a CORE component is required: it has no Remove
+        const n = await removeOwned(pkg);
+        if (keep.indexOf(id) > -1) { keep = keep.filter((x) => x !== id); saveKeep(); }
+        S.sizes.clear(); await refresh(); return n;
+    }
+
+    // ---- Keep offline: the person's choice per component (CORE ones are always kept) ----
+    const keepKey = () => (typeof W.getPrefixedKey === 'function' ? W.getPrefixedKey('keepOffline') : 'codemini_keepOffline');
+    let keep = [];
+    function loadKeep() { try { keep = parseKeep(localStorage.getItem(keepKey())); } catch (e) { keep = []; } }
+    function saveKeep() { try { if (keep.length) localStorage.setItem(keepKey(), JSON.stringify(keep)); else localStorage.removeItem(keepKey()); } catch (e) { /* not remembered */ } }
+    const isKeptPkg = (pkg) => isKept(pkg, keep);
+    // On: it is downloaded now and stays (it is fetched again if the browser clears it). Off: it is saved the first time it is used, as before.
+    async function setKeep(id, on) {
+        const pkg = byId(id); if (!pkg || pkg.required || pkg.bundled) return false;
+        keep = on ? (keep.indexOf(id) > -1 ? keep : keep.concat([id])) : keep.filter((x) => x !== id);
+        saveKeep(); notify(); drawSection();
+        if (on) { const r = rows().find((x) => x.pkg.id === id); if (r && needsDownload(r) && r.state !== 'runner') await downloadPackages([id]); }
+        return true;
+    }
+    // Fetches again what was chosen to keep and has gone missing, when there is a connection that is not slow or data-saver. At start-up and when
+    // the connection comes back; it shows in RUNNING like any download, and does not announce itself.
+    let maintaining = false;
+    async function maintainKept() {
+        if (maintaining || S.running || (typeof navigator !== 'undefined' && (navigator.onLine === false || slowConnection(navigator.connection)))) return;
+        const todo = rows().filter((r) => isKeptPkg(r.pkg) && !r.pkg.bundled && r.state !== 'runner' && needsDownload(r)).map((r) => r.pkg.id);
+        if (!todo.length) return;
+        maintaining = true;
+        try { await downloadPackages(todo, { quiet: true }); } finally { maintaining = false; }
+    }
+
+    // ---- Re-verify: is every saved file there, readable, and (where the host said) the length it should be? ----
+    async function readInfo(url) {
+        try {
+            const resp = await caches.match(url); if (!resp) return null;
+            const enc = (resp.headers.get('content-encoding') || '').toLowerCase();
+            // content-length is the COMPRESSED size when the host compressed the file, so it is only comparable for an uncompressed answer.
+            const length = !enc || enc === 'identity' ? Number(resp.headers.get('content-length')) || 0 : 0;
+            let bytes = 0;
+            if (resp.body && resp.body.getReader) { const rd = resp.clone().body.getReader(); for (;;) { const { done, value } = await rd.read(); if (done) break; bytes += value.byteLength; } }
+            return { ok: resp.ok, bytes, length };
+        } catch (e) { return null; }
+    }
+    async function verifyPackage(id) {
+        const r = rows().find((x) => x.pkg.id === id); if (!r || !r.result) return null;
+        const infos = new Map();
+        for (const f of r.result.files.filter((l) => l.cached)) infos.set(f.url, await readInfo(f.url));
+        return Object.assign({ id }, verifyFiles(r.result.files, (u) => infos.get(u) || null));
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -519,7 +602,10 @@
     const NI = () => W.CodeMiniNowIsland || null;
     const COLLAPSE_KEY = 'codemini_offline_collapsed';
     const getCollapsed = () => { try { return localStorage.getItem(COLLAPSE_KEY) === '1'; } catch (e) { return false; } };
-    let ui = null, viewOpen = false, viewApi = null, drawQueued = false;
+    let ui = null, drawQueued = false;
+    const listeners = new Set();           // the Components tab (and anything else) that redraws when the state changes
+    const notify = () => listeners.forEach((fn) => { try { fn(); } catch (e) { /* a listener must not break the engine */ } });
+    const openComponents = () => { if (W.CodeMiniExtensionsUI && W.CodeMiniExtensionsUI.open) W.CodeMiniExtensionsUI.open('components'); };
 
     function stateIcon(state, pct) {
         const d = STATE_ICON[state] || STATE_ICON.none;
@@ -565,7 +651,7 @@
         const pkgIcon = stateIcon(sum.tone === 'ok' ? 'ready' : sum.tone === 'warn' ? 'partial' : 'none');
         const t1 = [el('span', 'off-main-text', summaryText(sum))];
         if (sum.runner) t1.push(el('span', 'off-sub', sum.runner + (sum.runner === 1 ? ' runs' : ' run') + ' in the isolated runner, which this does not cover'));
-        const manage = linkBtn('Manage', 'Manage offline packages', () => openView());
+        const manage = linkBtn('Manage', 'Manage components in the Extensions sidebar', () => openComponents());
         ui.body.appendChild(statusRow(pkgIcon, t1, manage, sum.counted ? 100 * sum.ready / sum.counted : 0));
         // Storage
         const est = S.storage, used = est && est.usage || 0, quota = est && est.quota || 0, pct = quota ? 100 * used / quota : 0;
@@ -583,186 +669,32 @@
         ui.body.appendChild(statusRow(el('i', (standalone ? 'ri-checkbox-circle-fill off-new' : 'ri-smartphone-line off-muted') + ' off-ico'), [el('span', 'off-main-text', standalone ? 'Installed as app' : 'Not installed as an app'), el('span', 'off-sub', sw)], install, null));
     }
 
-    // ---------------------------------------------------------------------------------------------
-    // Browser: the drill-in (the island's slide-over view)
-    // ---------------------------------------------------------------------------------------------
-    let V = null;   // { list, search, seg, foot, footMsg }
-    function openView() {
-        const n = NI(); if (!n) return;
-        n.openView({
-            title: 'Offline and packages', label: 'Offline and packages',
-            build: (content) => {
-                viewOpen = true;
-                const toolbar = el('div', 'off-toolbar');
-                const seg = el('div', 'sb-segmented'); seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', 'Show');
-                FILTERS.forEach((f) => { const b = el('button', 'sb-seg', f.label); b.type = 'button'; b.dataset.offFilter = f.id; b.addEventListener('click', () => { S.filter = f.id; drawView(); }); seg.appendChild(b); });
-                const search = el('input', 'off-search'); search.type = 'text'; search.placeholder = 'Search'; search.setAttribute('aria-label', 'Search packages'); search.value = S.query;
-                search.addEventListener('input', () => { S.query = search.value; drawView(true); });
-                toolbar.append(seg, search);
-                const list = el('div', 'off-scroll');
-                const foot = el('div', 'off-foot');
-                content.append(toolbar, list, foot);
-                V = { content, toolbar, seg, search, list, foot };
-                drawView();
-                refresh().then(() => measureAll());
-                return () => { viewOpen = false; V = null; S.confirm = null; };
-            }
-        });
-    }
-
-    function sectionHeader(label, count) {
-        const h = el('div', 'sb-section-header off-group'); const left = el('span'); left.appendChild(document.createTextNode(label));
-        if (count != null) left.appendChild(el('span', 'sb-count-badge', String(count)));
-        h.appendChild(left); return h;
-    }
-    const kv = (k, v, action) => { const r = el('div', 'off-kv'); r.append(el('span', 'off-k', k), el('span', 'off-v', v)); if (action) r.appendChild(action); return r; };
-    const fmtWhen = (t) => t ? new Date(t).toLocaleString() : 'Not yet this session';
-
-    function appBlock() {
-        const frag = document.createDocumentFragment();
-        frag.appendChild(sectionHeader('THIS APP'));
-        const pwa = W.CodeMiniPWA, standalone = !!(pwa && pwa.isStandalone && pwa.isStandalone());
-        const mode = standalone ? 'Standalone window' : 'Browser tab';
-        frag.appendChild(kv('Installed', standalone ? 'Yes' : 'No', !standalone && pwa && pwa.canInstall && pwa.canInstall() ? linkBtn('Install', 'Install CodeMini as an app', async () => { try { await pwa.install(); } finally { draw(); } }) : null));
-        frag.appendChild(kv('Display mode', mode));
-        S.names.filter((k) => k.indexOf('codemini-') === 0).forEach((name) => frag.appendChild(kv('Cache', name)));
-        const st = pwa && pwa.getUpdateState ? pwa.getUpdateState() : {};
-        const check = linkBtn(S.checking ? 'Checking' : 'Check for updates', 'Check for an app update', async () => {
-            if (!pwa || !pwa.checkForUpdates || S.checking) return;
-            S.checking = true; drawView();
-            try { const r = await pwa.checkForUpdates(); S.checkedMsg = r === 'up-to-date' ? 'Up to date' : r === 'updated' ? 'An update is ready' : r === 'unsupported' ? 'Not supported here' : 'Checked'; }
-            catch (e) { S.checkedMsg = 'Could not check'; }
-            S.checking = false; drawView();
-        });
-        frag.appendChild(kv('Last checked', (S.checkedMsg ? S.checkedMsg + '. ' : '') + fmtWhen(st.lastChecked), check));
-        return frag;
-    }
-
-    function listItems(title, items, nameOf) {
-        const wrap = el('div', 'off-rel'); wrap.appendChild(el('div', 'off-rel-title', title));
-        const ul = el('ul', 'off-rel-list');
-        items.forEach((x) => ul.appendChild(el('li', null, nameOf ? nameOf(x) : x)));
-        wrap.appendChild(ul); return wrap;
-    }
-
-    function packageRow(r) {
-        const { pkg, result, state, busy } = r;
-        const open = S.expanded.has(pkg.id);
-        const li = el('div', 'off-pkg' + (open ? ' open' : '')); li.dataset.pkg = pkg.id;
-        const main = el('button', 'off-pkg-main'); main.type = 'button'; main.setAttribute('aria-expanded', String(open));
-        main.setAttribute('aria-label', pkg.name + ', ' + (STATE_ICON[state] || STATE_ICON.none).label);
-        const text = el('span', 'off-pkg-text');
-        const l1 = el('span', 'off-pkg-l1'); l1.append(el('span', 'off-pkg-name', pkg.name), el('span', 'off-pill', pkg.version));
-        const files = result && result.total ? result.have + ' of ' + result.total + ' files' : '';
-        text.append(l1, el('span', 'off-pkg-l2', [hostOf(pkg), files].filter(Boolean).join(' · ')));
-        const bytes = packageBytes(r);
-        main.append(stateIcon(state, busy && busy.pct), text, el('span', 'off-pkg-size', bytes ? fmtBytes(bytes) : ''), el('i', open ? 'ri-arrow-up-s-line off-chev' : 'ri-arrow-down-s-line off-chev'));
-        main.addEventListener('click', () => { if (open) S.expanded.delete(pkg.id); else S.expanded.add(pkg.id); drawView(true); });
-        li.appendChild(main);
-        if (state === 'loading') { const line = el('div', 'off-line'); const f = el('div', 'off-line-fill'); f.style.width = (busy.pct || 3) + '%'; line.appendChild(f); li.appendChild(line); }
-        if (!open) return li;
-        const d = el('div', 'off-detail');
-        if (state === 'loading') d.appendChild(el('div', 'off-note', 'Downloading ' + (busy.pct || 0) + '%'));
-        if (state === 'failed') d.appendChild(el('div', 'off-note danger', busy.error || 'It could not be saved.'));
-        if (state === 'runner') d.appendChild(el('div', 'off-note', 'Isolation is on, so this runs inside the runner: a separate site with no service worker of its own. This app cannot see or fill the runner\u2019s cache, so it is not counted here. The browser\u2019s own cache may keep it between visits, but that cannot be checked from here. In Same origin mode (Settings > Security) the files below are used.'));
-        if (state === 'session') d.appendChild(el('div', 'off-note', 'It was loaded in this session but is not saved on this device (the service worker may not be controlling this page yet). Download it to keep a copy.'));
-        if (pkg.bundled) d.appendChild(el('div', 'off-note', 'Part of the app itself. It is saved with the app shell and works offline once the app has been installed by the browser.'));
-        if (pkg.note && state !== 'runner') d.appendChild(el('div', 'off-note', pkg.note));
-        if (result && !result.closureKnown && state !== 'none' && state !== 'runner') d.appendChild(el('div', 'off-note', 'Some of the files it pulls in are not known until the main file is saved.'));
-        if (r.extras.length) d.appendChild(el('div', 'off-note', '+' + r.extras.length + (r.extras.length === 1 ? ' more file' : ' more files') + ' saved while you used it'));
-        // Needed by / Depends on, joined by dashed connectors
-        const rel = el('div', 'off-rels');
-        rel.appendChild(listItems('Needed by', pkg.neededBy));
-        if (pkg.dependsOn.length) rel.appendChild(listItems('Depends on', pkg.dependsOn, (id) => { const p = byId(id); return p ? p.name + ' ' + p.version : id; }));
-        d.appendChild(rel);
-        if (result && result.files.length) {
-            const fl = el('details', 'off-files'); fl.appendChild(el('summary', null, 'Files (' + result.files.length + ')'));
-            const ul = el('ul', 'off-file-list');
-            result.files.forEach((l) => { const li2 = el('li', l.cached ? 'cached' : ''); li2.append(el('i', l.cached ? 'ri-checkbox-circle-fill off-new' : 'ri-cloud-line off-muted'), el('span', null, l.url.replace(/^https?:\/\//, '') + (l.optional ? ' (optional)' : ''))); ul.appendChild(li2); });
-            fl.appendChild(ul); d.appendChild(fl);
-        }
-        // Actions
-        const act = el('div', 'off-actions');
-        const cached = !!(result && (result.files.some((l) => l.cached) || r.extras.length));
-        if (!pkg.bundled && state !== 'runner') {
-            const online = typeof navigator === 'undefined' || navigator.onLine !== false;
-            if (state !== 'ready' && state !== 'loading') { const b = linkBtn(state === 'failed' ? 'Retry' : 'Download now', 'Download ' + pkg.name, () => downloadPackages([pkg.id])); if (!online || S.running) b.disabled = true; act.appendChild(b); }
-            if (cached && state !== 'loading') { const b = linkBtn('Re-download', 'Download ' + pkg.name + ' again', () => downloadPackages([pkg.id], { redo: true })); if (!online || S.running) b.disabled = true; act.appendChild(b); }
-            if (cached && state !== 'loading') {
-                if (S.confirm && S.confirm.kind === 'remove' && S.confirm.id === pkg.id) {
-                    act.append(el('span', 'off-confirm-text', 'Remove it?'), linkBtn('Remove', 'Confirm: remove ' + pkg.name + ' from the cache', async () => { S.confirm = null; await removePackage(pkg.id); }), linkBtn('Cancel', 'Cancel', () => { S.confirm = null; drawView(true); }));
-                } else { const b = linkBtn('Remove from cache', 'Remove ' + pkg.name + ' from the cache', () => { S.confirm = { kind: 'remove', id: pkg.id }; drawView(true); }); b.classList.add('danger'); act.appendChild(b); }
-            }
-        }
-        if (pkg.source) act.appendChild(linkBtn('Open source', 'Open the ' + pkg.name + ' page', () => { try { W.open(pkg.source, '_blank', 'noopener'); } catch (e) { /* popup blocked */ } }));
-        d.appendChild(act);
-        li.appendChild(d);
-        return li;
-    }
-
-    function drawView(keepScroll) {
-        if (!V) return;
-        const rs = rows();
-        V.seg.querySelectorAll('.sb-seg').forEach((b) => b.classList.toggle('active', b.dataset.offFilter === S.filter));
-        const prevTop = V.list.scrollTop;
-        V.list.textContent = '';
-        V.list.appendChild(appBlock());
-        const shown = filterRows(rs, S.filter, S.query);
-        if (!shown.length) V.list.appendChild(el('div', 'off-empty', S.query || S.filter !== 'all' ? 'No packages match' : 'No packages'));
-        groupRows(shown).forEach((g) => {
-            V.list.appendChild(sectionHeader(g.group, g.rows.length));
-            g.rows.forEach((r) => V.list.appendChild(packageRow(r)));
-        });
-        V.list.scrollTop = prevTop;
-        drawFooter(rs);
-    }
-
-    function drawFooter(rs) {
-        const left = rs.filter(needsDownload).length, online = typeof navigator === 'undefined' || navigator.onLine !== false;
-        V.foot.textContent = '';
-        if (S.lastError) V.foot.appendChild(el('div', 'off-foot-msg danger', S.lastError));
-        if (!online) V.foot.appendChild(el('div', 'off-foot-msg', 'You are offline. Downloads need a connection.'));
-        const row = el('div', 'off-foot-row');
-        if (S.running) {
-            const stop = el('button', 'ni-btn primary', 'Stop downloading'); stop.type = 'button'; stop.addEventListener('click', stopDownloads); row.appendChild(stop);
-        } else if (S.confirm && S.confirm.kind === 'slow') {
-            V.foot.appendChild(el('div', 'off-foot-msg', 'You are on a slow or data-saver connection, and these files are large. Download anyway?'));
-            const go = el('button', 'ni-btn primary', 'Download'); go.type = 'button'; go.addEventListener('click', () => { S.confirm = null; downloadPackages(rows().filter(needsDownload).map((r) => r.pkg.id)); });
-            row.append(go, linkBtn('Cancel', 'Cancel', () => { S.confirm = null; drawView(true); }));
-        } else {
-            const all = el('button', 'ni-btn primary', leftLabel(left)); all.type = 'button'; all.disabled = left === 0 || !online;
-            all.addEventListener('click', () => {
-                if (slowConnection(navigator.connection)) { S.confirm = { kind: 'slow' }; drawView(true); return; }
-                downloadPackages(rows().filter(needsDownload).map((r) => r.pkg.id));
-            });
-            row.appendChild(all);
-            if (S.confirm && S.confirm.kind === 'clear') {
-                row.append(el('span', 'off-confirm-text', 'Clear all saved packages?'), linkBtn('Clear', 'Confirm: clear all saved packages', async () => { await clearAll(); }), linkBtn('Cancel', 'Cancel', () => { S.confirm = null; drawView(true); }));
-            } else {
-                const clear = linkBtn('Clear cached data', 'Clear the saved packages', () => { S.confirm = { kind: 'clear' }; drawView(true); }); clear.classList.add('danger'); row.appendChild(clear);
-            }
-        }
-        V.foot.appendChild(row);
-    }
-
     function scheduleDraw() { if (drawQueued) return; drawQueued = true; (W.requestAnimationFrame || ((f) => setTimeout(f, 16)))(() => { drawQueued = false; draw(); }); }
-    function draw() { drawSection(); if (viewOpen) drawView(true); }
+    function draw() { drawSection(); notify(); }
 
     // ---------------------------------------------------------------------------------------------
     // Start-up
     // ---------------------------------------------------------------------------------------------
     function init() {
         const n = NI(); if (!n) return;
+        loadKeep();
         buildSection();
         n.mount(ui.root, 40, { always: true });
         n.onOpen(() => refresh());
-        W.addEventListener('online', draw); W.addEventListener('offline', draw);
-        refresh();
+        // The automatic top-ups (at start-up and when the connection returns) can be switched off by setting window.__codeminiKeepAuto = false before
+        // the app loads; the tests do, so that nothing is downloaded behind their back. maintainKept() called directly always runs.
+        const auto = () => { if (W.__codeminiKeepAuto !== false) maintainKept(); };
+        W.addEventListener('online', () => { draw(); auto(); }); W.addEventListener('offline', draw);
+        refresh().then(() => setTimeout(auto, 8000));
     }
     init();
 
+    W.CodeMiniOfflineRules = api;   // the pure rules, for the Components tab (js/core/extensions-ui.js)
     W.CodeMiniOffline = Object.freeze({
-        refresh, rows, openView, download: (ids, opts) => downloadPackages(ids, opts), stop: stopDownloads, removePackage, clearAll,
-        summary: () => summarize(rows()), state: () => ({ running: S.running, filter: S.filter, query: S.query, skipped: Array.from(S.skip) })
+        refresh, rows, download: (ids, opts) => downloadPackages(ids, opts), stop: stopDownloads, removePackage, setKeep, isKept: (id) => { const p = byId(id); return !!p && isKeptPkg(p); },
+        keptIds: () => keep.slice(), maintainKept, verify: verifyPackage, summary: () => summarize(rows()), needsDownload, packageBytes, onChange: (fn) => { listeners.add(fn); return () => listeners.delete(fn); },
+        wantSizes: (on) => { S.wantSizes = !!on; if (on) measureAll(); }, missing: () => rows().filter(needsDownload).length,
+        info: () => ({ running: S.running, lastError: S.lastError, storage: S.storage, persisted: S.persisted, names: S.names.slice() }),
+        reloadKeep: loadKeep, state: () => ({ running: S.running, skipped: Array.from(S.skip) })
     });
 })(typeof window !== 'undefined' ? window : globalThis);

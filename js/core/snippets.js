@@ -112,6 +112,7 @@
 
     // The saved text of every language, with parsing remembered per text. io = { load(): object | null, save(object) }.
     function createStore(io) {
+        let extra = null;
         let texts = Object.create(null); // no prototype: a language called "__proto__" or "constructor" is just a key
         const cache = new Map(); // language -> { text, parsed }
         const listeners = new Set();
@@ -142,7 +143,10 @@
                 try { io.save(texts); } catch (e) { /* private mode: it lasts for this page */ }
                 emit(); return true;
             },
-            entries: (lang) => parsedFor(lang).entries,
+            // `extra(lang)` adds entries the person did not write (the installed snippet packs) to what completion offers; it never touches the
+            // person's own text, and count() and languages() (the editor's own numbers) stay theirs alone.
+            entries: (lang) => { const mine = parsedFor(lang).entries; if (!extra) return mine; try { const more = extra(lang); return Array.isArray(more) && more.length ? mine.concat(more) : mine; } catch (e) { return mine; } },
+            setExtra: (fn) => { extra = typeof fn === 'function' ? fn : null; },
             parsed: parsedFor,
             count: (lang) => parsedFor(lang).entries.length,
             languages: () => Object.keys(texts).filter((l) => parsedFor(l).entries.length > 0),
@@ -365,5 +369,6 @@
         store, renderSettings, open, ensureProvider, entries: store.entries, reload: store.reload,
         reloadFor(winId, isProfile) { pendingWin = winId ? { winId, isProfile: !!isProfile } : null; try { store.reload(); } finally { pendingWin = null; } }
     });
+    api.setExtra = (fn) => store.setExtra(fn);   // installed snippet packs (js/core/extensions.js)
     W.CodeMiniSnippets = api;
 })(typeof window !== 'undefined' ? window : globalThis);

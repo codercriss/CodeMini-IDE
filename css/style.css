@@ -5688,3 +5688,79 @@ html.is-pwa code, html.is-pwa samp {
 .today-note { padding: 2px 15px 0; font-size: 11px; line-height: 1.4; color: var(--text-muted); }
 .today-note[hidden] { display: none; }
 @media (max-width: 768px) { .today-quote-text { -webkit-line-clamp: 2; } }
+
+/* ---- Shared tabs for a sidebar (UI/UX specs, "Shared patterns to reuse"): used by the Extensions sidebar ---- */
+.sb-tabs { display: flex; flex: none; gap: 2px; padding: 0 12px; border-bottom: 1px solid var(--border-color); overflow-x: auto; }
+.sb-tab { display: inline-flex; align-items: center; gap: 6px; padding: 7px 8px; margin-bottom: -1px; font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; color: var(--text-muted); background: none; border: 0; border-bottom: 2px solid transparent; cursor: pointer; }
+.sb-tab:hover, .sb-tab:focus-visible { color: var(--text-main); }
+.sb-tab.active { color: var(--text-main); border-bottom-color: var(--accent-blue); }
+
+/* ===== Extensions sidebar (UI/UX specs, feature 26): Installed, Components, and the install review. Flat rows, dashed dividers. ===== */
+#extensionsSidebar.open { display: flex; flex-direction: column; }
+.ext-root { display: flex; flex-direction: column; flex: 1; min-height: 0; position: relative; white-space: normal; }   /* the sidebar sets nowrap; descriptions and notes must wrap */
+.ext-back { display: flex; align-items: center; gap: 6px; }
+.sb-header .sb-icon-btn.on { color: var(--accent-blue); opacity: 1; }
+.ext-menu { position: absolute; right: 12px; top: 46px; z-index: 5; min-width: 170px; padding: 4px; background: var(--bg-dropdown, var(--bg-white)); border: 1px solid var(--border-color); box-shadow: 0 4px 14px var(--shadow-color); }
+.ext-menu-item { display: block; width: 100%; padding: 6px 10px; font: inherit; font-size: 12px; text-align: left; color: var(--text-main); background: none; border: 0; cursor: pointer; }
+.ext-menu-item:hover, .ext-menu-item:focus-visible { background: var(--bg-panel); }
+.ext-searchbar { display: flex; align-items: center; gap: 8px; flex: none; padding: 6px 12px; }
+.ext-search { flex: 1; min-width: 0; height: 28px; padding: 0 4px; font: inherit; font-size: 12px; color: var(--text-main); background: transparent; border: 0; border-bottom: 1px solid var(--border-color); border-radius: 0; outline: none; }
+.ext-search:focus { border-bottom-color: var(--accent-blue); }
+.ext-body { padding-bottom: 20px; }
+.ext-row { position: relative; display: flex; align-items: flex-start; flex-wrap: wrap; border-bottom: 1px dashed var(--border-color); }
+.ext-row:hover { background: var(--bg-panel); }
+.ext-row.off .ext-row-name { color: var(--text-muted); }
+.ext-row.fresh { background: var(--accent-blue-light, var(--bg-panel)); }
+.ext-row-main { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; min-height: 52px; padding: 6px 4px 6px 15px; font: inherit; text-align: left; color: inherit; background: none; border: 0; cursor: pointer; }
+.ext-row-end { display: flex; align-items: center; gap: 8px; flex: none; min-height: 52px; padding: 0 15px 0 4px; }
+.ext-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.ext-row-l1 { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ext-row-name { font-size: 12px; font-weight: 600; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ext-row-l2 { font-size: 10px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ext-ico { font-size: 16px; flex: none; color: var(--text-muted); }
+.ext-pill { flex: none; padding: 0 6px; font-size: 10px; line-height: 16px; font-weight: 600; letter-spacing: 0.2px; color: var(--text-muted); background: var(--bg-panel); border-radius: 8px; }
+.ext-pill.active { color: #fff; background: var(--accent-blue); }
+.ext-pill.warn { color: var(--icon-yellow); background: transparent; border: 1px solid var(--icon-yellow); line-height: 14px; }
+.ext-size { flex: none; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.ext-lock { font-size: 14px; color: var(--text-muted); }
+.ext-switch { position: relative; flex: none; width: 28px; height: 16px; padding: 0; border: 0; border-radius: 8px; background: var(--border-color); cursor: pointer; transition: background 0.15s ease; }
+.ext-switch.on { background: var(--accent-blue); }
+.ext-switch-knob { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; transition: transform 0.15s ease; }
+.ext-switch.on .ext-switch-knob { transform: translateX(12px); }
+.ext-switch:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
+.ext-detail { flex: 0 0 100%; padding: 0 15px 10px 41px; font-size: 11px; color: var(--text-main); }
+.ext-desc { margin: 0 0 6px; line-height: 1.5; color: var(--text-muted); }
+.ext-desc.danger, .ext-summary-sub.danger { color: var(--color-danger); }
+.ext-kv { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 11px; }
+.ext-detail .ext-kv { padding-left: 0; }
+.ext-k { flex: none; width: 70px; color: var(--text-muted); } .ext-v { flex: 1; min-width: 0; overflow-wrap: anywhere; color: var(--text-main); }
+.ext-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin-top: 4px; }
+.ext-actions .ni-link:disabled, .ext-summary .ni-link:disabled { opacity: 0.45; cursor: default; }
+.ext-actions .ni-link.danger:hover { color: var(--color-danger); }
+.ext-confirm { font-size: 11px; color: var(--text-main); }
+.ext-empty { padding: 28px 15px; text-align: center; font-size: 12px; color: var(--text-muted); }
+.ext-error { margin: 8px 12px; padding: 8px 10px; font-size: 12px; color: var(--text-main); border: 1px solid var(--color-danger); }
+.ext-error-top { display: flex; align-items: flex-start; gap: 8px; } .ext-error-top > i { color: var(--color-danger); font-size: 15px; flex: none; } .ext-error-top > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ext-error-list { margin: 6px 0 0 23px; padding: 0; font-size: 11px; color: var(--text-muted); }
+.ext-summary { padding: 8px 15px 10px; border-bottom: 1px dashed var(--border-color); }
+.ext-summary-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--text-main); }
+.ext-summary-text { min-width: 0; overflow-wrap: anywhere; }
+.ext-usage { height: 2px; margin: 6px 0; background: var(--border-color); } .ext-usage-fill { height: 100%; background: var(--accent-blue); }
+.ext-usage-fill.yellow { background: var(--icon-yellow); } .ext-usage-fill.danger { background: var(--color-danger); }
+.ext-summary-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.ext-summary-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 6px; }
+.ext-review-head { display: flex; align-items: center; gap: 8px; padding: 6px 15px 4px; } .ext-review-name { font-size: 14px; font-weight: 700; color: var(--text-main); }
+.ext-body > .ext-kv { padding: 3px 15px; }
+.ext-note { margin: 6px 15px; font-size: 11px; color: var(--text-muted); } .ext-note.warn { color: var(--icon-yellow); }
+.ext-guard { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 6px 15px; }
+.ext-changes, .ext-warnings { margin: 0; padding: 4px 15px 4px 31px; font-size: 12px; color: var(--text-main); } .ext-changes li { padding: 2px 0; }
+.ext-warnings { list-style: none; padding-left: 15px; color: var(--icon-yellow); } .ext-warnings li { display: flex; gap: 6px; align-items: flex-start; padding: 2px 0; }
+.ext-source { margin: 8px 15px; } .ext-pre { margin: 6px 0 0; max-height: 180px; overflow: auto; padding: 6px; font-family: var(--font-mono); font-size: 10px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg-panel); color: var(--text-main); }
+.ext-review-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 15px; }
+.ext-review-actions .ni-btn:disabled { opacity: 0.5; cursor: default; }
+@media (max-width: 768px) { .ext-detail { padding-left: 15px; } .ext-k { width: 64px; } }
+/* On a touch screen the links and the switch are made easy to hit (the switch keeps its look; its hit area grows). */
+@media (pointer: coarse) {
+    .ext-row .ni-link, .ext-actions .ni-link, .ext-summary .ni-link, .ext-review-actions .ni-link, .ext-error .ni-link { display: inline-flex; align-items: center; min-height: 32px; }
+    .ext-switch::after { content: ''; position: absolute; inset: -14px -8px; }
+}
